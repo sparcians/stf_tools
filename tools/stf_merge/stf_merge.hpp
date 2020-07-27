@@ -1,0 +1,154 @@
+#pragma once
+
+#include <cstdint>
+#include <list>
+#include <string>
+
+#include "stf_pte.hpp"
+#include "stf_reader.hpp"
+#include "stf_writer.hpp"
+#include "stf_record_map.hpp"
+#include "util.hpp"
+
+struct ExtractFileInfo {
+    const uint64_t start;
+    const uint64_t end;
+    const uint64_t repeat;
+    const std::string filename;
+
+    ExtractFileInfo(const uint64_t start,
+                    const uint64_t end,
+                    const uint64_t repeat,
+                    std::string filename) :
+        start(start),
+        end(end),
+        repeat(repeat),
+        filename(std::move(filename))
+    {
+    }
+};
+
+using FileList = std::list<ExtractFileInfo>;
+
+class STFMergeExtractor {
+    private:
+        uint32_t inst_tid_ = 0;
+        uint32_t inst_tgid_ = 0;
+        uint32_t inst_asid_ = 0;
+        stf::RecordMap record_map_;
+
+    public:
+        /**
+         * \brief Helper function to parse the Escape record for thread id information;
+         *  return 1 if the record is opcode record, otherwise return 0;
+         *
+         * \param rec the STF record
+         * \param page_table the live TLB page table without size limitation;
+         */
+        void processRecord(stf::STFRecord::UniqueHandle& rec,
+                           stf::STF_PTE& page_table,
+                           const uint64_t inst_count) {
+            // keep track of initial values of PC and INST_IEM
+            switch (rec->getDescriptor()) {
+                case stf::descriptors::internal::Descriptor::STF_PROCESS_ID_EXT:
+                    {
+                        const auto& pid_rec = rec->as<stf::ProcessIDExtRecord>();
+                        inst_tid_ = pid_rec.getTID();
+                        inst_tgid_ = pid_rec.getTGID();
+                        inst_asid_ = pid_rec.getASID();
+                    }
+                    break;
+
+                case stf::descriptors::internal::Descriptor::STF_PAGE_TABLE_WALK:
+                    {
+                        const auto result = record_map_.emplace(stf::pointer_utils::grabOwnership<stf::STFRecord, stf::PageTableWalkRecord>(rec));
+                        const auto& pte_rec = result->as<stf::PageTableWalkRecord>();
+                        const_cast<stf::PageTableWalkRecord&>(pte_rec).setIndex(inst_count + 1);
+                        page_table.UpdatePTE(inst_asid_, &pte_rec);
+                    }
+                    break;
+
+                case stf::descriptors::internal::Descriptor::STF_RESERVED:
+                case stf::descriptors::internal::Descriptor::STF_IDENTIFIER:
+                case stf::descriptors::internal::Descriptor::STF_VERSION:
+                case stf::descriptors::internal::Descriptor::STF_ISA:
+                case stf::descriptors::internal::Descriptor::STF_TRACE_INFO_FEATURE:
+                case stf::descriptors::internal::Descriptor::STF_END_HEADER:
+                case stf::descriptors::internal::Descriptor::STF_INST_REG:
+                case stf::descriptors::internal::Descriptor::STF_INST_READY_REG:
+                case stf::descriptors::internal::Descriptor::STF_INST_MEM_ACCESS:
+                case stf::descriptors::internal::Descriptor::STF_INST_MEM_CONTENT:
+                case stf::descriptors::internal::Descriptor::STF_BUS_MASTER_ACCESS:
+                case stf::descriptors::internal::Descriptor::STF_BUS_MASTER_CONTENT:
+                case stf::descriptors::internal::Descriptor::STF_EVENT:
+                case stf::descriptors::internal::Descriptor::STF_EVENT_PC_TARGET:
+                case stf::descriptors::internal::Descriptor::STF_INST_MICROOP:
+                case stf::descriptors::internal::Descriptor::STF_RESERVED_END:
+                case stf::descriptors::internal::Descriptor::STF_TRACE_INFO:
+                case stf::descriptors::internal::Descriptor::STF_COMMENT:
+                case stf::descriptors::internal::Descriptor::STF_FORCE_PC:
+                case stf::descriptors::internal::Descriptor::STF_INST_PC_TARGET:
+                case stf::descriptors::internal::Descriptor::STF_INST_OPCODE16:
+                case stf::descriptors::internal::Descriptor::STF_INST_OPCODE32:
+                case stf::descriptors::internal::Descriptor::STF_INST_IEM:
+                    break;
+            }
+        }
+
+        /**
+         * \brief Skip the first skipcount instructions and build up the TLB page table;
+         * return number of instructions skipped
+         */
+        uint64_t extractSkip(stf::STFReader& stf_reader,
+                              const uint64_t skipcount,
+                              stf::STF_PTE &page_table) {
+            stf::STFRecord::UniqueHandle rec;
+
+            const uint64_t num_insts_read = stf_reader.numInstsRead();
+            // Process trace records
+            while ((stf_reader.numInstsRead() < skipcount) && (stf_reader >> rec)) {
+                processRecord(rec, page_table, stf_reader.numInstsRead()) ;
+            }
+
+            return stf_reader.numInstsRead() - num_insts_read;
+        }
+
+        /**
+         * \brief extract instcount instructions; and update TLB page table;
+         * return number of instructions written;
+         */
+        uint64_t extractInsts(stf::STFReader& stf_reader,
+                               stf::STFWriter& stf_writer,
+                               const uint64_t instcount,
+                               stf::STF_PTE &page_table) {
+            stf::STFRecord::UniqueHandle rec;
+
+            // Indicate the input file had been read in the past;
+            // The trace_info and instruction initial info, such as
+            // pc, physical pc are required to written in new output file.
+            stf_reader.copyHeader(stf_writer);
+            stf_writer.addTraceInfo(stf::TraceInfoRecord(stf::STF_GEN::STF_GEN_STF_MERGE,
+                                                         stf::STF_CUR_VERSION_MAJOR,
+                                                         stf::STF_CUR_VERSION_MINOR,
+                                                         0,
+                                                         "Merge trace generated by stf_merge"));
+            stf_writer.setHeaderPC(stf_reader.getPC());
+            stf_writer.finalizeHeader();
+            stf_writer << stf::ProcessIDExtRecord(inst_tgid_, inst_tid_, inst_asid_);
+            if (stf_reader.getTraceFeatures()->hasFeature(stf::TRACE_FEATURES::STF_CONTAIN_PTE)) {
+                page_table.DumpPTEtoSTF(stf_writer);
+            }
+
+            const uint64_t init_count = stf_reader.numInstsRead();
+            uint64_t count = 0;
+            // Process trace records
+            while ((count < instcount) && (stf_reader >> rec)) {
+                count = stf_reader.numInstsRead() - init_count;
+                processRecord(rec, page_table, count);
+                stf_writer << *rec;
+            }
+
+            std::cerr << "Output " << count << " instructions" << std::endl;
+            return count;
+        }
+};

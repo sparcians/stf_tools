@@ -1,0 +1,3 @@
+#include "trace_tools_git_version.hpp"
+
+const char TRACE_TOOLS_GIT_VERSION[] = "@TRACE_TOOLS_GIT_SHA1@";
