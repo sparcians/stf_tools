@@ -33,6 +33,7 @@ namespace stf {
      * exmple. Once you've instantiated your filter subclass, call the extract()
      * method to filter an input trace.
      */
+    template<typename DerivedType>
     class STFFilter {
         public:
             /**
@@ -80,6 +81,7 @@ namespace stf {
                 }
                 for (auto inst_it = stf_inst_reader_.begin(); (inst_it != stf_inst_reader_.end()) && (num_insts_extracted_ < num_to_extract); ++inst_it) {
                     const auto& inst = *inst_it;
+                    in_user_code_ &= !inst.isChangeFromUserMode();
 
                     if (num_insts_read_ >= num_to_skip) {
                         if (num_insts_extracted_ == 0 && num_to_skip > 0) {
@@ -88,7 +90,7 @@ namespace stf {
                             }
                         }
 
-                        const auto& insts_to_write = filter(inst);
+                        const auto& insts_to_write = static_cast<DerivedType*>(this)->filter(inst);
 
                         if (stf_writer_ && !insts_to_write.empty()) {
                             for (const auto& inst_to_write: insts_to_write) {
@@ -105,12 +107,14 @@ namespace stf {
                     }
 
                     ++num_insts_read_;
+                    in_user_code_ |= inst.isChangeToUserMode();
                 }
-                finished();
+                static_cast<const DerivedType*>(this)->finished();
             }
 
 
         protected:
+            inline static const std::vector<stf::STFInst> EMPTY_INST_LIST_;
 
             /**
              * This function should be overridden by child classes for different
@@ -125,13 +129,13 @@ namespace stf {
              *
              * \returns vector of instructions to write to the output trace
              */
-            virtual const std::vector<STFInst>& filter(const STFInst& inst) = 0;
+            inline const std::vector<STFInst>& filter(const STFInst& inst) { return EMPTY_INST_LIST_; }
 
             /**
              * Sometimes a task needs to be performed at the end of an extraction. This
              * function can be overridden for this purpose.
              */
-            virtual void finished() const {
+            void finished() const {
                 std::cerr << "Read " << num_insts_read_ << " insts" << std::endl;
             }
 
@@ -229,5 +233,6 @@ namespace stf {
             STF_PTE page_table_; /**< Tracks page table info */
 
             bool dump_ptes_on_demand_ = false; /**< If true, dumps PTEs inline with instructions */
+            bool in_user_code_ = false; /**< If true, current instruction is user code */
     };
 } // end namespace stf

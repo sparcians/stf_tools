@@ -31,11 +31,15 @@ struct RecordCount {
  * \class STFCountFilter
  * Filter class used for counting STF records
  */
-class STFCountFilter : public stf::STFFilter {
+class STFCountFilter : public stf::STFFilter<STFCountFilter> {
     private:
         const bool verbose_ = false;             /**< If false, outputs all counts on a single line */
         const bool short_mode_ = false;          /**< If true, only outputs instruction count */
+        const bool user_mode_only_ = false;      /**< If true, only counts user-mode code */
+        const bool csv_output_ = false;          /**< If true, output results in CSV format */
+        const uint64_t csv_interval_ = 0;        /**< CSV dump interval. If 0, CSV will only be dumped at the end */
 
+        mutable bool dumped_csv_header_ = false; /**< Set to true once CSV header has been dumped */
         uint64_t record_count_ = 0;              /**< Count all records */
         uint64_t inst_count_ = 0;                /**< Count instruction anchor records */
         uint64_t inst_record_count_ = 0;         /**< Count instruction records */
@@ -46,6 +50,40 @@ class STFCountFilter : public stf::STFFilter {
         uint64_t uop_count_ = 0;                 /**< Count all micro-op records */
         uint64_t event_count_ = 0;               /**< Count Event records */
         uint64_t kernel_count_ = 0;              /**< Count kernel instructions */
+        uint64_t next_csv_dump_ = 0;             /**< Last time CSV was dumped */
+
+        friend class stf::STFFilter<STFCountFilter>;
+
+        inline void dumpCSVHeader_() const {
+            if(STF_EXPECT_FALSE(!dumped_csv_header_)) {
+                std::cout << "total_record_count,"
+                             "inst_count,"
+                             "inst_record_count,"
+                             "mem access_count,"
+                             "mem_record_count,"
+                             "uop_count,"
+                             "comment_count,"
+                             "event_count,"
+                             "kernel_count,"
+                             "PTE_count" << std::endl;
+                dumped_csv_header_ = true;
+            }
+        }
+
+        inline void dumpCSV_() const {
+            dumpCSVHeader_();
+
+            std::cout << record_count_ << ','
+                      << inst_count_ << ','
+                      << inst_record_count_ << ','
+                      << mem_access_count_ << ','
+                      << mem_record_count_ << ','
+                      << uop_count_ << ','
+                      << comment_count_ << ','
+                      << event_count_ << ','
+                      << kernel_count_ << ','
+                      << page_table_walk_count_ << std::endl;
+        }
 
     public:
         /**
@@ -53,44 +91,66 @@ class STFCountFilter : public stf::STFFilter {
          * \param inst_reader Instruction reader object
          * \param verbose If false, all output will be on a single line
          */
-        explicit STFCountFilter(stf::STFInstReader& inst_reader, bool verbose = false, bool short_mode = false) :
-            stf::STFFilter(inst_reader),
+        explicit STFCountFilter(stf::STFInstReader& inst_reader,
+                                const bool verbose,
+                                const bool short_mode,
+                                const bool user_mode_only,
+                                const bool csv_output,
+                                const uint64_t csv_interval) :
+            stf::STFFilter<STFCountFilter>(inst_reader),
             verbose_(verbose),
-            short_mode_(short_mode)
+            short_mode_(short_mode),
+            user_mode_only_(user_mode_only),
+            csv_output_(csv_output),
+            csv_interval_(csv_interval),
+            next_csv_dump_(csv_interval)
         {
         }
 
     protected:
-        const std::vector<stf::STFInst>& filter(const stf::STFInst& inst) override {
-            static const std::vector<stf::STFInst> empty_inst_list;
+        inline const std::vector<stf::STFInst>& filter(const stf::STFInst& inst) {
+            const bool count_inst = !user_mode_only_ || in_user_code_;
 
-            inst_count_++;
+            if(STF_EXPECT_TRUE(count_inst)) {
+                inst_count_++;
+            }
 
             if(!short_mode_) {
-                if(inst.isKernelCode()) {
+                if(STF_EXPECT_FALSE(!in_user_code_)) {
                     kernel_count_++;
                 }
 
-                const auto& orig_records = inst.getOrigRecords();
-                record_count_ += orig_records.size();
-                inst_record_count_ += orig_records.count(stf::descriptors::internal::Descriptor::STF_INST_OPCODE16);
-                inst_record_count_ += orig_records.count(stf::descriptors::internal::Descriptor::STF_INST_OPCODE32);
-                uop_count_ += orig_records.count(stf::descriptors::internal::Descriptor::STF_INST_MICROOP);
-                const size_t num_mem_accesses = orig_records.count(stf::descriptors::internal::Descriptor::STF_INST_MEM_ACCESS);
-                const size_t num_mem_content = orig_records.count(stf::descriptors::internal::Descriptor::STF_INST_MEM_CONTENT);
-                mem_access_count_ += num_mem_accesses;
-                mem_record_count_ += num_mem_accesses + num_mem_content;
-                comment_count_ += orig_records.count(stf::descriptors::internal::Descriptor::STF_COMMENT);
-                page_table_walk_count_ += orig_records.count(stf::descriptors::internal::Descriptor::STF_COMMENT);
-                event_count_ += orig_records.count(stf::descriptors::internal::Descriptor::STF_EVENT);
+                if(STF_EXPECT_TRUE(count_inst)) {
+                    const auto& orig_records = inst.getOrigRecords();
+                    record_count_ += orig_records.size();
+                    inst_record_count_ += orig_records.count(stf::descriptors::internal::Descriptor::STF_INST_OPCODE16);
+                    inst_record_count_ += orig_records.count(stf::descriptors::internal::Descriptor::STF_INST_OPCODE32);
+                    uop_count_ += orig_records.count(stf::descriptors::internal::Descriptor::STF_INST_MICROOP);
+                    const size_t num_mem_accesses = orig_records.count(stf::descriptors::internal::Descriptor::STF_INST_MEM_ACCESS);
+                    const size_t num_mem_content = orig_records.count(stf::descriptors::internal::Descriptor::STF_INST_MEM_CONTENT);
+                    mem_access_count_ += num_mem_accesses;
+                    mem_record_count_ += num_mem_accesses + num_mem_content;
+                    comment_count_ += orig_records.count(stf::descriptors::internal::Descriptor::STF_COMMENT);
+                    page_table_walk_count_ += orig_records.count(stf::descriptors::internal::Descriptor::STF_COMMENT);
+                    event_count_ += orig_records.count(stf::descriptors::internal::Descriptor::STF_EVENT);
+
+                    if(STF_EXPECT_FALSE(csv_output_ && (inst_count_ == next_csv_dump_))) {
+                        dumpCSV_();
+                        next_csv_dump_ += csv_interval_;
+                    }
+                }
             }
 
-            return empty_inst_list;
+            return EMPTY_INST_LIST_;
         }
 
-        void finished() const override {
+        void finished() const {
             if(short_mode_) {
                 std::cout << inst_count_ << std::endl;
+            }
+            else if(csv_output_ && (inst_count_ != next_csv_dump_)) {
+                // only dump CSV if we haven't already dumped this row
+                dumpCSV_();
             }
             else {
                 const std::string_view sep_char = verbose_ ? "\n" : " ";
@@ -98,21 +158,19 @@ class STFCountFilter : public stf::STFFilter {
                 comma << "total_record_count " << record_count_ << sep_char;
 
                 if (inst_count_ > 0) {
-                    comma << "inst_count " << inst_count_ << sep_char;
-                    comma << "inst_record_count " << inst_record_count_ << sep_char;
+                    comma << "inst_count " << inst_count_ << sep_char
+                          << "inst_record_count " << inst_record_count_ << sep_char;
                 } else {
-                    comma << "mem access_count " << mem_access_count_ << sep_char;
-                    comma << "mem_record_count " << mem_record_count_ << sep_char;
+                    comma << "mem access_count " << mem_access_count_ << sep_char
+                          << "mem_record_count " << mem_record_count_ << sep_char;
                 }
 
-                comma << "uop_count " << uop_count_ << sep_char;
-
-                comma << "comment_count " << comment_count_ << sep_char;
-                comma << "event_count " << event_count_ << sep_char;
-                comma << "kernel_count " << kernel_count_ << sep_char;
-                comma << "PTE_count " << page_table_walk_count_ << sep_char;
-
-                comma << std::endl;
+                comma << "uop_count " << uop_count_ << sep_char
+                      << "comment_count " << comment_count_ << sep_char
+                      << "event_count " << event_count_ << sep_char
+                      << "kernel_count " << kernel_count_ << sep_char
+                      << "PTE_count " << page_table_walk_count_ << sep_char
+                      << std::endl;
             }
         }
 };
