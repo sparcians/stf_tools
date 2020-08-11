@@ -33,24 +33,25 @@ struct RecordCount {
  */
 class STFCountFilter : public stf::STFFilter<STFCountFilter> {
     private:
-        const bool verbose_ = false;             /**< If false, outputs all counts on a single line */
-        const bool short_mode_ = false;          /**< If true, only outputs instruction count */
-        const bool user_mode_only_ = false;      /**< If true, only counts user-mode code */
-        const bool csv_output_ = false;          /**< If true, output results in CSV format */
-        const uint64_t csv_interval_ = 0;        /**< CSV dump interval. If 0, CSV will only be dumped at the end */
+        const bool verbose_ = false;                     /**< If false, outputs all counts on a single line */
+        const bool short_mode_ = false;                  /**< If true, only outputs instruction count */
+        const bool user_mode_only_ = false;              /**< If true, only counts user-mode code */
+        const bool csv_output_ = false;                  /**< If true, output results in CSV format */
+        const bool cumulative_csv_ = false;              /**< If true, CSV results will be cumulativet */
+        const uint64_t csv_interval_ = 0;                /**< CSV dump interval. If 0, CSV will only be dumped at the end */
 
-        mutable bool dumped_csv_header_ = false; /**< Set to true once CSV header has been dumped */
-        uint64_t record_count_ = 0;              /**< Count all records */
-        uint64_t inst_count_ = 0;                /**< Count instruction anchor records */
-        uint64_t inst_record_count_ = 0;         /**< Count instruction records */
-        uint64_t mem_access_count_ = 0;          /**< Count memory anchor records */
-        uint64_t mem_record_count_ = 0;          /**< Count memory records */
-        uint64_t comment_count_ = 0;             /**< Count escape records */
-        uint64_t page_table_walk_count_ = 0;     /**< Count page table walk records */
-        uint64_t uop_count_ = 0;                 /**< Count all micro-op records */
-        uint64_t event_count_ = 0;               /**< Count Event records */
-        uint64_t kernel_count_ = 0;              /**< Count kernel instructions */
-        uint64_t next_csv_dump_ = 0;             /**< Last time CSV was dumped */
+        mutable bool dumped_csv_header_ = false;         /**< Set to true once CSV header has been dumped */
+        mutable uint64_t record_count_ = 0;              /**< Count all records */
+        mutable uint64_t inst_count_ = 0;                /**< Count instruction anchor records */
+        mutable uint64_t inst_record_count_ = 0;         /**< Count instruction records */
+        mutable uint64_t mem_access_count_ = 0;          /**< Count memory anchor records */
+        mutable uint64_t mem_record_count_ = 0;          /**< Count memory records */
+        mutable uint64_t comment_count_ = 0;             /**< Count escape records */
+        mutable uint64_t page_table_walk_count_ = 0;     /**< Count page table walk records */
+        mutable uint64_t uop_count_ = 0;                 /**< Count all micro-op records */
+        mutable uint64_t event_count_ = 0;               /**< Count Event records */
+        mutable uint64_t kernel_count_ = 0;              /**< Count kernel instructions */
+        mutable uint64_t next_csv_dump_ = 0;             /**< Last time CSV was dumped */
 
         friend class stf::STFFilter<STFCountFilter>;
 
@@ -83,6 +84,20 @@ class STFCountFilter : public stf::STFFilter<STFCountFilter> {
                       << event_count_ << ','
                       << kernel_count_ << ','
                       << page_table_walk_count_ << std::endl;
+
+            if(!cumulative_csv_) {
+                record_count_ = 0;
+                inst_count_ = 0;
+                inst_record_count_ = 0;
+                mem_access_count_ = 0;
+                mem_record_count_ = 0;
+                uop_count_ = 0;
+                comment_count_ = 0;
+                event_count_ = 0;
+                kernel_count_ = 0;
+                page_table_walk_count_ = 0;
+                next_csv_dump_ = 0;
+            }
         }
 
     public:
@@ -96,12 +111,14 @@ class STFCountFilter : public stf::STFFilter<STFCountFilter> {
                                 const bool short_mode,
                                 const bool user_mode_only,
                                 const bool csv_output,
+                                const bool cumulative_csv,
                                 const uint64_t csv_interval) :
             stf::STFFilter<STFCountFilter>(inst_reader),
             verbose_(verbose),
             short_mode_(short_mode),
             user_mode_only_(user_mode_only),
             csv_output_(csv_output),
+            cumulative_csv_(cumulative_csv),
             csv_interval_(csv_interval),
             next_csv_dump_(csv_interval)
         {

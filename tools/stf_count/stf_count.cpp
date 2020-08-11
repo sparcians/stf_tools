@@ -28,6 +28,7 @@ static void parse_command_line(int argc,
                                bool& user_mode_only,
                                bool& short_output,
                                bool& csv_output,
+                               bool& cumulative_csv,
                                uint64_t& csv_interval,
                                uint64_t& start_inst,
                                uint64_t& end_inst) {
@@ -36,6 +37,7 @@ static void parse_command_line(int argc,
     parser.addFlag('u', "only count user-mode instructions");
     parser.addFlag('S', "short output - only output instruction count");
     parser.addFlag('c', "output in csv format");
+    parser.addFlag('C', "make CSV output cumulative");
     parser.addFlag('i', "interval", "dump CSV on this instruction interval");
     parser.addFlag('s', "N", "start counting at Nth instruction");
     parser.addFlag('e', "M", "stop counting at Mth instruction");
@@ -46,6 +48,7 @@ static void parse_command_line(int argc,
     parser.getArgumentValue('u', user_mode_only);
     parser.getArgumentValue('S', short_output);
     parser.getArgumentValue('c', csv_output);
+    parser.getArgumentValue('C', cumulative_csv);
     parser.getArgumentValue('i', csv_interval);
     parser.getArgumentValue('s', start_inst);
     parser.getArgumentValue('e', end_inst);
@@ -62,6 +65,14 @@ static void parse_command_line(int argc,
         parser.raiseErrorWithHelp("Specifying -c and -v at the same time is not allowed.");
     }
 
+    if(!csv_output && cumulative_csv) {
+        parser.raiseErrorWithHelp("The -C flag is only valid when -c is specified");
+    }
+
+    if(!csv_interval) {
+        cumulative_csv = true; // If we aren't doing interval dumps, the CSV should always be cumulative
+    }
+
     parser.getPositionalArgument(0, trace_filename);
 }
 
@@ -71,6 +82,7 @@ int main (int argc, char **argv) {
     bool user_mode_only = false;
     bool short_output = false;
     bool csv_output = false;
+    bool cumulative_csv = false;
     uint64_t csv_interval = 0;
     uint64_t start_inst = 0;
     uint64_t end_inst = std::numeric_limits<uint64_t>::max();
@@ -83,6 +95,7 @@ int main (int argc, char **argv) {
                            user_mode_only,
                            short_output,
                            csv_output,
+                           cumulative_csv,
                            csv_interval,
                            start_inst,
                            end_inst);
@@ -99,6 +112,7 @@ int main (int argc, char **argv) {
                                     short_output,
                                     user_mode_only,
                                     csv_output,
+                                    cumulative_csv,
                                     csv_interval);
 
     stf_count_filter.extract(start_inst, end_inst - start_inst, stf_inst_reader.getISA(), stf_inst_reader.getInitialIEM());
