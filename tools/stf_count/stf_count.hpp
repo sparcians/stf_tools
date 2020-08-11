@@ -50,7 +50,7 @@ class STFCountFilter : public stf::STFFilter<STFCountFilter> {
         mutable uint64_t page_table_walk_count_ = 0;     /**< Count page table walk records */
         mutable uint64_t uop_count_ = 0;                 /**< Count all micro-op records */
         mutable uint64_t event_count_ = 0;               /**< Count Event records */
-        mutable uint64_t kernel_count_ = 0;              /**< Count kernel instructions */
+        mutable uint64_t non_user_count_ = 0;              /**< Count kernel instructions */
         mutable uint64_t next_csv_dump_ = 0;             /**< Last time CSV was dumped */
 
         friend class stf::STFFilter<STFCountFilter>;
@@ -65,7 +65,7 @@ class STFCountFilter : public stf::STFFilter<STFCountFilter> {
                              "uop_count,"
                              "comment_count,"
                              "event_count,"
-                             "kernel_count,"
+                             "non_user_count,"
                              "PTE_count" << std::endl;
                 dumped_csv_header_ = true;
             }
@@ -82,7 +82,7 @@ class STFCountFilter : public stf::STFFilter<STFCountFilter> {
                       << uop_count_ << ','
                       << comment_count_ << ','
                       << event_count_ << ','
-                      << kernel_count_ << ','
+                      << non_user_count_ << ','
                       << page_table_walk_count_ << std::endl;
 
             if(!cumulative_csv_) {
@@ -94,7 +94,7 @@ class STFCountFilter : public stf::STFFilter<STFCountFilter> {
                 uop_count_ = 0;
                 comment_count_ = 0;
                 event_count_ = 0;
-                kernel_count_ = 0;
+                non_user_count_ = 0;
                 page_table_walk_count_ = 0;
                 next_csv_dump_ = 0;
             }
@@ -134,7 +134,7 @@ class STFCountFilter : public stf::STFFilter<STFCountFilter> {
 
             if(!short_mode_) {
                 if(STF_EXPECT_FALSE(!in_user_code_)) {
-                    kernel_count_++;
+                    non_user_count_++;
                 }
 
                 if(STF_EXPECT_TRUE(count_inst)) {
@@ -185,7 +185,7 @@ class STFCountFilter : public stf::STFFilter<STFCountFilter> {
                 comma << "uop_count " << uop_count_ << sep_char
                       << "comment_count " << comment_count_ << sep_char
                       << "event_count " << event_count_ << sep_char
-                      << "kernel_count " << kernel_count_ << sep_char
+                      << "non_user_count " << non_user_count_ << sep_char
                       << "PTE_count " << page_table_walk_count_ << sep_char
                       << std::endl;
             }
