@@ -178,10 +178,10 @@ msg     << "STF_CONTAIN_PHYSICAL_ADDRESS not set, but is required as part of the
                 reportError(msg.str().c_str(), 9);
             }*/
 
-            const auto& prev_events = inst.getEvents();
+            const auto& prev_events = inst_prev.getEvents();
             //check if inst is_load or is_store and doesn't have memory accesses when it should
             if (decoder.isLoad() && // it decodes as a load
-                (!inst_prev.isLoad() || inst.getMemoryReads().empty()) && // but it isn't doing any loads
+                (!inst_prev.isLoad() || inst_prev.getMemoryReads().empty()) && // but it isn't doing any loads
                 prev_events.empty()) { // and there are no events stopping it from doing a load
                 bool found = false;
                 // Commenting this out for now since RISC-V doesn't have software prefetches
@@ -203,7 +203,7 @@ msg     << "STF_CONTAIN_PHYSICAL_ADDRESS not set, but is required as part of the
                 }
             }
             if (decoder.isStore() && // it decodes as a store
-                (!inst_prev.isStore() || inst.getMemoryWrites().empty()) && // but it isn't doing any stores
+                (!inst_prev.isStore() || inst_prev.getMemoryWrites().empty()) && // but it isn't doing any stores
                 prev_events.empty()) { // and there are no events stopping it from doing a store
                 bool found = false;
                 // Commenting this out for now since RISC-V doesn't have software prefetches

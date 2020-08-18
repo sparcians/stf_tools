@@ -7,3 +7,6 @@
 [submodule "dtl"]
 	path = dtl
 	url = git@github.com:cubicdaiya/dtl.git
+[submodule "dtl"]
+	path = dtl
+	url = git@github.com:cubicdaiya/dtl.git

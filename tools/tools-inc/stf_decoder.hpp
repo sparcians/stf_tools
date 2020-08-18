@@ -50,6 +50,9 @@ namespace stf {
                     }
             };
 
+            class InvalidInstException : public std::exception {
+            };
+
             /**
              * \typedef MavisType
              * \brief Mavis decoder type
@@ -60,12 +63,24 @@ namespace stf {
             mutable bool has_pending_decode_info_ = false; /**< Cached decode info */
             stf::ValidValue<uint32_t> opcode_;
             bool is_compressed_ = false; /**< Set to true if the decoded instruction was compressed */
+            mutable bool is_invalid_ = false;
 
             const MavisType::DecodeInfoType& getDecodeInfo_() const {
                 if(STF_EXPECT_FALSE(has_pending_decode_info_)) {
-                    decode_info_ = mavis_.getInfo(opcode_.get());
-                    has_pending_decode_info_ = false;
+                    try {
+                        decode_info_ = mavis_.getInfo(opcode_.get());
+                        has_pending_decode_info_ = false;
+                        is_invalid_ = false;
+                    }
+                    catch(const mavis::IllegalOpcode&) {
+                        is_invalid_ = true;
+                        throw InvalidInstException();
+                    }
                 }
+                else if(STF_EXPECT_FALSE(is_invalid_)) {
+                    throw InvalidInstException();
+                }
+
                 stf_assert(decode_info_, "Attempted to get instruction info without calling decode() first.");
                 return decode_info_;
             }
@@ -198,7 +213,12 @@ namespace stf {
              * \param type Instruction type to check
              */
             inline bool isInstType(const mavis::InstMetaData::InstructionTypes type) const {
-                return getDecodeInfo_()->opinfo->isInstType(type);
+                try {
+                    return getDecodeInfo_()->opinfo->isInstType(type);
+                }
+                catch(const InvalidInstException&) {
+                    return false;
+                }
             }
 
             /**
@@ -255,21 +275,38 @@ namespace stf {
              * Gets the mnemonic for the decoded instruction
              */
             inline const std::string& getMnemonic() const {
-                return getDecodeInfo_()->opinfo->getMnemonic();
+                static const std::string UNIMP = "c.unimp";
+
+                try {
+                    return getDecodeInfo_()->opinfo->getMnemonic();
+                }
+                catch(const InvalidInstException&) {
+                    return UNIMP;
+                }
             }
 
             /**
              * Gets the immediate for the decoded instruction
              */
-            inline auto getImmediate() const {
-                return getDecodeInfo_()->opinfo->getImmediate();
+            inline uint64_t getImmediate() const {
+                try {
+                    return getDecodeInfo_()->opinfo->getImmediate();
+                }
+                catch(const InvalidInstException&) {
+                    return 0;
+                }
             }
 
             /**
              * Gets the sign-extended immediate for the decoded instruction
              */
-            inline auto getSignedImmediate() const {
-                return getDecodeInfo_()->opinfo->getSignedOffset();
+            inline int64_t getSignedImmediate() const {
+                try {
+                    return getDecodeInfo_()->opinfo->getSignedOffset();
+                }
+                catch(const InvalidInstException&) {
+                    return 0;
+                }
             }
 
             /**
@@ -290,23 +327,86 @@ namespace stf {
                 const auto reg_num = stf::Registers::getArchRegIndex(reg);
                 stf_assert(!stf::Registers::isCSR(reg), "CSRs are not supported yet");
 
-                if(stf::Registers::isFPR(reg)) {
-                    return getDecodeInfo_()->opinfo->getFloatSourceRegs().test(reg_num);
-                }
+                try {
+                    if(stf::Registers::isFPR(reg)) {
+                        return getDecodeInfo_()->opinfo->getFloatSourceRegs().test(reg_num);
+                    }
 
-                return getDecodeInfo_()->opinfo->getIntSourceRegs().test(reg_num);
+                    return getDecodeInfo_()->opinfo->getIntSourceRegs().test(reg_num);
+                }
+                catch(const InvalidInstException&) {
+                    return false;
+                }
             }
 
             inline bool hasDestRegister(const stf::Registers::STF_REG reg) const {
                 const auto reg_num = stf::Registers::getArchRegIndex(reg);
                 stf_assert(!stf::Registers::isCSR(reg), "CSRs are not supported yet");
 
-                if(stf::Registers::isFPR(reg)) {
-                    return getDecodeInfo_()->opinfo->getFloatDestRegs().test(reg_num);
-                }
+                try {
+                    if(stf::Registers::isFPR(reg)) {
+                        return getDecodeInfo_()->opinfo->getFloatDestRegs().test(reg_num);
+                    }
 
-                return getDecodeInfo_()->opinfo->getIntDestRegs().test(reg_num);
+                    return getDecodeInfo_()->opinfo->getIntDestRegs().test(reg_num);
+                }
+                catch(const InvalidInstException&) {
+                    return false;
+                }
             }
 
+            inline bool isMarkpoint() const {
+                if(!(isInstType(mavis::InstMetaData::InstructionTypes::INT) && isInstType(mavis::InstMetaData::InstructionTypes::ARITH))) {
+                    return false;
+                }
+
+                if(!hasDestRegister(stf::Registers::STF_REG::STF_REG_X0)) {
+                    return false;
+                }
+
+                try {
+                    const auto& opinfo = getDecodeInfo_()->opinfo;
+                    if(opinfo->numSourceRegs() != 2) {
+                        return false;
+                    }
+
+                    const auto& op_list = opinfo->getSourceOpInfoList();
+                    if(op_list[0].field_value != op_list[1].field_value) {
+                        return false;
+                    }
+                }
+                catch(const InvalidInstException&) {
+                    return false;
+                }
+
+                return getMnemonic() == "or";
+            }
+
+            inline bool isTracepoint() const {
+                if(!(isInstType(mavis::InstMetaData::InstructionTypes::INT) && isInstType(mavis::InstMetaData::InstructionTypes::ARITH))) {
+                    return false;
+                }
+
+                if(!hasDestRegister(stf::Registers::STF_REG::STF_REG_X0)) {
+                    return false;
+                }
+
+                try {
+                    const auto& opinfo = getDecodeInfo_()->opinfo;
+                    if(opinfo->numSourceRegs() != 2) {
+                        return false;
+                    }
+
+                    const auto& op_list = opinfo->getSourceOpInfoList();
+                    if(op_list[0].field_value != op_list[1].field_value) {
+                        return false;
+                    }
+                }
+                catch(const InvalidInstException&) {
+                    return false;
+                }
+
+                return getMnemonic() == "xor";
+            }
     };
 } // end namespace stf

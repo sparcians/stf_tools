@@ -240,12 +240,14 @@ namespace trace_tools {
             };
 
 
+            const std::string program_name_;
+            const bool allow_hidden_arguments_;
+
             using ArgMap = std::unordered_map<char, std::unique_ptr<BaseArgument>>;
             ArgMap arguments_;
             std::vector<ArgMap::iterator> arguments_insertion_ordered_;
 
             std::vector<std::unique_ptr<NamedValueArgument>> positional_arguments_;
-            std::string program_name_;
             std::stringstream help_addendum_; // String that will be appended to the end of the help string
             std::ostringstream arg_str_;
             size_t max_argument_width_ = 1;
@@ -304,8 +306,9 @@ namespace trace_tools {
                     }
             };
 
-            explicit CommandLineParser(std::string program_name) :
-                program_name_(std::move(program_name))
+            explicit CommandLineParser(std::string program_name, const bool allow_hidden_arguments = false) :
+                program_name_(std::move(program_name)),
+                allow_hidden_arguments_(allow_hidden_arguments)
             {
                 addFlag('h', "show this message");
                 addFlag('V', "show the STF version the tool is built with");
@@ -319,6 +322,13 @@ namespace trace_tools {
                     ss << "Attempted to add flag -" << flag << " multiple times." << std::endl;
                     throw InvalidArgumentException(ss.str());
                 }
+
+                if(STF_EXPECT_FALSE(result.first->second->isHidden() && !allow_hidden_arguments_)) {
+                    std::ostringstream ss;
+                    ss << "Attempted to add hidden flag -" << flag << " without enabling hidden arguments." << std::endl;
+                    throw InvalidArgumentException(ss.str());
+                }
+
                 arguments_insertion_ordered_.emplace_back(result.first);
                 max_argument_width_ = std::max(max_argument_width_, arg_name.size() + 3);
             }
@@ -332,6 +342,13 @@ namespace trace_tools {
                     ss << "Attempted to add flag -" << flag << " multiple times." << std::endl;
                     throw InvalidArgumentException(ss.str());
                 }
+
+                if(STF_EXPECT_FALSE(result.first->second->isHidden() && !allow_hidden_arguments_)) {
+                    std::ostringstream ss;
+                    ss << "Attempted to add hidden flag -" << flag << " without enabling hidden arguments." << std::endl;
+                    throw InvalidArgumentException(ss.str());
+                }
+
                 arguments_insertion_ordered_.emplace_back(result.first);
                 max_argument_width_ = std::max(max_argument_width_, arg_name.size() + 3);
             }
@@ -344,6 +361,13 @@ namespace trace_tools {
                     ss << "Attempted to add flag -" << flag << " multiple times." << std::endl;
                     throw InvalidArgumentException(ss.str());
                 }
+
+                if(STF_EXPECT_FALSE(result.first->second->isHidden() && !allow_hidden_arguments_)) {
+                    std::ostringstream ss;
+                    ss << "Attempted to add hidden flag -" << flag << " without enabling hidden arguments." << std::endl;
+                    throw InvalidArgumentException(ss.str());
+                }
+
                 arguments_insertion_ordered_.emplace_back(result.first);
             }
 
@@ -355,6 +379,13 @@ namespace trace_tools {
                     ss << "Attempted to add flag -" << flag << " multiple times." << std::endl;
                     throw InvalidArgumentException(ss.str());
                 }
+
+                if(STF_EXPECT_FALSE(result.first->second->isHidden() && !allow_hidden_arguments_)) {
+                    std::ostringstream ss;
+                    ss << "Attempted to add hidden flag -" << flag << " without enabling hidden arguments." << std::endl;
+                    throw InvalidArgumentException(ss.str());
+                }
+
                 arguments_insertion_ordered_.emplace_back(result.first);
             }
 
@@ -375,6 +406,11 @@ namespace trace_tools {
                 else {
                     new_arg = std::make_unique<ArgumentWithValue>(argument_name, help_message);
                 }
+
+                if(STF_EXPECT_FALSE(new_arg->isHidden())) {
+                    throw InvalidArgumentException(argument_name + " is hidden. Hidden positional arguments are never allowed.");
+                }
+
                 positional_arguments_.emplace_back(std::move(new_arg));
                 max_argument_width_ = std::max(max_argument_width_, argument_name.size() + 1);
             }

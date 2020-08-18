@@ -81,7 +81,8 @@ namespace stf {
                 }
                 for (auto inst_it = stf_inst_reader_.begin(); (inst_it != stf_inst_reader_.end()) && (num_insts_extracted_ < num_to_extract); ++inst_it) {
                     const auto& inst = *inst_it;
-                    in_user_code_ &= !inst.isChangeFromUserMode();
+
+                    const bool is_change_from_user = inst.isChangeFromUserMode();
 
                     if (num_insts_read_ >= num_to_skip) {
                         if (num_insts_extracted_ == 0 && num_to_skip > 0) {
@@ -89,6 +90,8 @@ namespace stf {
                                 writeStartingRecords(inst);
                             }
                         }
+
+                        in_user_code_ &= !is_change_from_user || inst.isSyscall(); // Syscalls still count as user-mode code since the transition happens after the instruction
 
                         const auto& insts_to_write = static_cast<DerivedType*>(this)->filter(inst);
 
@@ -107,7 +110,9 @@ namespace stf {
                     }
 
                     ++num_insts_read_;
-                    in_user_code_ |= inst.isChangeToUserMode();
+
+                    const bool is_change_to_user = !is_change_from_user && inst.isChangeToUserMode();
+                    in_user_code_ = (in_user_code_ && !is_change_from_user) || is_change_to_user;
                 }
                 static_cast<const DerivedType*>(this)->finished();
             }

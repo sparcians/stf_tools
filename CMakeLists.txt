@@ -92,6 +92,11 @@ set(CMAKE_CXX_FLAGS_DEBUG "-O0 -g -fno-omit-frame-pointer")
 set(CMAKE_CXX_FLAGS_PROFILE "-O3 -g -fomit-frame-pointer ${LTO_FLAGS}")
 
 set (DISABLE_STF_DOXYGEN ON)
+
+if (CMAKE_BUILD_TYPE MATCHES "^[Dd]ebug")
+    SET(NO_STF_LTO 1)
+endif()
+
 add_subdirectory(stf_lib)
 
 add_subdirectory(tools)
