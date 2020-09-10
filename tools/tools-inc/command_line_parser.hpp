@@ -31,13 +31,15 @@ namespace trace_tools {
 
                 protected:
                     const std::string help_message_;
+                    const bool hidden_ = false;
                     const uint64_t id_ = getNextId_();
 
                 public:
                     BaseArgument() = default;
 
                     explicit BaseArgument(std::string help_message) :
-                        help_message_(std::move(help_message))
+                        help_message_(std::move(help_message)),
+                        hidden_(help_message_.empty())
                     {
                     }
 
@@ -45,6 +47,10 @@ namespace trace_tools {
 
                     const std::string& getHelpMessage() const {
                         return help_message_;
+                    }
+
+                    bool isHidden() const {
+                        return hidden_;
                     }
 
                     virtual bool hasCountValue() const {
@@ -423,6 +429,9 @@ namespace trace_tools {
 
                 for(const auto& it: arguments_insertion_ordered_) {
                     const auto& a = *it;
+                    if(a.second->isHidden()) {
+                        continue;
+                    }
                     os << " [-" << a.first;
                     if(a.second->hasNamedValue()) {
                         const auto named_arg = dynamic_cast<const NamedValueArgument*>(a.second.get());
@@ -439,6 +448,9 @@ namespace trace_tools {
 
                 for(const auto& it: arguments_insertion_ordered_) {
                     const auto& a = *it;
+                    if(a.second->isHidden()) {
+                        continue;
+                    }
                     stf::format_utils::formatSpaces(os, TAB_WIDTH);
                     os << "-";
                     std::ostringstream arg_str;
