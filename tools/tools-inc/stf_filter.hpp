@@ -82,8 +82,6 @@ namespace stf {
                 for (auto inst_it = stf_inst_reader_.begin(); (inst_it != stf_inst_reader_.end()) && (num_insts_extracted_ < num_to_extract); ++inst_it) {
                     const auto& inst = *inst_it;
 
-                    const bool is_change_from_user = inst.isChangeFromUserMode();
-
                     if (num_insts_read_ >= num_to_skip) {
                         if (num_insts_extracted_ == 0 && num_to_skip > 0) {
                             if (stf_writer_) {
@@ -91,7 +89,7 @@ namespace stf {
                             }
                         }
 
-                        in_user_code_ &= !is_change_from_user || inst.isSyscall(); // Syscalls still count as user-mode code since the transition happens after the instruction
+                        is_fault_ = inst.isFault();
 
                         const auto& insts_to_write = static_cast<DerivedType*>(this)->filter(inst);
 
@@ -111,8 +109,7 @@ namespace stf {
 
                     ++num_insts_read_;
 
-                    const bool is_change_to_user = !is_change_from_user && inst.isChangeToUserMode();
-                    in_user_code_ = (in_user_code_ && !is_change_from_user) || is_change_to_user;
+                    in_user_code_ = !inst.isChangeFromUserMode() && (in_user_code_ || inst.isChangeToUserMode());
                 }
                 static_cast<const DerivedType*>(this)->finished();
             }
@@ -239,5 +236,6 @@ namespace stf {
 
             bool dump_ptes_on_demand_ = false; /**< If true, dumps PTEs inline with instructions */
             bool in_user_code_ = false; /**< If true, current instruction is user code */
+            bool is_fault_ = false; /**< If true, current instruction is a fault */
     };
 } // end namespace stf

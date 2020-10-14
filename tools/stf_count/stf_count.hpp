@@ -50,7 +50,8 @@ class STFCountFilter : public stf::STFFilter<STFCountFilter> {
         mutable uint64_t page_table_walk_count_ = 0;     /**< Count page table walk records */
         mutable uint64_t uop_count_ = 0;                 /**< Count all micro-op records */
         mutable uint64_t event_count_ = 0;               /**< Count Event records */
-        mutable uint64_t non_user_count_ = 0;              /**< Count kernel instructions */
+        mutable uint64_t non_user_count_ = 0;            /**< Count kernel instructions */
+        mutable uint64_t fault_count_ = 0;               /**< Count faults */
         mutable uint64_t next_csv_dump_ = 0;             /**< Last time CSV was dumped */
 
         friend class stf::STFFilter<STFCountFilter>;
@@ -66,6 +67,7 @@ class STFCountFilter : public stf::STFFilter<STFCountFilter> {
                              "comment_count,"
                              "event_count,"
                              "non_user_count,"
+                             "fault_count,"
                              "PTE_count" << std::endl;
                 dumped_csv_header_ = true;
             }
@@ -83,6 +85,7 @@ class STFCountFilter : public stf::STFFilter<STFCountFilter> {
                       << comment_count_ << ','
                       << event_count_ << ','
                       << non_user_count_ << ','
+                      << fault_count_ << ','
                       << page_table_walk_count_ << std::endl;
 
             if(!cumulative_csv_) {
@@ -95,6 +98,7 @@ class STFCountFilter : public stf::STFFilter<STFCountFilter> {
                 comment_count_ = 0;
                 event_count_ = 0;
                 non_user_count_ = 0;
+                fault_count_ = 0;
                 page_table_walk_count_ = 0;
                 next_csv_dump_ = 0;
             }
@@ -126,16 +130,18 @@ class STFCountFilter : public stf::STFFilter<STFCountFilter> {
 
     protected:
         inline const std::vector<stf::STFInst>& filter(const stf::STFInst& inst) {
-            const bool count_inst = !user_mode_only_ || in_user_code_;
+            const bool count_inst = !is_fault_ && (!user_mode_only_ || in_user_code_);
 
             if(STF_EXPECT_TRUE(count_inst)) {
                 inst_count_++;
             }
 
             if(!short_mode_) {
-                if(STF_EXPECT_FALSE(!in_user_code_)) {
+                if(STF_EXPECT_FALSE(!is_fault_ && !in_user_code_)) {
                     non_user_count_++;
                 }
+
+                fault_count_ += is_fault_;
 
                 if(STF_EXPECT_TRUE(count_inst)) {
                     const auto& orig_records = inst.getOrigRecords();
@@ -186,6 +192,7 @@ class STFCountFilter : public stf::STFFilter<STFCountFilter> {
                       << "comment_count " << comment_count_ << sep_char
                       << "event_count " << event_count_ << sep_char
                       << "non_user_count " << non_user_count_ << sep_char
+                      << "fault_count " << fault_count_ << sep_char
                       << "PTE_count " << page_table_walk_count_ << sep_char
                       << std::endl;
             }
