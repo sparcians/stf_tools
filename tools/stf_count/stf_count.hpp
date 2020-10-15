@@ -130,9 +130,9 @@ class STFCountFilter : public stf::STFFilter<STFCountFilter> {
 
     protected:
         inline const std::vector<stf::STFInst>& filter(const stf::STFInst& inst) {
-            const bool count_inst = !is_fault_ && (!user_mode_only_ || in_user_code_);
+            const bool count_inst = !user_mode_only_ || in_user_code_;
 
-            if(STF_EXPECT_TRUE(count_inst)) {
+            if(STF_EXPECT_TRUE(!is_fault_ && count_inst)) {
                 inst_count_++;
             }
 
@@ -146,15 +146,14 @@ class STFCountFilter : public stf::STFFilter<STFCountFilter> {
                 if(STF_EXPECT_TRUE(count_inst)) {
                     const auto& orig_records = inst.getOrigRecords();
                     record_count_ += orig_records.size();
-                    inst_record_count_ += orig_records.count(stf::descriptors::internal::Descriptor::STF_INST_OPCODE16);
-                    inst_record_count_ += orig_records.count(stf::descriptors::internal::Descriptor::STF_INST_OPCODE32);
+                    inst_record_count_ += orig_records.count(stf::descriptors::internal::Descriptor::STF_INST_OPCODE16) + orig_records.count(stf::descriptors::internal::Descriptor::STF_INST_OPCODE32);
                     uop_count_ += orig_records.count(stf::descriptors::internal::Descriptor::STF_INST_MICROOP);
                     const size_t num_mem_accesses = orig_records.count(stf::descriptors::internal::Descriptor::STF_INST_MEM_ACCESS);
                     const size_t num_mem_content = orig_records.count(stf::descriptors::internal::Descriptor::STF_INST_MEM_CONTENT);
                     mem_access_count_ += num_mem_accesses;
                     mem_record_count_ += num_mem_accesses + num_mem_content;
                     comment_count_ += orig_records.count(stf::descriptors::internal::Descriptor::STF_COMMENT);
-                    page_table_walk_count_ += orig_records.count(stf::descriptors::internal::Descriptor::STF_COMMENT);
+                    page_table_walk_count_ += orig_records.count(stf::descriptors::internal::Descriptor::STF_PAGE_TABLE_WALK);
                     event_count_ += orig_records.count(stf::descriptors::internal::Descriptor::STF_EVENT);
 
                     if(STF_EXPECT_FALSE(csv_output_ && (inst_count_ == next_csv_dump_))) {
