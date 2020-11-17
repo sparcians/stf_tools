@@ -23,11 +23,12 @@ int main (int argc, char **argv)
 
         AddrMap::iterator amit;
 
-        if (config.start_inst) {
-            stf_reader.seek(config.start_inst - 1);
-        }
+        auto it = config.start_inst ? stf_reader.seekFromBeginning(config.start_inst - 1) : stf_reader.begin();
+        const auto end_it = stf_reader.end();
 
-        for (const auto& inst: stf_reader) {
+        for (; it != end_it; ++it) {
+            const auto& inst = *it;
+
             if (!inst.valid()) {
                 std::cerr << "ERROR: ";
                 stf::format_utils::formatDec(std::cerr, inst.index());

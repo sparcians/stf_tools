@@ -112,11 +112,12 @@ int main (int argc, char **argv)
         uint32_t pid_prev = std::numeric_limits<uint32_t>::max();
         uint32_t asid_prev = std::numeric_limits<uint32_t>::max();
 
-        if(config.start_inst > 1) {
-            stf_reader.seek(config.start_inst - 1);
-        }
+        auto it = config.start_inst > 1 ? stf_reader.seekFromBeginning(config.start_inst - 1) : stf_reader.begin();
+        const auto end_it = stf_reader.end();
 
-        for (const auto& inst: stf_reader) {
+        for (; it != end_it; ++it) {
+            const auto& inst = *it;
+
             if (!inst.valid()) {
                 std::cerr << "ERROR: " << inst.index() << " invalid instruction " << std::hex << inst.opcode() << " PC " << inst.pc() << std::endl;
             }
