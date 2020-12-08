@@ -69,7 +69,7 @@ static STFEditConfig parseCommandLine(int argc, char **argv) {
     parser.addFlag('e', "M", "end at instruction M");
     parser.addFlag('A', "address", "assume all LS ops access the given address");
     parser.addFlag('S', "size", "assume all LS ops have the given size");
-    parser.addMultiFlag('a', "pc=opcode1[->addr1:size1][,opcode2[->addr2:size2],...]", "morph instruction at pc to specified opcode(s)");
+    parser.addMultiFlag('a', "pc=opcode1[->addr1:size1][,opcode2[->addr2:size2],...]", "morph instruction at pc to specified opcode(s). LS instructions can have target addresses and access sizes specified with `opcode->addr:size` syntax");
     parser.addPositionalArgument("trace", "trace in STF format");
     parser.parseArguments(argc, argv);
 
