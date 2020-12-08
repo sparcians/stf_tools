@@ -163,7 +163,7 @@ class STFEventFilter {
                             stf::format_utils::formatHex(std::cerr, prev_inst_.branchTarget());
                             std::cerr << "), adjust to ";
                             stf::format_utils::formatHex(std::cerr, inst.pc());
-                            std::cerr << "." << std::endl;
+                            std::cerr << '.' << std::endl;
                         }
                     }
                 } else {

@@ -31,9 +31,9 @@ class STFBinary {
                                                                                     address <<
                                                                                     " is outside binary range: [" <<
                                                                                     base_addr_ <<
-                                                                                    "," <<
+                                                                                    ',' <<
                                                                                     (base_addr_ + file_size_) <<
-                                                                                    "]");
+                                                                                    ']');
         }
 
         virtual void read_(const uint64_t address, void* const ptr, const size_t num_bytes) const {

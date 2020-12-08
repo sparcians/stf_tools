@@ -53,7 +53,7 @@ static STFDumpConfig parseCommandLine (int argc, char **argv) {
     parser.getPositionalArgument(0, config.trace_filename);
 
     stf_assert(!config.end_inst || (config.end_inst > config.start_inst),
-               "End inst (" << config.end_inst << ") must be greater than start inst (" << config.start_inst << ")");
+               "End inst (" << config.end_inst << ") must be greater than start inst (" << config.start_inst << ')');
 
     return config;
 }
@@ -76,7 +76,7 @@ int main (int argc, char **argv)
 
         // Print Version info
         stf::print_utils::printLabel("VERSION");
-        std::cout << stf_reader.major() << "." << stf_reader.minor() << std::endl;
+        std::cout << stf_reader.major() << '.' << stf_reader.minor() << std::endl;
 
         // Print trace info
         for(const auto& i: stf_reader.getTraceInfo()) {
@@ -132,9 +132,9 @@ int main (int argc, char **argv)
             if (tid != tid_prev || pid != pid_prev || asid != asid_prev) {
                 stf::print_utils::printLabel("PID");
                 stf::print_utils::printTID(pid);
-                std::cout << ":";
+                std::cout << ':';
                 stf::print_utils::printTID(tid);
-                std::cout << ":";
+                std::cout << ':';
                 stf::print_utils::printTID(asid);
                 std::cout << std::endl;
             }
@@ -151,7 +151,7 @@ int main (int argc, char **argv)
 
             if (stf::format_utils::showPhys()) {
                 // Make sure we zero-fill as needed, so that the address remains "virt:phys" and not "virt:  phys"
-                std::cout << ":";
+                std::cout << ':';
                 //stf::print_utils::printPA(inst.physPc());
             }
             stf::print_utils::printSpaces(1);
@@ -160,7 +160,7 @@ int main (int argc, char **argv)
                 std::cout << "PC ";
                 stf::print_utils::printVA(inst.branchTarget());
                 if (stf::format_utils::showPhys()) {
-                    std::cout << ":";
+                    std::cout << ':';
                     //stf::print_utils::printPA(inst.physBranchTarget());
                 }
                 stf::print_utils::printSpaces(1);

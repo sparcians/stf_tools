@@ -114,7 +114,7 @@ static STFEditConfig parseCommandLine(int argc, char **argv) {
                 uint64_t address = 0;
                 uint16_t size = 0;
                 if(arrow_pos != std::string::npos) {
-                    const auto colon_pos = opcode_str.find(":");
+                    const auto colon_pos = opcode_str.find(':');
                     if(STF_EXPECT_FALSE(colon_pos == std::string::npos)) {
                         if(has_global_size) {
                             size = global_size;

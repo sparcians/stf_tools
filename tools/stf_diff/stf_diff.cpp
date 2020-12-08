@@ -275,7 +275,7 @@ int main (int argc, char **argv) {
                                 config.start2,
                                 config);
 
-            std::cerr << "Now diffing " << instVec1.size() << "(" << instVec2.size() << ") instructions" << std::endl;
+            std::cerr << "Now diffing " << instVec1.size() << '(' << instVec2.size() << ") instructions" << std::endl;
 
             dtl::Diff<STFDiffInst, DiffInstVec> d(instVec1, instVec2);
 

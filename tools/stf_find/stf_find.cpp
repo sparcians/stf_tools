@@ -68,7 +68,7 @@ int main (int argc, char **argv)
                             stf::print_utils::printVA(first_access.getAddress());
                             std::cout << " 0x";
                             stf::format_utils::formatData(std::cout, first_access.getData());
-                            std::cout << " " << first_access.getData();
+                            std::cout << ' ' << first_access.getData();
                         }
                         if (inst.isTakenBranch()) {
                             std::cout << " tgt 0x";
@@ -112,7 +112,7 @@ int main (int argc, char **argv)
                 if (mem_found && !config.summary && !config.per_iter) {
                     stf::print_utils::printVA(mem_access.getAddress());
                     // FIXME: print PA
-                    // std::cout << ":";
+                    // std::cout << ':';
                     // stf::print_utils::printPA(mem_access.getPA());
                     std::cout << " trace-inst-num " << index << "  ";
                     stf::format_utils::formatData(std::cout, mem_access.getData());

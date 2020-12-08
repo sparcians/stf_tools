@@ -169,10 +169,10 @@ int main(int argc, char** argv) {
         };
 
         if(branch_info.indirect) {
-            stf::print_utils::printLeft("Y", COLUMN_WIDTH);
+            stf::print_utils::printLeft('Y', COLUMN_WIDTH);
         }
         else {
-            stf::print_utils::printLeft("N", COLUMN_WIDTH);
+            stf::print_utils::printLeft('N', COLUMN_WIDTH);
         }
 
         stf::print_utils::printDecLeft(branch_info.targets.size(), COLUMN_WIDTH);

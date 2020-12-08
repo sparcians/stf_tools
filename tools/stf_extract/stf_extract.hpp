@@ -203,7 +203,7 @@ class STFExtractor {
                 while(true) {
                     uint64_t inst_written = 0;
 
-                    const std::string cur_output_file = output_filename + "." + std::to_string(file_count++) + ".zstf";
+                    const std::string cur_output_file = output_filename + '.' + std::to_string(file_count++) + ".zstf";
                     // open new stf file for slicing;
                     std::cerr << overall_instcnt << " Creating split trace file " << cur_output_file << std::endl;
                     stf_writer_.open(cur_output_file);

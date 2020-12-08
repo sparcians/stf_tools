@@ -136,10 +136,10 @@ class BasicBlockTracker {
         void dumpBasicBlockVector(const uint64_t interval_count, const bool has_non_user_code, const uint64_t inst_idx, const bool dump_interval) {
             if(interval_count) {
                 std::ostringstream ss;
-                ss << "T";
+                ss << 'T';
                 for(auto& b: bbv_) {
                     if(b.second.bb_count_) {
-                        ss << ":" << b.second.bb_id_ << ":" << b.second.bb_count_ << " ";
+                        ss << ':' << b.second.bb_id_ << ':' << b.second.bb_count_ << ' ';
                         b.second.bb_count_ = 0;
                     }
                 }

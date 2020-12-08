@@ -36,10 +36,10 @@ static STFRecordDumpConfig parseCommandLine(int argc, char **argv) {
     parser.getPositionalArgument(0, config.trace_filename);
 
     stf_assert(!config.end_inst || (config.end_inst > config.start_inst),
-               "End inst (" << config.end_inst << ") must be greater than start inst (" << config.start_inst << ")");
+               "End inst (" << config.end_inst << ") must be greater than start inst (" << config.start_inst << ')');
 
     stf_assert(!config.end_record || (config.end_record > config.start_record),
-               "End record (" << config.end_record << ") must be greater than start record (" << config.start_record << ")");
+               "End record (" << config.end_record << ") must be greater than start record (" << config.start_record << ')');
 
     stf_assert(!config.start_record || !config.start_inst, "Cannot specify both -s and -S options at the same time.");
     stf_assert(!config.end_record || !config.end_inst, "Cannot specify both -e and -E options at the same time.");

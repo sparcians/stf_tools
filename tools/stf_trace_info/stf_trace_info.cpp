@@ -160,7 +160,7 @@ int main (int argc, char **argv) {
 
     if (show_detail) {
         stf::format_utils::formatLabel(std::cerr, "VERSION");
-        std::cerr << reader.major() << "." << reader.minor() << std::endl;
+        std::cerr << reader.major() << '.' << reader.minor() << std::endl;
     }
 
     stf::STFRecord::UniqueHandle rec;

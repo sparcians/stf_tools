@@ -186,7 +186,7 @@ namespace stf
             void printOpcode (ISA inst_set, uint32_t opcode,
                               OutputStreamType & os = std::cout) const {
                 format_utils::formatOpcode(os, opcode);
-                os << " ";
+                os << ' ';
             }
 
         private:

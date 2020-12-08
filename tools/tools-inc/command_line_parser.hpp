@@ -435,13 +435,13 @@ namespace trace_tools {
                     os << " [-" << a.first;
                     if(a.second->hasNamedValue()) {
                         const auto named_arg = dynamic_cast<const NamedValueArgument*>(a.second.get());
-                        os << " " << named_arg->getArgumentName();
+                        os << ' ' << named_arg->getArgumentName();
                     }
-                    os << "]";
+                    os << ']';
                 }
 
                 for(const auto& a: positional_arguments_) {
-                    os << " <" << a->getArgumentName() << ">";
+                    os << " <" << a->getArgumentName() << '>';
                 }
 
                 os << std::endl;
@@ -452,12 +452,12 @@ namespace trace_tools {
                         continue;
                     }
                     stf::format_utils::formatSpaces(os, TAB_WIDTH);
-                    os << "-";
+                    os << '-';
                     std::ostringstream arg_str;
                     arg_str << a.first;
                     if(a.second->hasNamedValue()) {
                         const auto named_arg = dynamic_cast<const NamedValueArgument*>(a.second.get());
-                        arg_str << " <" << named_arg->getArgumentName() << ">";
+                        arg_str << " <" << named_arg->getArgumentName() << '>';
                     }
                     stf::format_utils::formatLeft(os, arg_str.str(), arg_field_width);
                     os << a.second->getHelpMessage() << std::endl;
@@ -465,8 +465,8 @@ namespace trace_tools {
 
                 for(const auto& a: positional_arguments_) {
                     stf::format_utils::formatSpaces(os, TAB_WIDTH);
-                    os << "<";
-                    stf::format_utils::formatLeft(os, a->getArgumentName() + ">", arg_field_width);
+                    os << '<';
+                    stf::format_utils::formatLeft(os, a->getArgumentName() + '>', arg_field_width);
                     os << a->getHelpMessage() << std::endl;
                 }
 

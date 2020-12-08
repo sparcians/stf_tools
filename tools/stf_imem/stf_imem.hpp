@@ -289,7 +289,7 @@ class IMemMapVec {
             stf::format_utils::formatSpaces(os, 2);
             stf::format_utils::formatHex(os, inst_pc, stf::format_utils::VA_WIDTH);
             if (config.show_physpc) {
-                os << ":";
+                os << ':';
                 stf::format_utils::formatHex(os, physpc, stf::format_utils::VA_WIDTH);
             }
 
@@ -320,7 +320,7 @@ class IMemMapVec {
             printSortedPercentage_(os, cumulative_count, inst_count_);
             stf::format_utils::formatHex(os, inst_pc, stf::format_utils::VA_WIDTH);
             if (config.show_physpc) {
-                os << ":";
+                os << ':';
                 stf::format_utils::formatHex(os, physpc, stf::format_utils::VA_WIDTH);
             }
 
@@ -597,7 +597,7 @@ class IMem : public IMemMapVecIntf<IMem> {
                 stf::format_utils::formatHex(std::cerr, key);
                 std::cerr << " two opcodes ";
                 stf::format_utils::formatHex(std::cerr, cur->second.getOpcode());
-                std::cerr << " ";
+                std::cerr << ' ';
                 stf::format_utils::formatHex(std::cerr, inst.opcode());
                 std::cerr << std::endl;
             }

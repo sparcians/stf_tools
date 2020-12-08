@@ -277,7 +277,7 @@ namespace stf {
                     }
                     std::cerr << "ERROR: Expected PTE entry 'PTE ";
                     format_utils::formatHex(std::cerr, vaddr);
-                    std::cerr << ":";
+                    std::cerr << ':';
                     format_utils::formatHex(std::cerr, paddr);
                     std::cerr << " ASID ";
                     format_utils::formatHex(std::cerr, asid);
@@ -285,7 +285,7 @@ namespace stf {
                 } else {
                     std::cerr << "ERROR: Expected PTE entry 'PTE ";
                     format_utils::formatHex(std::cerr, vaddr);
-                    std::cerr << ":";
+                    std::cerr << ':';
                     format_utils::formatHex(std::cerr, paddr);
                     std::cerr << " ASID ";
                     format_utils::formatHex(std::cerr, asid);

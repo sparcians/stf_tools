@@ -175,7 +175,7 @@ class STFCountFilter : public stf::STFFilter<STFCountFilter> {
                 dumpCSV_();
             }
             else {
-                const std::string_view sep_char = verbose_ ? "\n" : " ";
+                const char sep_char = verbose_ ? '\n' : ' ';
                 CommaFormatter comma(std::cout);
                 comma << "total_record_count " << record_count_ << sep_char;
 
