@@ -1,5 +1,6 @@
 #pragma once
 
+#include <bitset>
 #include <cstdlib>
 #include <memory>
 #include <ostream>
@@ -16,6 +17,32 @@ namespace stf {
      * \brief Class used by STF tools to decode instructions
      */
     class STFDecoder {
+        public:
+            /**
+             * \class InvalidInstException
+             * \brief Exception type thrown when the STFDecoder attempts to decode an invalid instruction
+             */
+            class InvalidInstException : public std::exception {
+                private:
+                    uint32_t opcode_;
+
+                public:
+                    InvalidInstException(const uint32_t opcode) :
+                        opcode_(opcode)
+                    {
+                    }
+
+                    const char* what() const noexcept final {
+                        static std::string opcode_hex;
+                        if(opcode_hex.empty()) {
+                            std::stringstream ss;
+                            ss << std::hex << opcode_;
+                            opcode_hex = ss.str();
+                        }
+                        return opcode_hex.c_str();
+                    }
+            };
+
         private:
             /**
              * \class InstType
@@ -50,9 +77,6 @@ namespace stf {
                     }
             };
 
-            class InvalidInstException : public std::exception {
-            };
-
             /**
              * \typedef MavisType
              * \brief Mavis decoder type
@@ -74,11 +98,11 @@ namespace stf {
                     }
                     catch(const mavis::IllegalOpcode&) {
                         is_invalid_ = true;
-                        throw InvalidInstException();
+                        throw InvalidInstException(opcode_.get());
                     }
                 }
                 else if(STF_EXPECT_FALSE(is_invalid_)) {
-                    throw InvalidInstException();
+                    throw InvalidInstException(opcode_.get());
                 }
 
                 stf_assert(decode_info_, "Attempted to get instruction info without calling decode() first.");
@@ -146,6 +170,14 @@ namespace stf {
 
                 return mnemonic.compare(1, mnemonic.size() - 1, suffix) == 0;
             }
+
+            template<typename>
+            struct bitset_size;
+
+            template<size_t N>
+            struct bitset_size<std::bitset<N>> {
+                static constexpr size_t size = N;
+            };
 
         public:
             STFDecoder() :
@@ -298,6 +330,18 @@ namespace stf {
             }
 
             /**
+             * Gets whether the instruction has an immediate
+             */
+            inline bool hasImmediate() const {
+                try {
+                    return getDecodeInfo_()->opinfo->hasImmediate();
+                }
+                catch(const InvalidInstException&) {
+                    return false;
+                }
+            }
+
+            /**
              * Gets the sign-extended immediate for the decoded instruction
              */
             inline int64_t getSignedImmediate() const {
@@ -321,6 +365,60 @@ namespace stf {
              */
             inline bool isCompressed() const {
                 return is_compressed_;
+            }
+
+            std::vector<stf::InstRegRecord> getRegisterOperands() const {
+                std::vector<stf::InstRegRecord> operands;
+                const auto& op_info = getDecodeInfo_()->opinfo;
+
+                const auto int_sources = op_info->getIntSourceRegs();
+                const auto float_sources = op_info->getFloatSourceRegs();
+                const auto vector_sources = op_info->getVectorSourceRegs();
+
+                const auto int_dests = op_info->getIntDestRegs();
+                const auto float_dests = op_info->getFloatDestRegs();
+                const auto vector_dests = op_info->getVectorDestRegs();
+
+                for(size_t i = 0; i < bitset_size<mavis::DecodedInstructionInfo::BitMask>::size; ++i) {
+                    if(STF_EXPECT_FALSE(int_sources.test(i))) {
+                        operands.emplace_back(i,
+                                              stf::Registers::STF_REG_TYPE::INTEGER,
+                                              stf::Registers::STF_REG_OPERAND_TYPE::REG_SOURCE,
+                                              0);
+                    }
+                    if(STF_EXPECT_FALSE(float_sources.test(i))) {
+                        operands.emplace_back(i,
+                                              stf::Registers::STF_REG_TYPE::FLOATING_POINT,
+                                              stf::Registers::STF_REG_OPERAND_TYPE::REG_SOURCE,
+                                              0);
+                    }
+                    if(STF_EXPECT_FALSE(vector_sources.test(i))) {
+                        operands.emplace_back(i,
+                                              stf::Registers::STF_REG_TYPE::VECTOR,
+                                              stf::Registers::STF_REG_OPERAND_TYPE::REG_SOURCE,
+                                              0);
+                    }
+                    if(STF_EXPECT_FALSE(int_dests.test(i))) {
+                        operands.emplace_back(i,
+                                              stf::Registers::STF_REG_TYPE::INTEGER,
+                                              stf::Registers::STF_REG_OPERAND_TYPE::REG_DEST,
+                                              0);
+                    }
+                    if(STF_EXPECT_FALSE(float_dests.test(i))) {
+                        operands.emplace_back(i,
+                                              stf::Registers::STF_REG_TYPE::FLOATING_POINT,
+                                              stf::Registers::STF_REG_OPERAND_TYPE::REG_DEST,
+                                              0);
+                    }
+                    if(STF_EXPECT_FALSE(vector_dests.test(i))) {
+                        operands.emplace_back(i,
+                                              stf::Registers::STF_REG_TYPE::VECTOR,
+                                              stf::Registers::STF_REG_OPERAND_TYPE::REG_DEST,
+                                              0);
+                    }
+                }
+
+                return operands;
             }
 
             inline bool hasSourceRegister(const stf::Registers::STF_REG reg) const {
