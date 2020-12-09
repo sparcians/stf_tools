@@ -10,47 +10,94 @@
 #include "stf_writer.hpp"
 #include "stf_record_types.hpp"
 
-struct OpcodeMorph {
-    struct Op {
-        enum class TYPE {
-            REG,
-            LOAD,
-            STORE
+class OpcodeMorph {
+    public:
+        class Op {
+            private:
+                uint32_t opcode_;
+                mutable std::vector<stf::InstRegRecord> operands_;
+                uint64_t ls_address_;
+                uint16_t ls_size_;
+                stf::INST_MEM_ACCESS ls_access_type_;
+                size_t op_size_;
+
+            public:
+                Op(const uint32_t opcode,
+                   std::vector<stf::InstRegRecord>&& operands,
+                   const uint64_t ls_address,
+                   const uint16_t ls_size,
+                   const stf::INST_MEM_ACCESS ls_access_type,
+                   const size_t op_size) :
+                    opcode_(opcode),
+                    operands_(std::move(operands)),
+                    ls_address_(ls_address),
+                    ls_access_type_(ls_access_type),
+                    op_size_(op_size)
+                {
+                }
+
+                size_t write(stf::STFWriter& writer, const stf::STFRegState& reg_state) const {
+                    for(auto& op: operands_) {
+                        uint64_t reg_data = 0;
+
+                        // Grab the latest values for each operand
+                        try {
+                            reg_state.getRegValue(op.getReg(), reg_data);
+                        }
+                        catch(const stf::STFRegState::RegNotFoundException&) {
+                            // Defaults to 0 if we haven't seen the register in the trace yet
+                        }
+
+                        op.setData(reg_data);
+                        writer << op;
+                    }
+
+                    if(STF_EXPECT_FALSE(ls_access_type_ != stf::INST_MEM_ACCESS::INVALID)) {
+                        writer << stf::InstMemAccessRecord(ls_address_,
+                                                           ls_size_,
+                                                           0,
+                                                           ls_access_type_);
+                        writer << stf::InstMemContentRecord(0);
+                    }
+
+                    if(op_size_ == 2) {
+                        writer << stf::InstOpcode16Record(static_cast<uint16_t>(opcode_));
+                    }
+                    else {
+                        writer << stf::InstOpcode32Record(opcode_);
+                    }
+
+                    return op_size_;
+                }
         };
 
-        uint32_t opcode;
-        std::vector<stf::InstRegRecord> operands;
-        uint64_t ls_address;
-        uint16_t ls_size;
-        TYPE type;
-        bool compressed;
+    private:
+        size_t total_size_;
+        std::vector<Op> opcodes_;
 
-        Op(const uint32_t opcode,
-           std::vector<stf::InstRegRecord>&& operands,
-           const uint64_t ls_address,
-           const uint16_t ls_size,
-           const bool is_load,
-           const bool is_store,
-           const bool is_compressed) :
-            opcode(opcode),
-            operands(std::move(operands)),
-            ls_address(ls_address),
-            type(is_load ? TYPE::LOAD : (is_store ? TYPE::STORE : TYPE::REG)),
-            compressed(is_compressed)
-        {
+    public:
+        inline void addOp(const uint32_t opcode,
+                          std::vector<stf::InstRegRecord>&& operands,
+                          const uint64_t ls_address,
+                          const uint16_t ls_size,
+                          const stf::INST_MEM_ACCESS ls_access_type,
+                          const size_t op_size) {
+            opcodes_.emplace_back(opcode,
+                                  std::forward<std::vector<stf::InstRegRecord>>(operands),
+                                  ls_address,
+                                  ls_size,
+                                  ls_access_type,
+                                  op_size);
+            total_size_ += op_size;
         }
 
-        bool isLoad() const {
-            return type == TYPE::LOAD;
+        const auto& getOpcodes() const {
+            return opcodes_;
         }
 
-        bool isStore() const {
-            return type == TYPE::STORE;
+        auto getTotalSize() const {
+            return total_size_;
         }
-    };
-
-    size_t opcode_size;
-    std::vector<Op> opcodes;
 };
 
 struct STFEditConfig {
@@ -69,7 +116,10 @@ static STFEditConfig parseCommandLine(int argc, char **argv) {
     parser.addFlag('e', "M", "end at instruction M");
     parser.addFlag('A', "address", "assume all LS ops access the given address");
     parser.addFlag('S', "size", "assume all LS ops have the given size");
-    parser.addMultiFlag('a', "pc=opcode1[->addr1:size1][,opcode2[->addr2:size2],...]", "morph instruction at pc to specified opcode(s). LS instructions can have target addresses and access sizes specified with `opcode->addr:size` syntax");
+    parser.addMultiFlag('a',
+                        "pc=opcode1[@addr1:size1][,opcode2[@addr2:size2],...]",
+                        "morph instruction(s) starting at pc to specified opcode(s). "
+                        "LS instructions can have target addresses and access sizes specified with `opcode@addr:size` syntax");
     parser.addPositionalArgument("trace", "trace in STF format");
     parser.parseArguments(argc, argv);
 
@@ -109,11 +159,11 @@ static STFEditConfig parseCommandLine(int argc, char **argv) {
 
             const auto morph_it = result.first;
             while(getline(opcode_stream, opcode_str, ',')) {
-                const auto arrow_pos = opcode_str.find("->");
+                const auto at_pos = opcode_str.find('@');
                 uint32_t opcode = 0;
                 uint64_t address = 0;
                 uint16_t size = 0;
-                if(arrow_pos != std::string::npos) {
+                if(at_pos != std::string::npos) {
                     const auto colon_pos = opcode_str.find(':');
                     if(STF_EXPECT_FALSE(colon_pos == std::string::npos)) {
                         if(has_global_size) {
@@ -123,9 +173,9 @@ static STFEditConfig parseCommandLine(int argc, char **argv) {
                             parser.raiseErrorWithHelp("Did not specify an access size for an LS op: " + opcode_str);
                         }
                     }
-                    address = std::stoull(opcode_str.substr(arrow_pos + 2, colon_pos - arrow_pos - 2), 0, 16);
+                    address = std::stoull(opcode_str.substr(at_pos + 1, colon_pos - at_pos - 1), 0, 16);
                     size = static_cast<uint16_t>(std::stoul(opcode_str.substr(colon_pos + 1)));
-                    opcode = static_cast<uint32_t>(std::stoul(opcode_str.substr(0, arrow_pos), 0, 16));
+                    opcode = static_cast<uint32_t>(std::stoul(opcode_str.substr(0, at_pos), 0, 16));
                 }
                 else {
                     opcode = static_cast<uint32_t>(std::stoul(opcode_str, 0, 16));
@@ -135,10 +185,10 @@ static STFEditConfig parseCommandLine(int argc, char **argv) {
                 if(STF_EXPECT_FALSE(decoder.isBranch())) {
                     parser.raiseErrorWithHelp("Instructions cannot be replaced with branches. Opcode " + opcode_str + " is a branch.");
                 }
-                else if(STF_EXPECT_FALSE(arrow_pos != std::string::npos && !(decoder.isLoad() || decoder.isStore()))) {
+                else if(STF_EXPECT_FALSE(at_pos != std::string::npos && !(decoder.isLoad() || decoder.isStore()))) {
                     parser.raiseErrorWithHelp("Specified a destination/source address for a non-LS op: " + opcode_str);
                 }
-                else if(STF_EXPECT_FALSE(arrow_pos == std::string::npos && (decoder.isLoad() || decoder.isStore()))) {
+                else if(STF_EXPECT_FALSE(at_pos == std::string::npos && (decoder.isLoad() || decoder.isStore()))) {
                     if(has_global_address) {
                         address = global_address;
                     }
@@ -147,16 +197,13 @@ static STFEditConfig parseCommandLine(int argc, char **argv) {
                     }
                 }
 
-                const bool is_compressed = decoder.isCompressed();
-                morph_it->second.opcodes.emplace_back(opcode,
-                                                      decoder.getRegisterOperands(),
-                                                      address,
-                                                      size,
-                                                      decoder.isLoad(),
-                                                      decoder.isStore(),
-                                               is_compressed);
-
-                morph_it->second.opcode_size += is_compressed ? 2 : 4;
+                const size_t inst_size = decoder.isCompressed() ? 2 : 4;
+                morph_it->second.addOp(opcode,
+                                       decoder.getRegisterOperands(),
+                                       address,
+                                       size,
+                                       decoder.getMemAccessType(),
+                                       inst_size);
             }
         }
         catch(const stf::STFDecoder::InvalidInstException& e) {
@@ -173,9 +220,25 @@ static STFEditConfig parseCommandLine(int argc, char **argv) {
     return config;
 }
 
+void updateInitialRegState(stf::STFRegState& reg_state, const stf::STFInstReader::iterator& it) {
+    for(const auto& op: it->getRegisterStates()) {
+        reg_state.regStateUpdate(op.getReg(), op.getValue());
+    }
+
+    for(const auto& op: it->getSourceOperands()) {
+        reg_state.regStateUpdate(op.getReg(), op.getValue());
+    }
+}
+
+void updateFinalRegState(stf::STFRegState& reg_state, const stf::STFInstReader::iterator& it) {
+    for(const auto& op: it->getDestOperands()) {
+        reg_state.regStateUpdate(op.getReg(), op.getValue());
+    }
+}
+
 int main(int argc, char** argv) {
     try {
-        STFEditConfig config = parseCommandLine(argc, argv);
+        const STFEditConfig config = parseCommandLine(argc, argv);
         stf::STFInstReader reader(config.trace);
         stf::STFWriter writer(config.output);
         reader.copyHeader(writer);
@@ -187,66 +250,62 @@ int main(int argc, char** argv) {
         stf::STFRegState reg_state(reader.getISA(), reader.getInitialIEM());
 
         for(; it != end_it; ++it) {
-            const auto& inst = *it;
-            const auto pc = inst.pc();
+            const auto pc = it->pc();
 
-            for(const auto& op: inst.getRegisterStates()) {
-                reg_state.regStateUpdate(op.getReg(), op.getValue());
-            }
-
-            for(const auto& op: inst.getSourceOperands()) {
-                reg_state.regStateUpdate(op.getReg(), op.getValue());
-            }
+            updateInitialRegState(reg_state, it);
 
             if(const auto morph_it = config.opcode_morphs.find(pc);
                STF_EXPECT_FALSE(morph_it != config.opcode_morphs.end())) {
-                stf_assert(inst.opcodeSize() == morph_it->second.opcode_size,
-                           "Attempted to replace a " << inst.opcodeSize() << "-byte instruction with " << morph_it->second.opcode_size << " bytes of instructions");
-                stf_assert(!inst.isTakenBranch(),
-                           "Taken branches cannot be replaced. Instruction at PC " << std::hex << pc << " is a taken branch.");
+                size_t orig_inst_bytes_seen = 0;
+                auto opcode_it = morph_it->second.getOpcodes().begin();
+                const auto opcode_end_it = morph_it->second.getOpcodes().end();
+                const auto total_morph_size = morph_it->second.getTotalSize();
+                size_t morph_bytes_written = 0;
+                bool increment_instruction_size = true;
 
-                for(auto& opcode: morph_it->second.opcodes) {
-                    for(auto& op: opcode.operands) {
-                        uint64_t reg_data = 0;
+                while(opcode_it != opcode_end_it || (orig_inst_bytes_seen < total_morph_size && it != end_it)) {
+                    stf_assert(!it->isTakenBranch(),
+                               "Taken branches cannot be replaced. Instruction at PC "
+                               << std::hex
+                               << pc
+                               << " is a taken branch.");
 
-                        try {
-                            reg_state.getRegValue(op.getReg(), reg_data);
-                        }
-                        catch(const stf::STFRegState::RegNotFoundException&) {
-                        }
-
-                        op.setData(reg_data);
-                        writer << op;
+                    if(opcode_it != opcode_end_it) {
+                        morph_bytes_written += opcode_it->write(writer, reg_state);
+                        ++opcode_it;
                     }
 
-                    stf::INST_MEM_ACCESS access_type = stf::INST_MEM_ACCESS::INVALID;
-                    if(STF_EXPECT_FALSE(opcode.isLoad())) {
-                        access_type = stf::INST_MEM_ACCESS::READ;
-                    }
-                    else if(STF_EXPECT_FALSE(opcode.isStore())) {
-                        access_type = stf::INST_MEM_ACCESS::WRITE;
+                    // Only count an original instruction if this is the first time we've seen it
+                    if(increment_instruction_size) {
+                        orig_inst_bytes_seen += it->opcodeSize();
                     }
 
-                    if(STF_EXPECT_FALSE(access_type != stf::INST_MEM_ACCESS::INVALID)) {
-                        writer << stf::InstMemAccessRecord(opcode.ls_address, opcode.ls_size, 0, access_type);
-                        writer << stf::InstMemContentRecord(0);
-                    }
-
-                    if(opcode.compressed) {
-                        writer << stf::InstOpcode16Record(static_cast<uint16_t>(opcode.opcode));
+                    // Move the reader forward if we haven't seen enough bytes to account for the replacement opcodes
+                    if(orig_inst_bytes_seen < morph_bytes_written ||
+                       (orig_inst_bytes_seen == morph_bytes_written && opcode_it != opcode_end_it)) {
+                        updateFinalRegState(reg_state, it);
+                        ++it;
+                        updateInitialRegState(reg_state, it);
+                        increment_instruction_size = true;
                     }
                     else {
-                        writer << stf::InstOpcode32Record(opcode.opcode);
+                        increment_instruction_size = false;
                     }
                 }
+
+                // Make sure all of the original and new instruction bytes are accounted for
+                stf_assert(orig_inst_bytes_seen == total_morph_size,
+                           "Attempted to replace "
+                           << orig_inst_bytes_seen
+                           << " bytes of instructions with "
+                           << total_morph_size
+                           << " bytes of instructions");
             }
             else {
-                inst.write(writer);
+                it->write(writer);
             }
 
-            for(const auto& op: inst.getDestOperands()) {
-                reg_state.regStateUpdate(op.getReg(), op.getValue());
-            }
+            updateFinalRegState(reg_state, it);
         }
     }
     catch(const trace_tools::CommandLineParser::EarlyExitException& e) {

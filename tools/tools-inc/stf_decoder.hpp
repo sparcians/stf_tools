@@ -268,6 +268,26 @@ namespace stf {
             }
 
             /**
+             * Returns the stf::INST_MEM_ACCESS type associated with the instruction
+             */
+            inline stf::INST_MEM_ACCESS getMemAccessType() const {
+                const bool is_load = isLoad();
+                const bool is_store = isStore();
+
+                stf_assert(!(is_load && is_store), "Instruction cannot be both a load and a store");
+
+                if(STF_EXPECT_FALSE(is_load)) {
+                    return stf::INST_MEM_ACCESS::READ;
+                }
+
+                if(STF_EXPECT_FALSE(is_store)) {
+                    return stf::INST_MEM_ACCESS::WRITE;
+                }
+
+                return stf::INST_MEM_ACCESS::INVALID;
+            }
+
+            /**
              * Returns whether the decoded instruction is a branch
              */
             inline bool isBranch() const {
