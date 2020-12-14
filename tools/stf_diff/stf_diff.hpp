@@ -4,9 +4,10 @@
 #include <iostream>
 #include <string>
 
-#include "Disassembler.hpp"
+#include "disassembler.hpp"
 #include "command_line_parser.hpp"
 #include "stf_inst.hpp"
+#include "stf_vlen.hpp"
 #include "util.hpp"
 
 struct STFDiffConfig {
@@ -122,15 +123,17 @@ class STFDiffInst {
             private:
                 const stf::Registers::STF_REG reg_;
                 const stf::Registers::STF_REG_OPERAND_TYPE type_;
-                const uint64_t data_;
+                const stf::InstRegRecord::VectorType data_;
                 const std::string_view label_;
+                const stf::vlen_t vlen_;
 
             public:
                 explicit Operand(const stf::Operand& op) :
                     reg_(op.getReg()),
                     type_(op.getType()),
-                    data_(op.getValue()),
-                    label_(op.getLabel())
+                    data_(op.isVector() ? op.getVectorValue() : stf::InstRegRecord::VectorType(1, op.getScalarValue())),
+                    label_(op.getLabel()),
+                    vlen_(op.getVLen())
                 {
                 }
 
@@ -142,8 +145,14 @@ class STFDiffInst {
                     return type_;
                 }
 
-                uint64_t getData() const {
+                const stf::InstRegRecord::VectorType& getVectorData() const {
+                    stf_assert(isVector(), "Attempted to get vector data from a scalar operand");
                     return data_;
+                }
+
+                uint64_t getScalarData() const {
+                    stf_assert(!isVector(), "Attempted to get scalar data from a vector operand");
+                    return data_.front();
                 }
 
                 const std::string_view& getLabel() const {
@@ -157,6 +166,14 @@ class STFDiffInst {
                 bool operator!=(const Operand& rhs) const {
                     return !(*this == rhs);
                 }
+
+                bool isVector() const {
+                    return data_.size() > 1;
+                }
+
+                stf::vlen_t getVLen() const {
+                    return vlen_;
+                }
         };
 
         uint64_t pc_;
@@ -165,7 +182,6 @@ class STFDiffInst {
         uint64_t index_;
         std::vector<MemAccess> mem_accesses_;
         std::vector<Operand> operands_;
-        const stf::ISA isa_;
         const stf::Disassembler* dis_ = nullptr;
 
     public:
@@ -175,12 +191,10 @@ class STFDiffInst {
                     bool diff_memory,
                     bool diff_registers,
                     bool ignore_addresses,
-                    const stf::ISA isa,
                     const stf::Disassembler* dis) :
             pc_(ignore_addresses ? stf::page_utils::INVALID_PHYS_ADDR : inst.pc()),
             opcode_(inst.opcode()),
             index_(inst.index()),
-            isa_(isa),
             dis_(dis)
         {
             //physPC_ = pPC ? inst->physPc() : INVALID_PHYS_ADDR;
@@ -212,7 +226,6 @@ class STFDiffInst {
             index_ = std::move(rhs.index_);
             mem_accesses_ = std::move(rhs.mem_accesses_);
             operands_ = std::move(rhs.operands_);
-            const_cast<stf::ISA&>(isa_) = std::move(rhs.isa_);
             dis_ = std::move(rhs.dis_);
 
             return *this;
@@ -230,7 +243,6 @@ class STFDiffInst {
             std::copy(rhs.mem_accesses_.begin(), rhs.mem_accesses_.end(), std::back_inserter(mem_accesses_));
             operands_.clear();
             std::copy(rhs.operands_.begin(), rhs.operands_.end(), std::back_inserter(operands_));
-            const_cast<stf::ISA&>(isa_) = rhs.isa_;
             dis_ = rhs.dis_;
 
             return *this;

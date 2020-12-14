@@ -33,7 +33,7 @@ int main(int argc, char* argv[]) {
                     const auto& reg_rec = rec->as<stf::InstRegRecord>();
                     if(STF_EXPECT_FALSE((reg_rec.getOperandType() == stf::Registers::STF_REG_OPERAND_TYPE::REG_DEST) &&
                                         (reg_rec.getReg() == stf::Registers::STF_REG::STF_REG_CSR_SATP))) {
-                        const uint64_t new_satp_value = reg_rec.getData();
+                        const uint64_t new_satp_value = reg_rec.getScalarData();
                         // Ignore the initial zeroing out of the satp register
                         process_instruction_counts.emplace(new_satp_value, 0);
                         cur_satp = new_satp_value;

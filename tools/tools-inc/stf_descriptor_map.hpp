@@ -26,6 +26,7 @@ static const auto STF_DESCRIPTOR_NAME_MAP = std::unordered_map<std::string, stf:
     {"STF_TRACE_INFO", stf::descriptors::internal::Descriptor::STF_TRACE_INFO},
     {"STF_TRACE_INFO_FEATURE", stf::descriptors::internal::Descriptor::STF_TRACE_INFO_FEATURE},
     {"STF_VERSION", stf::descriptors::internal::Descriptor::STF_VERSION},
+    {"STF_VLEN_CONFIG", stf::descriptors::internal::Descriptor::STF_VLEN_CONFIG},
     {"STF_END_HEADER", stf::descriptors::internal::Descriptor::STF_END_HEADER},
     {"STF_RESERVED", stf::descriptors::internal::Descriptor::STF_RESERVED},
     {"STF_RESERVED_END", stf::descriptors::internal::Descriptor::STF_RESERVED_END}

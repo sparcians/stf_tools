@@ -211,7 +211,7 @@ class ErrorTracker {
                  * Subclass of std::stringbuf that optionally exits the program when its parent ostream is
                  * flushed - i.e. when an error is printed.
                  */
-                class ErrorOstreamBuf : public std::stringbuf {
+                class ErrorOstreamBuf final : public std::stringbuf {
                     private:
                         std::ostream& os_; /**< Underlying ostream that gets our output */
                         bool continue_on_error_ = false; /**< If false, will exit the program after printing the first error */

@@ -106,20 +106,21 @@ class STFExtractor {
             // The trace_info and instruction initial info, such as
             // pc, physical pc are required to written in new output file.
             stf_reader_.copyHeader(stf_writer_);
-            stf_writer_.addTraceInfo(stf::TraceInfoRecord(stf::STF_GEN::STF_GEN_STF_EXTRACT,
-                                                          stf::STF_TOOL_VERSION,
-                                                          0,
-                                                          0,
-                                                          "Trace extracted with stf_extract"));
+            stf_writer_.addTraceInfo(stf::STF_GEN::STF_GEN_STF_EXTRACT,
+                                     TRACE_TOOLS_VERSION_MAJOR,
+                                     TRACE_TOOLS_VERSION_MINOR,
+                                     TRACE_TOOLS_VERSION_MINOR_MINOR,
+                                     "Trace extracted with stf_extract");
 
             if (modify_header) {
                 stf_writer_.addHeaderComments(comments_);
                 stf_writer_.setHeaderPC(pc_tracker_.getNextPC());
-                stf_writer_.finalizeHeader();
 
                 if (stf_reader_.getTraceFeatures()->hasFeature(stf::TRACE_FEATURES::STF_CONTAIN_PROCESS_ID)) {
                     stf_writer_ << stf::ProcessIDExtRecord(inst_it_->tgid(), inst_it_->tid(), inst_it_->asid());
                 }
+
+                stf_writer_.finalizeHeader();
 
                 regstate_.writeRegState(stf_writer_);
 

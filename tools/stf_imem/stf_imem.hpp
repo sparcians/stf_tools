@@ -6,7 +6,7 @@
 #include <string>
 #include <vector>
 
-#include "Disassembler.hpp"
+#include "disassembler.hpp"
 #include "format_utils.hpp"
 #include "stf_enums.hpp"
 #include "stf_inst.hpp"
@@ -294,9 +294,9 @@ class IMemMapVec {
             }
 
             stf::format_utils::formatSpaces(os, 2);
-            dis.printOpcode (inst_set_, opcode, os);
+            dis.printOpcode(os, opcode);
             stf::format_utils::formatSpaces(os, 1);
-            dis.printDisassembly (inst_pc, inst_set_, opcode, os);
+            dis.printDisassembly(os, inst_pc, opcode);
 
             os << std::endl;
         }
@@ -325,9 +325,9 @@ class IMemMapVec {
             }
 
             stf::format_utils::formatSpaces(os, 2);
-            dis.printOpcode (inst_set_, opcode, os);
+            dis.printOpcode(os, opcode);
             stf::format_utils::formatSpaces(os, 2);
-            dis.printDisassembly (inst_pc, inst_set_, opcode, os);
+            dis.printDisassembly(os, inst_pc, opcode);
 
             os << std::endl;
         }
@@ -405,7 +405,7 @@ class IMemMapVec {
 
             std::multimap<SortedMapKey, SortedVector> sorted_map;
             bool first = true;
-            stf::Disassembler dis(config.use_aliases);
+            stf::Disassembler dis(inst_set_, config.use_aliases);
             uint64_t block_count = 0;
 
             for (auto it = imem_mapvec_.rbegin(); it != imem_mapvec_.rend(); it ++) {

@@ -37,7 +37,7 @@ static std::pair<FileList, std::string> parseCommandLine (int argc, char **argv)
     parser.addMultiFlag('e', "M", "ending at the nth instruction (exclusive) of input trace");
     parser.addMultiFlag('r', "K", "repeat the specified intruction interval [N, M) K times. Default is 0.");
     parser.addMultiFlag('f', "trace", "filename of input trace");
-    parser.addMultiFlag('o', "trace", "output trace filename. stdout is default");
+    parser.addFlag('o', "trace", "output trace filename. stdout is default");
     parser.appendHelpText("-b, -e, -r, and -f flags can be specified multiple times for merging multiple traces");
 
     parser.parseArguments(argc, argv);
@@ -48,28 +48,20 @@ static std::pair<FileList, std::string> parseCommandLine (int argc, char **argv)
 
     parser.getArgumentValue('o', output_filename);
 
-    auto b_it = parser.getMultipleValueArgument('b').begin();
-    auto e_it = parser.getMultipleValueArgument('e').begin();
-    auto r_it = parser.getMultipleValueArgument('r').begin();
-    auto f_it = parser.getMultipleValueArgument('f').begin();
     for(const auto& arg: parser) {
-        switch(arg->first) {
+        switch(arg.getFlag()) {
             case 'b':
-                bcount = parseInt<uint64_t>(*b_it);
-                ++b_it;
+                bcount = parseInt<uint64_t>(arg.getValue());
                 break;
             case 'e':
-                ecount = parseInt<uint64_t>(*e_it);
-                ++e_it;
+                ecount = parseInt<uint64_t>(arg.getValue());
                 break;
             case 'r':
-                repeat = parseInt<uint64_t>(*r_it);
-                ++r_it;
+                repeat = parseInt<uint64_t>(arg.getValue());
                 break;
             case 'f':
                 stf_assert(ecount > bcount, "End count must be greater than start count");
-                tracelist.emplace_back(bcount, ecount, repeat, *f_it);
-                ++f_it;
+                tracelist.emplace_back(bcount, ecount, repeat, arg.getValue());
 
                 // clear it for next trace input;
                 bcount = 1;
@@ -166,7 +158,7 @@ int main(int argc, char **argv) {
     }
 
     bool sameInput = true;
-    std::string inputfilename = tracelist.begin()->filename;
+    std::string_view inputfilename = tracelist.begin()->filename;
     uint64_t repeat = tracelist.begin()->repeat;
     for (const auto& f: tracelist) {
         if (inputfilename != f.filename || repeat != f.repeat) {

@@ -10,6 +10,7 @@
 #include "stf_valid_value.hpp"
 #include "stf_record_types.hpp"
 #include "filesystem.hpp"
+#include "tools_util.hpp"
 
 namespace stf {
     /**
@@ -88,6 +89,7 @@ namespace stf {
             stf::ValidValue<uint32_t> opcode_;
             bool is_compressed_ = false; /**< Set to true if the decoded instruction was compressed */
             mutable bool is_invalid_ = false;
+            mutable std::string disasm_;
 
             const MavisType::DecodeInfoType& getDecodeInfo_() const {
                 if(STF_EXPECT_FALSE(has_pending_decode_info_)) {
@@ -95,6 +97,7 @@ namespace stf {
                         decode_info_ = mavis_.getInfo(opcode_.get());
                         has_pending_decode_info_ = false;
                         is_invalid_ = false;
+                        disasm_.clear();
                     }
                     catch(const mavis::IllegalOpcode&) {
                         is_invalid_ = true;
@@ -121,7 +124,8 @@ namespace stf {
                     return std::string(mavis_path_env);
                 }
 
-                const auto relative_path = fs::read_symlink("/proc/self/exe").parent_path() / DEFAULT_RELATIVE_JSON_PATH_;
+                const auto relative_path = getExecutablePath().parent_path() / DEFAULT_RELATIVE_JSON_PATH_;
+
                 if(fs::exists(relative_path)) {
                     return relative_path;
                 }
@@ -190,10 +194,20 @@ namespace stf {
              * \param mavis_path Path to Mavis checkout
              */
             explicit STFDecoder(const std::string& mavis_path) :
-                mavis_({mavis_path + "/json/isa_rv64g.json", mavis_path + "/json/isa_rv64c.json"}, {})
-                       //{mavis_path + "/test/mallard_uarch_rv64g.json", mavis_path + "/test/mallard_uarch_rv64c.json"})
+                mavis_({mavis_path + "/json/isa_rv64g.json", // G = IMAFD (general purpose)
+                        mavis_path + "/json/isa_rv64c.json", // compressed
+                        mavis_path + "/json/isa_rv64cf.json", // compressed float
+                        mavis_path + "/json/isa_rv64cd.json", // compressed double-precision
+                        mavis_path + "/json/isa_rv64v.json", // vector
+                        mavis_path + "/json/isa_rv64va.json", // vector
+                        mavis_path + "/json/isa_rv64vf.json", // vector
+                        mavis_path + "/json/isa_rv64b.json"}, // bitmanip
+                       {})
             {
             }
+
+            STFDecoder(STFDecoder&&) = default;
+            STFDecoder& operator=(STFDecoder&&) = default;
 
             /**
              * Decodes an instruction from an STFRecord
@@ -302,6 +316,35 @@ namespace stf {
             }
 
             /**
+             * Returns whether the decoded instruction is an indirect branch
+             */
+            inline bool isIndirect() const {
+                return isInstType(mavis::InstMetaData::InstructionTypes::JAL) ||
+                       isInstType(mavis::InstMetaData::InstructionTypes::JALR);
+            }
+
+            /**
+             * Returns whether the decoded instruction is a JALR instruction
+             */
+            inline bool isJalr() const {
+                return isInstType(mavis::InstMetaData::InstructionTypes::JALR);
+            }
+
+            /**
+             * Returns whether the decoded instruction is a AUIPC instruction
+             */
+            inline bool isAuipc() const {
+                return (opcode_.get() & 0x0000007f) == 0x00000017;
+            }
+
+            /**
+             * Returns whether the decoded instruction is a LUI instruction
+             */
+            inline bool isLui() const {
+                return (opcode_.get() & 0x0000007f) == 0x00000037;
+            }
+
+            /**
              * Returns whether the decoded instruction is an exception return
              */
             inline bool isExceptionReturn() const {
@@ -338,6 +381,25 @@ namespace stf {
             }
 
             /**
+             * Gets the disassembly for the decoded instruction
+             */
+            inline const std::string& getDisassembly() const {
+                static const std::string UNIMP = "c.unimp";
+
+                try {
+                    const auto& decode_info = getDecodeInfo_();
+                    if(STF_EXPECT_FALSE(disasm_.empty())) {
+                        disasm_ = decode_info->opinfo->dasmString();
+                    }
+                }
+                catch(const InvalidInstException&) {
+                    return UNIMP;
+                }
+
+                return disasm_;
+            }
+
+            /**
              * Gets the immediate for the decoded instruction
              */
             inline uint64_t getImmediate() const {
@@ -367,6 +429,30 @@ namespace stf {
             inline int64_t getSignedImmediate() const {
                 try {
                     return getDecodeInfo_()->opinfo->getSignedOffset();
+                }
+                catch(const InvalidInstException&) {
+                    return 0;
+                }
+            }
+
+            /**
+             * Gets a source register field for the decoded instruction
+             */
+            inline uint32_t getSourceRegister(const mavis::InstMetaData::OperandFieldID& fid) const {
+                try {
+                    return getDecodeInfo_()->opinfo->getSourceOpInfo().getFieldValue(fid);
+                }
+                catch(const InvalidInstException&) {
+                    return 0;
+                }
+            }
+
+            /**
+             * Gets a destination register field for the decoded instruction
+             */
+            inline uint32_t getDestRegister(const mavis::InstMetaData::OperandFieldID& fid) const {
+                try {
+                    return getDecodeInfo_()->opinfo->getDestOpInfo().getFieldValue(fid);
                 }
                 catch(const InvalidInstException&) {
                     return 0;

@@ -24,6 +24,8 @@ endif()
 include_directories(${STF_BASE}/stf-inc)
 include_directories(${STF_INCLUDE_DIRS} ${STF_TOOL_DIR}/tools-inc)
 
+include(${STF_TOOL_DIR}/FindDisassemblers.cmake)
+
 add_subdirectory(stf_dump)
 add_subdirectory(stf_check)
 add_subdirectory(stf_extract)

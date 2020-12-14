@@ -1,6 +1,7 @@
 #pragma once
 
 #include <algorithm>
+#include <deque>
 #include <iostream>
 #include <unordered_map>
 #include <memory>
@@ -131,7 +132,7 @@ namespace trace_tools {
                     }
 
                     template<typename T, int Radix = 0>
-                    typename std::enable_if<std::is_enum<T>::value, T>::type
+                    inline typename std::enable_if<std::is_enum<T>::value, T>::type
                     getValueAs() const {
                         static thread_local std::unordered_map<uint64_t, T> parsed_values_;
                         auto it = parsed_values_.find(id_);
@@ -146,7 +147,7 @@ namespace trace_tools {
                     }
 
                     template<typename T, int Radix = 10>
-                    typename std::enable_if<std::is_integral<T>::value && !std::is_enum<T>::value, T>::type
+                    inline typename std::enable_if<std::is_integral<T>::value && !std::is_enum<T>::value, T>::type
                     getValueAs() const {
                         static thread_local std::unordered_map<uint64_t, T> parsed_values_;
                         auto it = parsed_values_.find(id_);
@@ -161,7 +162,7 @@ namespace trace_tools {
                     }
 
                     template<typename T>
-                    typename std::enable_if<!std::is_integral<T>::value && !std::is_enum<T>::value && !std::is_same<T, std::string>::value, T>::type
+                    inline typename std::enable_if<!std::is_integral<T>::value && !std::is_enum<T>::value && !std::is_same<T, std::string>::value, T>::type
                     getValueAs() const {
                         static thread_local std::unordered_map<uint64_t, T> parsed_values_;
                         auto it = parsed_values_.find(id_);
@@ -179,7 +180,7 @@ namespace trace_tools {
                     }
 
                     template<typename T>
-                    typename std::enable_if<std::is_same<T, std::string>::value, const T&>::type
+                    inline typename std::enable_if<std::is_same<T, std::string>::value, const T&>::type
                     getValueAs() const {
                         return value_;
                     }
@@ -219,7 +220,7 @@ namespace trace_tools {
 
             class MultiArgumentWithValues : public NamedValueArgument {
                 protected:
-                    std::vector<std::string> values_;
+                    std::deque<std::string> values_; // Using a deque ensures that pointers to the values will be stable
 
                 public:
                     explicit MultiArgumentWithValues(const std::string& name, const std::string& help_message) :
@@ -245,15 +246,110 @@ namespace trace_tools {
                     }
             };
 
+            // This class gives an ordered view of the arguments as the parser encountered them
+            // Used by tools like stf_merge that have order-sensitive arguments
+            class OrderedArgumentView {
+                public:
+                    class View {
+                        private:
+                            std::pair<char, const std::string*> data_;
+
+                        public:
+                            template<typename ... Args>
+                            View(Args&&... args) :
+                                data_(std::forward<Args>(args)...)
+                            {
+                            }
+
+                            inline bool hasValue() const {
+                                return data_.second != nullptr;
+                            }
+
+                            inline char getFlag() const {
+                                return data_.first;
+                            }
+
+                            inline const std::string& getValue() const {
+                                stf_assert(hasValue(), "Attempted to get value of a value-less argument.");
+                                return *data_.second;
+                            }
+                    };
+
+                private:
+                    using VecType = std::vector<View>;
+                    using value_type = VecType::value_type;
+                    VecType args_;
+
+                public:
+                    class iterator {
+                        private:
+                            VecType::const_iterator it_;
+
+                        public:
+                            iterator(const VecType& vec, const bool is_end = false) :
+                                it_(is_end ? vec.end() : vec.begin())
+                            {
+                            }
+
+                            inline iterator& operator++() {
+                                ++it_;
+                                return *this;
+                            }
+
+                            inline iterator operator++(int) {
+                                const auto copy = *this;
+                                operator++();
+                                return copy;
+                            }
+
+                            inline bool operator==(const iterator& rhs) const {
+                                return it_ == rhs.it_;
+                            }
+
+                            inline bool operator!=(const iterator& rhs) const {
+                                return it_ != rhs.it_;
+                            }
+
+                            inline const value_type& operator*() const {
+                                return *it_;
+                            }
+
+                            inline const value_type* operator->() const {
+                                return it_.operator->();
+                            }
+                    };
+
+                    void add(const char id, const BaseArgument& arg) {
+                        const std::string* str_ptr = nullptr;
+
+                        if(arg.hasMultipleValues()) {
+                            str_ptr = &dynamic_cast<const MultiArgumentWithValues&>(arg).getValues().back();
+                        }
+
+                        args_.emplace_back(id, str_ptr);
+                    }
+
+                    auto begin() const {
+                        return iterator(args_);
+                    }
+
+                    auto end() const {
+                        return iterator(args_, true);
+                    }
+            };
+
 
             const std::string program_name_;
             const bool allow_hidden_arguments_;
 
             using ArgMap = std::unordered_map<char, std::unique_ptr<BaseArgument>>;
+            using ArgInsertionVec = std::vector<ArgMap::iterator>;
+
             ArgMap arguments_;
-            std::vector<ArgMap::iterator> arguments_insertion_ordered_;
+            ArgInsertionVec arguments_insertion_ordered_;
 
             std::vector<std::unique_ptr<NamedValueArgument>> positional_arguments_;
+            OrderedArgumentView ordered_arguments_;
             std::stringstream help_addendum_; // String that will be appended to the end of the help string
             std::ostringstream arg_str_;
             size_t max_argument_width_ = 1;
@@ -495,8 +591,9 @@ namespace trace_tools {
                             throw EarlyExitException(0, getVersion());
                         }
 
-                        if(const auto it = arguments_.find(c_char); it != arguments_.end()) {
+                        if(const auto it = arguments_.find(c_char); STF_EXPECT_TRUE(it != arguments_.end())) {
                             it->second->addValue(optarg);
+                            ordered_arguments_.add(c_char, *it->second);
                             continue;
                         }
 
@@ -558,7 +655,7 @@ namespace trace_tools {
             }
 
             template<typename T>
-            typename std::enable_if<!std::is_integral<T>::value && !std::is_enum<T>::value, bool>::type
+            inline typename std::enable_if<!std::is_integral<T>::value && !std::is_enum<T>::value, bool>::type
             getArgumentValue(const char arg, T& value) const {
                 const auto& a = arguments_.at(arg);
                 if(STF_EXPECT_FALSE(a->hasMultipleValues())) {
@@ -579,7 +676,7 @@ namespace trace_tools {
             }
 
             template<typename T, int Radix = 0>
-            typename std::enable_if<std::is_enum<T>::value, bool>::type
+            inline typename std::enable_if<std::is_enum<T>::value, bool>::type
             getArgumentValue(const char arg, T& value) const {
                 const auto& a = arguments_.at(arg);
                 if(STF_EXPECT_FALSE(a->hasMultipleValues())) {
@@ -600,7 +697,7 @@ namespace trace_tools {
             }
 
             template<typename T, int Radix = 10>
-            typename std::enable_if<std::is_integral<T>::value && !std::is_enum<T>::value, bool>::type
+            inline typename std::enable_if<std::is_integral<T>::value && !std::is_enum<T>::value, bool>::type
             getArgumentValue(const char arg, T& value) const {
                 const auto& a = arguments_.at(arg);
                 if(STF_EXPECT_FALSE(a->hasMultipleValues())) {
@@ -621,7 +718,7 @@ namespace trace_tools {
             }
 
             template<typename T>
-            typename std::enable_if<!std::is_scalar<T>::value, const T&>::type
+            inline typename std::enable_if<!std::is_scalar<T>::value, const T&>::type
             getPositionalArgument(const size_t idx) const {
                 const auto& a = getPositionalArgument_(idx);
                 if(STF_EXPECT_FALSE(a->hasMultipleValues())) {
@@ -632,7 +729,7 @@ namespace trace_tools {
             }
 
             template<typename T>
-            typename std::enable_if<std::is_scalar<T>::value && !std::is_integral<T>::value, T>::type
+            inline typename std::enable_if<std::is_scalar<T>::value && !std::is_integral<T>::value, T>::type
             getPositionalArgument(const size_t idx) const {
                 const auto& a = getPositionalArgument_(idx);
                 if(STF_EXPECT_FALSE(a->hasMultipleValues())) {
@@ -643,7 +740,7 @@ namespace trace_tools {
             }
 
             template<typename T, int Radix = 10>
-            typename std::enable_if<std::is_integral<T>::value, T>::type
+            inline typename std::enable_if<std::is_integral<T>::value, T>::type
             getPositionalArgument(const size_t idx) const {
                 const auto& a = getPositionalArgument_(idx);
                 if(STF_EXPECT_FALSE(a->hasMultipleValues())) {
@@ -654,7 +751,7 @@ namespace trace_tools {
             }
 
             template<typename T>
-            void getPositionalArgument(const size_t idx, T& value) const {
+            inline void getPositionalArgument(const size_t idx, T& value) const {
                 value = getPositionalArgument<T>(idx);
             }
 
@@ -680,7 +777,7 @@ namespace trace_tools {
                 help_addendum_ << std::endl << append_str;
             }
 
-            void raiseErrorWithHelp(const std::string_view msg) {
+            void raiseErrorWithHelp(const std::string_view msg) const {
                 std::ostringstream ss;
                 ss << msg << std::endl;
                 getHelpMessage(ss);
@@ -688,21 +785,21 @@ namespace trace_tools {
             }
 
             auto begin() const {
-                return arguments_insertion_ordered_.begin();
+                return ordered_arguments_.begin();
             }
 
             auto end() const {
-                return arguments_insertion_ordered_.end();
+                return ordered_arguments_.end();
             }
     };
 
     template<>
-    std::string_view CommandLineParser::ArgumentWithValue::getValueAs<std::string_view>() const {
+    inline std::string_view CommandLineParser::ArgumentWithValue::getValueAs<std::string_view>() const {
         return value_;
     }
 
     template<>
-    bool CommandLineParser::getArgumentValue(const char arg, bool& value) const {
+    inline bool CommandLineParser::getArgumentValue(const char arg, bool& value) const {
         const auto& a = arguments_.at(arg);
         if(STF_EXPECT_FALSE(a->hasMultipleValues())) {
             throw InvalidArgumentException("Attempted to call getArgumentValue on a multi-value argument.");

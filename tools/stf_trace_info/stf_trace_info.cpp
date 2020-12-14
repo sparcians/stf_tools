@@ -145,7 +145,10 @@ int main (int argc, char **argv) {
     }
 
     // Open stf trace reader
-    stf::STFReader reader(trace_filename);
+    const bool enable_writer = !output_filename.empty();
+    // Opens in single-threaded mode if we aren't writing anything
+    // (so we don't wait around to decompress a chunk we aren't going to use)
+    stf::STFReader reader(trace_filename, enable_writer);
     /* FIXME Because we have not kept up with STF versioning, this is currently broken and must be loosened.
     if (!stfr_check_version(reader)) {
         stfr_close(reader);
@@ -154,7 +157,7 @@ int main (int argc, char **argv) {
     */
 
     stf::STFWriter writer;
-    if (!output_filename.empty()) {
+    if (enable_writer) {
         writer.open(output_filename);
     }
 

@@ -5,7 +5,6 @@
 #include "stf_record_types.hpp"
 
 #include "command_line_parser.hpp"
-#include "Disassembler.hpp"
 #include "stf_record_dump.hpp"
 #include "tools_util.hpp"
 
@@ -52,9 +51,6 @@ int main (int argc, char **argv)
     try {
         // Get arguments
         const STFRecordDumpConfig config = parseCommandLine(argc, argv);
-
-        // Create disassembler
-        stf::Disassembler dis(config.use_aliases);
 
         // Open stf trace reader
         stf::STFReader stf_reader(config.trace_filename);

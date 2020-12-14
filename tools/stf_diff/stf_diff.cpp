@@ -33,7 +33,7 @@ std::ostream& operator<<(std::ostream& os, const STFDiffInst& inst) {
     stf::format_utils::formatHex(os, inst.opcode_);
     os << ' ';
 
-    inst.dis_->printDisassembly(inst.pc_, inst.isa_, inst.opcode_, os);
+    inst.dis_->printDisassembly(os, inst.pc_, inst.opcode_);
 
     if (!inst.mem_accesses_.empty()) {
         /*if (inst.mem_accesses[0].paddr == INVALID_PHYS_ADDR)
@@ -58,8 +58,17 @@ std::ostream& operator<<(std::ostream& os, const STFDiffInst& inst) {
     }
 
     for (const auto &rit : inst.operands_) {
-        os << "   " << rit.getLabel() << ": " << rit.getReg() << " : ";
-        stf::format_utils::formatHex(os, rit.getData());
+        if(STF_EXPECT_FALSE(rit.isVector())) {
+            std::ostringstream ss;
+            ss << "   " << rit.getLabel() << ": " << rit.getReg() << " : ";
+            const size_t padding = static_cast<size_t>(ss.tellp());
+            os << ss.str();
+            stf::format_utils::formatVector(os, rit.getVectorData(), rit.getVLen(), padding, false);
+        }
+        else {
+            os << "   " << rit.getLabel() << ": " << rit.getReg() << " : ";
+            stf::format_utils::formatHex(os, rit.getScalarData());
+        }
     }
 
     return os;
@@ -97,9 +106,10 @@ int streamingDiff(const STFDiffConfig &config,
     uint64_t count = 0;
     uint64_t diff_count = 0;
 
-    stf::Disassembler dis(config.use_aliases);
     const auto inst_set = rdr1.getISA();
     stf_assert(inst_set == rdr2.getISA(), "Traces must have the same instruction set in order to be compared!");
+
+    stf::Disassembler dis(inst_set, config.use_aliases);
 
     while ((!config.length) || (count < config.length)) {
         if (diff_count >= config.diff_count) {
@@ -122,7 +132,6 @@ int streamingDiff(const STFDiffConfig &config,
                                          config.diff_memory && !inst2.getMemoryAccesses().empty(),
                                          config.diff_registers,
                                          config.ignore_addresses,
-                                         inst_set,
                                          &dis)
                           << std::endl;
             }
@@ -143,7 +152,6 @@ int streamingDiff(const STFDiffConfig &config,
                                          config.diff_memory && !inst1.getMemoryAccesses().empty(),
                                          config.diff_registers,
                                          config.ignore_addresses,
-                                         inst_set,
                                          &dis)
                           << std::endl;
             }
@@ -175,7 +183,6 @@ int streamingDiff(const STFDiffConfig &config,
                           config.diff_memory && !inst1.getMemoryAccesses().empty(),
                           config.diff_registers,
                           config.ignore_addresses,
-                          inst_set,
                           &dis);
         STFDiffInst diff2(inst2,
                           config.diff_physical_data,
@@ -183,7 +190,6 @@ int streamingDiff(const STFDiffConfig &config,
                           config.diff_memory && !inst2.getMemoryAccesses().empty(),
                           config.diff_registers,
                           config.ignore_addresses,
-                          inst_set,
                           &dis);
 
         if (diff1 != diff2) {
@@ -212,8 +218,7 @@ void extractInstructions(const std::string &trace,
                          const STFDiffConfig &config) {
     // Open stf trace reader
     stf::STFInstReader rdr(trace);
-    stf::Disassembler dis(config.use_aliases);
-    const auto inst_set = rdr.getISA();
+    stf::Disassembler dis(rdr.getISA(), config.use_aliases);
     auto reader = getBeginIterator(start, config.diff_markpointed_region, config.diff_tracepointed_region, rdr);
 
     uint64_t count = 0;
@@ -242,7 +247,6 @@ void extractInstructions(const std::string &trace,
                          config.diff_memory && !inst.getMemoryAccesses().empty(),
                          config.diff_registers,
                          config.ignore_addresses,
-                         inst_set,
                          &dis);
 
         last_user_pc = inst.pc();

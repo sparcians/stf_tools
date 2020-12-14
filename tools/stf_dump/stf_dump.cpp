@@ -14,7 +14,7 @@
 #include <string>
 #include <vector>
 #include "command_line_parser.hpp"
-#include "Disassembler.hpp"
+#include "disassembler.hpp"
 #include "print_utils.hpp"
 #include "stf_dump.hpp"
 #include "stf_inst_reader.hpp"
@@ -30,7 +30,7 @@ static STFDumpConfig parseCommandLine (int argc, char **argv) {
     parser.addFlag('u', "only dump user-mode instructions");
     parser.addFlag('p', "show physical addresses");
     parser.addFlag('P', "show the PTE entries");
-    parser.addFlag('A', "use aliases for disassembly");
+    parser.addFlag('A', "use aliases for disassembly (only used by binutils disassembler)");
     parser.addFlag('m', "Enables cross checking trace instruction opcode against opcode from symbol table file <*_symTab.yaml>. Applicable only when '-y' flag is enabled");
     parser.addFlag('s', "N", "start dumping at N-th instruction");
     parser.addFlag('e', "M", "end dumping at M-th instruction");
@@ -58,6 +58,38 @@ static STFDumpConfig parseCommandLine (int argc, char **argv) {
     return config;
 }
 
+/**
+ * Prints an opcode along with its disassembly
+ * \param opcode instruction opcode
+ * \param pc instruction PC
+ * \param os The ostream to write the assembly to
+ */
+static inline void printOpcodeWithDisassembly(const stf::Disassembler& dis,
+                                              const uint32_t opcode,
+                                              const uint64_t pc) {
+    static constexpr int OPCODE_PADDING = stf::format_utils::OPCODE_FIELD_WIDTH - stf::format_utils::OPCODE_WIDTH - 1;
+
+    dis.printOpcode(std::cout, opcode);
+
+    stf::print_utils::printSpaces(OPCODE_PADDING); // pad out the rest of the opcode field with spaces
+
+    dis.printDisassembly(std::cout, pc, opcode);
+    // if (show_annotation)
+    // {
+    //     // Retrieve symbol information from symbol table hash map
+    //     symInfo = annoSt->getSymbol(dism_pc);
+    //     if (match_symbol_opcode)
+    //     {
+    //         if(symInfo.opcode != inst.opcode())
+    //             std::cout << " | " << " [ " << symInfo.libName << ", " << symInfo.symName << ", OPCODE_MISMATCH: " << std::hex  << symInfo.opcode << " ] ";
+    //         else
+    //             std::cout << " | " << " [ " << symInfo.libName << ", " << symInfo.symName << ", OPCODE_CROSSCHECKED"  << " ] ";
+    //     }
+    //     else
+    //         std::cout << " | " << " [ " << symInfo.libName << ", " << symInfo.symName << " ] ";
+    // }
+    std::cout << std::endl;
+}
 
 int main (int argc, char **argv)
 {
@@ -65,14 +97,12 @@ int main (int argc, char **argv)
     try {
         const STFDumpConfig config = parseCommandLine (argc, argv);
 
-        // Create disassembler
-        stf::Disassembler dis(config.use_aliases);
-
         // Open stf trace reader
         stf::STFInstReader stf_reader(config.trace_filename, config.user_mode_only);
         stf_reader.checkVersion();
 
-        const stf::ISA inst_set = stf_reader.getISA();
+        // Create disassembler
+        stf::Disassembler dis(stf_reader.getISA(), config.use_aliases);
 
         // Print Version info
         stf::print_utils::printLabel("VERSION");
@@ -172,10 +202,7 @@ int main (int argc, char **argv)
             }
 
             stf::print_utils::printSpaces(6); // Additional padding so that opcode lines up with operand values
-            stf::print_utils::printOpcodeWithDisassembly(dis,
-                                                         inst_set,
-                                                         inst.opcode(),
-                                                         inst.pc());
+            printOpcodeWithDisassembly(dis, inst.opcode(), inst.pc());
 
 
             if(!config.concise_mode) {
@@ -209,7 +236,7 @@ int main (int argc, char **argv)
                     const auto& microop = uop->as<stf::InstMicroOpRecord>();
                     stf::print_utils::printOperandLabel(microop.getSize() == 2 ? "UOp16 " : "UOp32 ");
                     stf::print_utils::printSpaces(stf::format_utils::REGISTER_NAME_WIDTH + stf::format_utils::DATA_WIDTH);
-                    stf::print_utils::printOpcodeWithDisassembly(dis, inst_set, microop.getMicroOp(), inst.pc());
+                    printOpcodeWithDisassembly(dis, microop.getMicroOp(), inst.pc());
                 }
 
                 for(const auto& reg: inst.getReadyRegs()) {

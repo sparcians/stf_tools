@@ -203,13 +203,14 @@ namespace stf {
              */
             void writeStartingRecords(const STFInst& inst) {
                 stf_writer_->setHeaderPC(inst.pc());
-                stf_writer_->finalizeHeader();
-
-                reg_state_.writeRegState(*stf_writer_);
 
                 if (stf_inst_reader_.getTraceFeatures()->hasFeature(TRACE_FEATURES::STF_CONTAIN_PROCESS_ID)) {
                     *stf_writer_ << ProcessIDExtRecord(inst.tgid(), inst.tid(), inst.asid());
                 }
+
+                stf_writer_->finalizeHeader();
+
+                reg_state_.writeRegState(*stf_writer_);
 
                 if (stf_inst_reader_.getTraceFeatures()->hasFeature(TRACE_FEATURES::STF_CONTAIN_PTE)) {
                     if(!dump_ptes_on_demand_) {
