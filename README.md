@@ -6,7 +6,7 @@ These are built for RISC-V use, but can be augmented for other architectures.
 
 ## Required Packages
 
-Install all packages needed to build [stf_lib](https://github.com/sifive/stf_lib).
+Install all packages needed to build [stf_lib](https://github.com/sparcians/stf_lib).
 
 ## Building
 
@@ -26,7 +26,7 @@ make
 
 ## RISC-V Toolchain Disassembly Support
 
-[Mavis](https://github.com/sifive/mavis) is the default disassembly backend. You can optionally use the [RISC-V toolchain](https://github.com/riscv/riscv-gnu-toolchain) instead.
+[Mavis](https://github.com/sparcians/mavis) is the default disassembly backend. You can optionally use the [RISC-V toolchain](https://github.com/riscv/riscv-gnu-toolchain) instead.
 
 If you are using the trace-env Docker image, the toolchain will be found automatically:
 ```
