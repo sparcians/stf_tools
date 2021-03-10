@@ -7,7 +7,7 @@
 #include "mavis/Mavis.h"
 
 namespace __mavis_array {
-    static constexpr size_t NUM_INSTRUCTION_TYPES_ = 28;
+    static constexpr size_t NUM_INSTRUCTION_TYPES_ = 29;
 
     using IType = mavis::InstMetaData::InstructionTypes;
     using InstructionTypeArray = std::array<IType, NUM_INSTRUCTION_TYPES_>;
@@ -39,6 +39,7 @@ namespace __mavis_array {
             IType::CLASSIFY,
             IType::VECTOR,
             IType::MASK,
+            IType::STRIDE,
             IType::INDEXED,
             IType::SEGMENT,
             IType::FAULTFIRST,
@@ -72,6 +73,7 @@ namespace __mavis_array {
                 case IType::CLASSIFY:
                 case IType::VECTOR:
                 case IType::MASK:
+                case IType::STRIDE:
                 case IType::INDEXED:
                 case IType::SEGMENT:
                 case IType::FAULTFIRST:
@@ -149,6 +151,8 @@ class MavisInstTypeArray {
                     return "vector";
                 case enum_t::MASK:
                     return "mask";
+                case enum_t::STRIDE:
+                    return "stride";
                 case enum_t::INDEXED:
                     return "indexed";
                 case enum_t::SEGMENT:
