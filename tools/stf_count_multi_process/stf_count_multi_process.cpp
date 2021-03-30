@@ -2,26 +2,50 @@
 #include <map>
 
 #include "command_line_parser.hpp"
+#include "filesystem.hpp"
 #include "print_utils.hpp"
 #include "stf_reader.hpp"
 #include "stf_record_types.hpp"
 #include "tools_util.hpp"
 
-static std::string parseCommandLine (int argc, char **argv) {
+static void parseCommandLine (int argc, char **argv, std::map<size_t, std::string>& traces, bool& print_all, bool& verbose) {
     trace_tools::CommandLineParser parser("stf_count_multi_process");
-    parser.addPositionalArgument("trace", "trace in STF format");
+    parser.addFlag('a', "Print counts for instructions before the first user process");
+    parser.addFlag('v', "Print which traces contain each process");
+    parser.addPositionalArgument("trace", "trace in STF format", true);
     parser.parseArguments(argc, argv);
 
-    return parser.getPositionalArgument<std::string>(0);
+    print_all = parser.hasArgument('a');
+    verbose = parser.hasArgument('v');
+    const auto& trace_list = parser.getMultipleValuePositionalArgument(0);
+    for(size_t i = 0; i < trace_list.size(); ++i) {
+        traces.emplace(i, trace_list[i]);
+    }
 }
 
 int main(int argc, char* argv[]) {
-    try {
-        stf::STFReader reader(parseCommandLine(argc, argv));
+    std::map<size_t, std::string> traces;
+    bool print_all = false;
+    bool verbose = false;
 
-        std::map<uint64_t, uint64_t> process_instruction_counts;
-        process_instruction_counts[0] = 0;
-        uint64_t num_insts = 0;
+    try {
+        parseCommandLine(argc, argv, traces, print_all, verbose);
+    }
+    catch(const trace_tools::CommandLineParser::EarlyExitException& e) {
+        std::cerr << e.what() << std::endl;
+        return e.getCode();
+    }
+
+    std::map<uint64_t, std::map<size_t, uint64_t>> process_instruction_counts;
+    uint64_t num_insts = 0;
+
+    for(const auto& trace_pair: traces) {
+        const auto trace_id = trace_pair.first;
+        const auto& trace = trace_pair.second;
+
+        stf::STFReader reader(trace);
+
+        process_instruction_counts[0][trace_id] = 0;
 
         try {
             stf::STFRecord::UniqueHandle rec;
@@ -35,7 +59,7 @@ int main(int argc, char* argv[]) {
                                         (reg_rec.getReg() == stf::Registers::STF_REG::STF_REG_CSR_SATP))) {
                         const uint64_t new_satp_value = reg_rec.getScalarData();
                         // Ignore the initial zeroing out of the satp register
-                        process_instruction_counts.emplace(new_satp_value, 0);
+                        process_instruction_counts[new_satp_value].try_emplace(trace_id, 0);
                         cur_satp = new_satp_value;
                     }
                 }
@@ -49,34 +73,73 @@ int main(int argc, char* argv[]) {
                     }
                 }
                 else if(STF_EXPECT_FALSE(rec->isInstructionRecord())) {
-                    ++process_instruction_counts[cur_satp];
+                    ++process_instruction_counts[cur_satp][trace_id];
                     ++num_insts;
                 }
             }
         }
         catch(const stf::EOFException&) {
         }
-
-        static constexpr int PROCESS_ID_COLUMN_WIDTH = 18;
-        static constexpr int COLUMN_SEPARATOR_WIDTH = 4;
-        std::cout << "Number of processes: " << process_instruction_counts.size() - 1 << std::endl;
-        std::cout << "Number of instructions: " << num_insts << std::endl;
-
-        stf::print_utils::printLeft("Process", PROCESS_ID_COLUMN_WIDTH);
-        stf::print_utils::printSpaces(COLUMN_SEPARATOR_WIDTH);
-        stf::print_utils::printLeft("Instruction Count");
-        std::cout << std::endl;
-
-        for(const auto& p: process_instruction_counts) {
-            stf::print_utils::printHex(p.first, PROCESS_ID_COLUMN_WIDTH);
-            stf::print_utils::printSpaces(COLUMN_SEPARATOR_WIDTH);
-            stf::print_utils::printDec(p.second);
-            std::cout << std::endl;
-        }
     }
-    catch(const trace_tools::CommandLineParser::EarlyExitException& e) {
-        std::cerr << e.what() << std::endl;
-        return e.getCode();
+
+    static constexpr int PROCESS_ID_COLUMN_WIDTH = 18;
+    static constexpr int INSTRUCTION_COUNT_COLUMN_WIDTH = 17;
+    static constexpr int TRACE_COUNT_COLUMN_WIDTH = 11;
+    static constexpr int COLUMN_SEPARATOR_WIDTH = 4;
+    std::cout << "Number of traces: " << traces.size() << std::endl
+              << "Number of processes: " << process_instruction_counts.size() - 1 << std::endl
+              << "Number of instructions: " << num_insts << std::endl;
+
+    stf::print_utils::printLeft("Process", PROCESS_ID_COLUMN_WIDTH);
+    stf::print_utils::printSpaces(COLUMN_SEPARATOR_WIDTH);
+    stf::print_utils::printLeft("Instruction Count");
+    stf::print_utils::printSpaces(COLUMN_SEPARATOR_WIDTH);
+    if(verbose) {
+        stf::print_utils::printLeft("Traces");
+    }
+    else {
+        stf::print_utils::printLeft("Trace Count");
+    }
+
+    std::cout << std::endl;
+
+    std::ostringstream ss;
+
+    for(const auto& p: process_instruction_counts) {
+        if(STF_EXPECT_FALSE(!print_all && p.first == 0)) {
+            continue;
+        }
+
+        stf::print_utils::printHex(p.first, PROCESS_ID_COLUMN_WIDTH);
+        stf::print_utils::printSpaces(COLUMN_SEPARATOR_WIDTH);
+        uint64_t process_num_insts = 0;
+        bool first = true;
+        for(const auto& pp: p.second) {
+            process_num_insts += pp.second;
+            if(verbose) {
+                if(STF_EXPECT_FALSE(first)) {
+                    first = false;
+                }
+                else {
+                    stf::format_utils::formatSpaces(ss,
+                                                    PROCESS_ID_COLUMN_WIDTH +
+                                                    COLUMN_SEPARATOR_WIDTH +
+                                                    INSTRUCTION_COUNT_COLUMN_WIDTH +
+                                                    COLUMN_SEPARATOR_WIDTH);
+                }
+                ss << fs::path(traces[pp.first]).filename().c_str() << std::endl;
+            }
+        }
+        stf::print_utils::printDec(process_num_insts, INSTRUCTION_COUNT_COLUMN_WIDTH, ' ');
+        stf::print_utils::printSpaces(COLUMN_SEPARATOR_WIDTH);
+        if(verbose) {
+            std::cout << ss.str();
+            ss.str("");
+        }
+        else {
+            stf::print_utils::printDec(p.second.size(), TRACE_COUNT_COLUMN_WIDTH, ' ');
+        }
+        std::cout << std::endl;
     }
 
     return 0;
