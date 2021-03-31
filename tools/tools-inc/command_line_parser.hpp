@@ -578,6 +578,7 @@ namespace trace_tools {
             void parseArguments(int argc, char** argv) {
                 try {
                     int c;
+                    opterr = 0;
                     while((c = getopt(argc, argv, arg_str_.str().c_str())) != -1) {
                         const char c_char = static_cast<char>(c);
 
@@ -597,8 +598,9 @@ namespace trace_tools {
                             continue;
                         }
 
+                        stf_assert(c_char == '?', "Argument parser is broken");
                         std::ostringstream ss;
-                        ss << "Unknown option specified: -" << c_char << std::endl;
+                        ss << "Unknown option specified: -" << static_cast<char>(optopt) << std::endl;
                         getHelpMessage(ss);
                         throw InvalidArgumentException(ss.str());
                     }
