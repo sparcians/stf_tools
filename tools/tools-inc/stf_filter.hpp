@@ -43,10 +43,13 @@ namespace stf {
              * \param stf_writer object to write instructions to
              */
             STFFilter(STFInstReader& stf_inst_reader,
-                      std::shared_ptr<STFWriter> stf_writer) :
+                      std::shared_ptr<STFWriter> stf_writer,
+                      const bool user_mode_only) :
+                user_mode_only_(user_mode_only),
                 stf_inst_reader_(stf_inst_reader),
                 stf_writer_(std::move(stf_writer)),
-                page_table_(nullptr, nullptr, true)
+                page_table_(nullptr, nullptr, true),
+                in_user_code_(user_mode_only)
             {}
 
             /**
@@ -54,10 +57,8 @@ namespace stf {
              *
              * \param stf_inst_reader object to read instructions from
              */
-            explicit STFFilter(STFInstReader& stf_inst_reader) :
-                stf_inst_reader_(stf_inst_reader),
-                stf_writer_(nullptr),
-                page_table_(nullptr, nullptr, true)
+            STFFilter(STFInstReader& stf_inst_reader, const bool user_mode_only) :
+                STFFilter(stf_inst_reader, nullptr, user_mode_only)
             {}
 
             /**
@@ -109,7 +110,7 @@ namespace stf {
 
                     ++num_insts_read_;
 
-                    in_user_code_ = !inst.isChangeFromUserMode() && (in_user_code_ || inst.isChangeToUserMode());
+                    in_user_code_ = user_mode_only_ || (!inst.isChangeFromUserMode() && (in_user_code_ || inst.isChangeToUserMode()));
                 }
                 static_cast<const DerivedType*>(this)->finished();
             }
@@ -225,6 +226,8 @@ namespace stf {
                 }
             }
 
+
+            const bool user_mode_only_ = false; /**< If true, the reader will only return user-mode code */
 
             STFInstReader& stf_inst_reader_; /**< STFInstReader used to read instructions */
             std::shared_ptr<STFWriter> stf_writer_; /**< STFWriter used to write filtered records - may be nullptr if we aren't writing anything */

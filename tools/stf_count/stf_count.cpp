@@ -34,7 +34,7 @@ static void parse_command_line(int argc,
                                uint64_t& end_inst) {
     trace_tools::CommandLineParser parser("stf_count");
     parser.addFlag('v', "multi-line output");
-    parser.addFlag('u', "only count user-mode instructions");
+    parser.addFlag('u', "only count user-mode instructions. When this is enabled, -i/-s/-e parameters will be in terms of user-mode instructions.");
     parser.addFlag('S', "short output - only output instruction count");
     parser.addFlag('c', "output in csv format");
     parser.addFlag('C', "make CSV output cumulative");
@@ -105,7 +105,7 @@ int main (int argc, char **argv) {
         return e.getCode();
     }
 
-    stf::STFInstReader stf_inst_reader(trace_filename);
+    stf::STFInstReader stf_inst_reader(trace_filename, user_mode_only);
 
     STFCountFilter stf_count_filter(stf_inst_reader,
                                     verbose,
