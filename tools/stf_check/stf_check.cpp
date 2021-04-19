@@ -71,6 +71,20 @@ static STFCheckConfig parse_command_line (int argc, char **argv) {
     return config;
 }
 
+inline bool isVLZero(const stf::STFInst& inst) {
+    if(inst.isVector()) {
+        for(const auto& op: inst.getSourceOperands()) {
+            if(op.getReg() == stf::Registers::STF_REG::STF_REG_CSR_VL) {
+                if(op.getScalarValue() == 0) {
+                    return true;
+                }
+                return false;
+            }
+        }
+    }
+    return false;
+}
+
 int main (int argc, char **argv) {
     try {
         uint64_t inst_count = 0;
@@ -194,6 +208,10 @@ msg     << "STF_CONTAIN_PHYSICAL_ADDRESS not set, but is required as part of the
                     }
                 }
                 */
+                // Special handling for vector loads
+                // If the VL register is 0, the load won't do any accesses (this is allowed by the spec)
+                found = isVLZero(inst_prev);
+
                 if(!found) {
                     ecount.countError(ErrorCode::MISS_MEM);
                     ecount.countError(ErrorCode::MISS_MEM_LOAD);
@@ -216,6 +234,10 @@ msg     << "STF_CONTAIN_PHYSICAL_ADDRESS not set, but is required as part of the
                     }
                 }
                 */
+                // Special handling for vector stores
+                // If the VL register is 0, the store won't do any accesses (this is allowed by the spec)
+                found = isVLZero(inst_prev);
+
                 if (!found) {
                     ecount.countError(ErrorCode::MISS_MEM);
                     ecount.countError(ErrorCode::MISS_MEM_STR);
