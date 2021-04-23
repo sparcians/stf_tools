@@ -99,6 +99,10 @@ namespace stf {
                         is_invalid_ = false;
                         disasm_.clear();
                     }
+                    catch(const mavis::UnknownOpcode&) {
+                        is_invalid_ = true;
+                        throw InvalidInstException(opcode_.get());
+                    }
                     catch(const mavis::IllegalOpcode&) {
                         is_invalid_ = true;
                         throw InvalidInstException(opcode_.get());
