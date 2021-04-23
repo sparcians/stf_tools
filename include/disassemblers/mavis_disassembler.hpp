@@ -1,5 +1,6 @@
 #pragma once
 
+#include <iostream>
 #include "stf_decoder.hpp"
 #include "base_disassembler.hpp"
 
@@ -33,6 +34,20 @@ namespace stf {
                 explicit MavisDisassembler(const ISA inst_set, const bool use_aliases) :
                     BaseDisassembler(inst_set, use_aliases)
                 {
+                }
+
+                ~MavisDisassembler() {
+                    if(decoder_.hasUnknownDisasm()) {
+                        std::cerr << "One or more unknown instructions were encountered." << std::endl
+#ifdef MULTIPLE_DISASSEMBLERS_ENABLED
+    #ifdef ENABLE_BINUTILS_DISASM
+                                  << "Try running again with STF_DISASM=BINUTILS or updating to the latest version of Mavis"
+    #endif
+#else
+                                  << "Rebuild stf_tools with binutils support or update to the latest version of Mavis"
+#endif
+                                  << std::endl;
+                    }
                 }
 
         };

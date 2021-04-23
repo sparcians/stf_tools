@@ -40,6 +40,7 @@ namespace stf {
                         std::ostream& os_;
                         bool saw_tab_ = false;
                         size_t num_spaces_ = 0;
+                        bool unknown_disasm_ = false;
 
                     public:
                         explicit UnTabStream(std::ostream& os) :
@@ -84,6 +85,15 @@ namespace stf {
 
                             return *this;
                         }
+
+                        void checkUnknownDisasm(const char* format) {
+                            // The backend returns the hex value of the opcode if it can't successfully disassemble it
+                            unknown_disasm_ |= (strcmp(format, "0x%llx") == 0);
+                        }
+
+                        bool hasUnknownDisasm() const {
+                            return unknown_disasm_;
+                        }
                 };
 
                 /**
@@ -98,6 +108,9 @@ namespace stf {
 
                     int retval;
                     bool keep_going = false;
+
+                    dis_str->checkUnknownDisasm(format);
+
                     do {
                         va_list ap;
                         va_start (ap, format);
@@ -134,6 +147,7 @@ namespace stf {
                     opcode_pc_ = pc;
                     copyU32_(opcode_mem_, opcode);
                     print_insn_riscv(opcode_pc_, &dis_info_);
+                    unknown_disasm_ |= dismStr.hasUnknownDisasm();
                 }
 
                 /**
@@ -201,6 +215,9 @@ namespace stf {
                 //! The PC of the opcode held in the 4 byte opcode memory
                 mutable uint64_t opcode_pc_;
 
+                //! Tracks whether we encountered an unknown instruction
+                mutable bool unknown_disasm_ = false;
+
             public:
                 /**
                  * \brief Construct a BinutilsDisassembler
@@ -216,6 +233,12 @@ namespace stf {
                         dis_info_.disassembler_options = "no-aliases,numeric";
                     }
                     disassemble_init_for_target(&dis_info_);
+                }
+
+                ~BinutilsDisassembler() {
+                    if(unknown_disasm_) {
+                        std::cerr << "One or more unknown instructions were encountered. Try running again with STF_DISASM=MAVIS" << std::endl;
+                    }
                 }
         };
     } //end namespace disassemblers

@@ -45,6 +45,8 @@ namespace stf {
             };
 
         private:
+            inline static const std::string UNIMP_ = "c.unimp";
+
             mutable mavis_helpers::Mavis mavis_; /**< Mavis decoder */
             mutable mavis_helpers::Mavis::DecodeInfoType decode_info_; /**< Cached decode info */
             mutable bool has_pending_decode_info_ = false; /**< Cached decode info */
@@ -52,6 +54,7 @@ namespace stf {
             bool is_compressed_ = false; /**< Set to true if the decoded instruction was compressed */
             mutable bool is_invalid_ = false;
             mutable std::string disasm_;
+            mutable bool unknown_disasm_ = false;
 
             const mavis_helpers::Mavis::DecodeInfoType& getDecodeInfo_() const {
                 if(STF_EXPECT_FALSE(has_pending_decode_info_)) {
@@ -328,13 +331,11 @@ namespace stf {
              * Gets the mnemonic for the decoded instruction
              */
             inline const std::string& getMnemonic() const {
-                static const std::string UNIMP = "c.unimp";
-
                 try {
                     return getDecodeInfo_()->opinfo->getMnemonic();
                 }
                 catch(const InvalidInstException&) {
-                    return UNIMP;
+                    return UNIMP_;
                 }
             }
 
@@ -342,8 +343,6 @@ namespace stf {
              * Gets the disassembly for the decoded instruction
              */
             inline const std::string& getDisassembly() const {
-                static const std::string UNIMP = "c.unimp";
-
                 try {
                     const auto& decode_info = getDecodeInfo_();
                     if(STF_EXPECT_FALSE(disasm_.empty())) {
@@ -351,7 +350,8 @@ namespace stf {
                     }
                 }
                 catch(const InvalidInstException&) {
-                    return UNIMP;
+                    unknown_disasm_ = true;
+                    return UNIMP_;
                 }
 
                 return disasm_;
@@ -545,7 +545,8 @@ namespace stf {
             }
 
             inline bool isTracepoint() const {
-                if(!(isInstType(mavis::InstMetaData::InstructionTypes::INT) && isInstType(mavis::InstMetaData::InstructionTypes::ARITH))) {
+                if(!(isInstType(mavis::InstMetaData::InstructionTypes::INT) &&
+                     isInstType(mavis::InstMetaData::InstructionTypes::ARITH))) {
                     return false;
                 }
 
@@ -569,6 +570,13 @@ namespace stf {
                 }
 
                 return getMnemonic() == "xor";
+            }
+
+            /**
+             * Returns whether an unknown instruction was ever encountered during disassembly
+             */
+            bool hasUnknownDisasm() const {
+                return unknown_disasm_;
             }
     };
 } // end namespace stf
