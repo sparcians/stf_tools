@@ -1,6 +1,6 @@
 project(stf_filter_evt)
 
-include(${STF_TOOL_DIR}/mavis.cmake)
+include(${STF_CMAKE_DIR}/stf_decoder.cmake)
 
 add_executable(stf_filter_evt stf_filter_evt.cpp)
 

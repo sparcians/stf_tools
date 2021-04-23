@@ -6,7 +6,7 @@
 #include <ostream>
 #include <string_view>
 
-#include "mavis/Mavis.h"
+#include "mavis_helpers.hpp"
 #include "stf_valid_value.hpp"
 #include "stf_record_types.hpp"
 #include "filesystem.hpp"
@@ -45,53 +45,15 @@ namespace stf {
             };
 
         private:
-            /**
-             * \class InstType
-             * \brief Stub class used for instantiating Mavis instance
-             */
-            class InstType {
-                public:
-                    using PtrType = std::shared_ptr<InstType>;
-            };
-
-            /**
-             * \class AnnotationType
-             * \brief Stub class used for instantiating Mavis instance
-             */
-            class AnnotationType {
-                public:
-                    using PtrType = std::shared_ptr<AnnotationType>;
-
-                    AnnotationType() = default;
-                    AnnotationType(const AnnotationType&) = default;
-                    explicit AnnotationType(const nlohmann::json& inst) {}
-                    void update(const nlohmann::json& inst) const {}
-
-                    /**
-                     * Writes an AnnotationType out to an std::ostream. Just a stub for now.
-                     * \param os std::ostream to use
-                     * \param anno AnnotationType to write
-                     */
-                    friend inline std::ostream& operator<<(std::ostream& os, const AnnotationType& anno) {
-                        (void)anno;
-                        return os;
-                    }
-            };
-
-            /**
-             * \typedef MavisType
-             * \brief Mavis decoder type
-             */
-            using MavisType = Mavis<InstType, AnnotationType>;
-            mutable MavisType mavis_; /**< Mavis decoder */
-            mutable MavisType::DecodeInfoType decode_info_; /**< Cached decode info */
+            mutable mavis_helpers::Mavis mavis_; /**< Mavis decoder */
+            mutable mavis_helpers::Mavis::DecodeInfoType decode_info_; /**< Cached decode info */
             mutable bool has_pending_decode_info_ = false; /**< Cached decode info */
             stf::ValidValue<uint32_t> opcode_;
             bool is_compressed_ = false; /**< Set to true if the decoded instruction was compressed */
             mutable bool is_invalid_ = false;
             mutable std::string disasm_;
 
-            const MavisType::DecodeInfoType& getDecodeInfo_() const {
+            const mavis_helpers::Mavis::DecodeInfoType& getDecodeInfo_() const {
                 if(STF_EXPECT_FALSE(has_pending_decode_info_)) {
                     try {
                         decode_info_ = mavis_.getInfo(opcode_.get());
@@ -198,15 +160,7 @@ namespace stf {
              * \param mavis_path Path to Mavis checkout
              */
             explicit STFDecoder(const std::string& mavis_path) :
-                mavis_({mavis_path + "/json/isa_rv64g.json", // G = IMAFD (general purpose)
-                        mavis_path + "/json/isa_rv64c.json", // compressed
-                        mavis_path + "/json/isa_rv64cf.json", // compressed float
-                        mavis_path + "/json/isa_rv64cd.json", // compressed double-precision
-                        mavis_path + "/json/isa_rv64v.json", // vector
-                        mavis_path + "/json/isa_rv64va.json", // vector
-                        mavis_path + "/json/isa_rv64vf.json", // vector
-                        mavis_path + "/json/isa_rv64b.json"}, // bitmanip
-                       {})
+                mavis_(mavis_helpers::getMavisJSONs(mavis_path), {})
             {
             }
 

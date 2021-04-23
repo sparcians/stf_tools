@@ -1,8 +1,8 @@
 project(stf_diff)
 
-include(${STF_TOOL_DIR}/disassembler.cmake)
-include(${STF_TOOL_DIR}/mavis.cmake)
-include(${STF_TOOL_DIR}/dtl.cmake)
+include(${STF_CMAKE_DIR}/disassembler.cmake)
+include(${STF_CMAKE_DIR}/stf_decoder.cmake)
+include(${STF_CMAKE_DIR}/dtl.cmake)
 
 add_executable(stf_diff stf_diff.cpp)
 

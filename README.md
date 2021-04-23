@@ -50,6 +50,6 @@ cmake .. -DCMAKE_BUILD_TYPE=Release -DRISCV_TOOLCHAIN=/path/to/riscv-gnu-toolcha
 make
 ```
 **NOTE:** Your RISC-V toolchain is assumed to have been built in the top-level of the repo.
-If you used a build directory, you will need to modify some of the paths in `tools/FindDisassemblers.cmake`.
+If you used a build directory, you will need to modify some of the paths in `cmake/FindDisassemblers.cmake`.
 
 When the trace tools are built with this support, the binutils disassembly backend can be selected by setting the environment variable `STF_DISASM=BINUTILS`.

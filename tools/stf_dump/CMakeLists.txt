@@ -1,6 +1,6 @@
 project(stf_dump)
 
-include(${STF_TOOL_DIR}/disassembler.cmake)
+include(${STF_CMAKE_DIR}/disassembler.cmake)
 
 add_executable(stf_dump stf_dump.cpp)
 

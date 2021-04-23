@@ -9,6 +9,20 @@ find_package (Boost 1.49.0)
 include_directories (SYSTEM ${Boost_INCLUDE_DIRS})
 
 set (STF_TOOLS_BASE ${CMAKE_CURRENT_SOURCE_DIR})
+include_directories(${STF_TOOLS_BASE}/include)
+set(STF_CMAKE_DIR ${STF_TOOLS_BASE}/cmake)
+
+set(FILESYSTEM_CHECK_FLAGS ${CMAKE_CXX_FLAGS})
+if(CMAKE_CXX_COMPILER_ID MATCHES "AppleClang")
+    set(FILESYSTEM_CHECK_FLAGS "${FILESYSTEM_CHECK_FLAGS} -isysroot ${CMAKE_OSX_SYSROOT}")
+endif()
+
+execute_process(COMMAND bash "-c" "${CMAKE_CXX_COMPILER} ${FILESYSTEM_CHECK_FLAGS} -E ${STF_TOOLS_BASE}/include/filesystem.hpp | grep \"namespace fs\" | grep -qv experimental"
+                RESULT_VARIABLE FILESYSTEM_EXPERIMENTAL)
+
+if (FILESYSTEM_EXPERIMENTAL EQUAL 1)
+    SET(EXTRA_LIBS ${EXTRA_LIBS} stdc++fs)
+endif()
 
 if(NOT EXISTS ${STF_TOOLS_BASE}/stf_lib/.git)
     message(FATAL_ERROR "stf_lib hasn't been checked out. Please run git submodule update --init --recursive")
@@ -99,6 +113,8 @@ endif()
 
 add_subdirectory(stf_lib)
 
+include_directories(${STF_BASE}/stf-inc)
+
+add_subdirectory(generators)
+
 add_subdirectory(tools)
-
-

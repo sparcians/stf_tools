@@ -7,7 +7,7 @@
 
 #include "file_utils.hpp"
 #include "command_line_parser.hpp"
-#include "mavis_inst_type_array.hpp"
+#include "mavis_helpers.hpp"
 #include "stf_decoder.hpp"
 
 /**
@@ -64,11 +64,11 @@ inline void formatIMixEntry(OutputFileStream& os,
  * \param column_width formatted column width
  */
 inline void formatIMixEntry(OutputFileStream& os,
-                            const MavisInstTypeArray::enum_t category,
+                            const mavis_helpers::MavisInstTypeArray::enum_t category,
                             const uint64_t count,
                             const double total_insts,
                             const int column_width) {
-    formatIMixEntry(os, MavisInstTypeArray::getTypeString(category), count, total_insts, column_width);
+    formatIMixEntry(os, mavis_helpers::MavisInstTypeArray::getTypeString(category), count, total_insts, column_width);
 }
 
 int main(int argc, char** argv) {
@@ -124,9 +124,9 @@ int main(int argc, char** argv) {
         }
     }
     else {
-        std::map<MavisInstTypeArray::enum_t, uint64_t> imix_counts;
+        std::map<mavis_helpers::MavisInstTypeArray::enum_t, uint64_t> imix_counts;
 
-        for(const auto type: MavisInstTypeArray()) {
+        for(const auto type: mavis_helpers::MavisInstTypeArray()) {
             imix_counts[type] = 0;
         }
 
@@ -148,7 +148,7 @@ int main(int argc, char** argv) {
         if(sorted) {
             // Quick and easy way to sort by instruction counts - copy them into an std::multimap
             // with values and keys swapped
-            std::multimap<uint64_t, MavisInstTypeArray::enum_t> sorted_imix_counts;
+            std::multimap<uint64_t, mavis_helpers::MavisInstTypeArray::enum_t> sorted_imix_counts;
             for(const auto& p: imix_counts) {
                 sorted_imix_counts.emplace(p.second, p.first);
             }

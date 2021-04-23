@@ -7,24 +7,9 @@ configure_file("${CMAKE_CURRENT_SOURCE_DIR}/trace_tools_git_version.cpp.in" "${C
 
 add_library(trace_tools_version "${CMAKE_CURRENT_BINARY_DIR}/trace_tools_git_version.cpp")
 
-set (STF_LINK_LIBS ${STF_LINK_LIBS} trace_tools_version stdc++)
+set (STF_LINK_LIBS ${EXTRA_LIBS} ${STF_LINK_LIBS} trace_tools_version stdc++)
 
-set(FILESYSTEM_CHECK_FLAGS ${CMAKE_CXX_FLAGS})
-if(CMAKE_CXX_COMPILER_ID MATCHES "AppleClang")
-    set(FILESYSTEM_CHECK_FLAGS "${FILESYSTEM_CHECK_FLAGS} -isysroot ${CMAKE_OSX_SYSROOT}")
-endif()
-
-execute_process(COMMAND bash "-c" "${CMAKE_CXX_COMPILER} ${FILESYSTEM_CHECK_FLAGS} -E ${STF_TOOL_DIR}/tools-inc/filesystem.hpp | grep \"namespace fs\" | grep -qv experimental"
-                RESULT_VARIABLE FILESYSTEM_EXPERIMENTAL)
-
-if (FILESYSTEM_EXPERIMENTAL EQUAL 1)
-    SET(STF_LINK_LIBS ${STF_LINK_LIBS} stdc++fs)
-endif()
-
-include_directories(${STF_BASE}/stf-inc)
-include_directories(${STF_INCLUDE_DIRS} ${STF_TOOL_DIR}/tools-inc)
-
-include(${STF_TOOL_DIR}/FindDisassemblers.cmake)
+include(${STF_CMAKE_DIR}/FindDisassemblers.cmake)
 
 add_subdirectory(stf_dump)
 add_subdirectory(stf_check)

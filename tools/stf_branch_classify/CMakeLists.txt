@@ -1,6 +1,6 @@
 project(stf_branch_classify)
 
-include(${STF_TOOL_DIR}/mavis.cmake)
+include(${STF_CMAKE_DIR}/stf_decoder.cmake)
 
 add_executable(stf_branch_classify stf_branch_classify.cpp)
 
