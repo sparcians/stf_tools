@@ -28,7 +28,6 @@ class LineIteratorData {
 using LineIterator = std::istream_iterator<LineIteratorData>;
 
 int main(int argc, char* argv[]) {
-    static const char* MAVIS_PATH = "../../mavis/json";
     static const char* CACHE_FILE = ".mavis_json_cache";
     static const char* CPP_FILE = "mavis_json_files.cpp";
 
@@ -37,7 +36,7 @@ int main(int argc, char* argv[]) {
     std::vector<std::string> excluded_files;
 
     std::vector<fs::directory_entry> mavis_json_files;
-    std::copy_if(fs::directory_iterator(MAVIS_PATH),
+    std::copy_if(fs::directory_iterator(MAVIS_JSON_PATH),
                  fs::directory_iterator(),
                  std::back_inserter(mavis_json_files),
                  [](const fs::directory_entry& f) {
