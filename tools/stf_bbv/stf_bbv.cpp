@@ -90,6 +90,8 @@ class BasicBlockTracker {
         OutputFileStream os_;
         OutputFileStream interval_file_;
         std::ofstream user_mode_file_;
+        std::ofstream user_interval_file_;
+        uint64_t last_interval_idx_ = 0;
         BasicBlockMap bbv_;
 
     public:
@@ -103,6 +105,7 @@ class BasicBlockTracker {
 
             if(!user_mode_filename.empty()) {
                 user_mode_file_.open(user_mode_filename, std::ofstream::trunc);
+                user_interval_file_.open(user_mode_filename + ".interval", std::ofstream::trunc);
             }
         }
 
@@ -148,17 +151,21 @@ class BasicBlockTracker {
                 const auto str = ss.str();
                 os_ << str;
 
-                if(dump_interval) {
-                    interval_file_ << inst_idx << std::endl;
-                }
-
                 if(user_mode_file_) {
-                    if(has_non_user_code || ((inst_idx - interval_count) < min_user_insts_)) {
+                    if(has_non_user_code || ((inst_idx != std::numeric_limits<uint64_t>::max()) && ((inst_idx - interval_count) < min_user_insts_))) {
                         user_mode_file_ << std::endl;
                     }
                     else {
                         user_mode_file_ << str;
+                        if(dump_interval) {
+                            user_interval_file_ << last_interval_idx_ << std::endl;
+                        }
                     }
+                }
+
+                if(dump_interval) {
+                    interval_file_ << last_interval_idx_ << std::endl;
+                    last_interval_idx_ = inst_idx;
                 }
             }
         }
@@ -235,7 +242,7 @@ int main(int argc, char **argv) {
         }
     }
 
-    tracker.dumpBasicBlockVector(interval_count, has_non_user_code, 0, false);
+    tracker.dumpBasicBlockVector(interval_count, has_non_user_code, std::numeric_limits<uint64_t>::max(), true);
 
     return 0;
 }
