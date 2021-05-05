@@ -101,8 +101,6 @@ class BasicBlockTracker {
             os_(output_filename),
             interval_file_(output_filename != "-" ? output_filename + ".interval" : "-")
         {
-            interval_file_ << 0 << std::endl;
-
             if(!user_mode_filename.empty()) {
                 user_mode_file_.open(user_mode_filename, std::ofstream::trunc);
                 user_interval_file_.open(user_mode_filename + ".interval", std::ofstream::trunc);
