@@ -5,6 +5,7 @@
 #include <map>
 #include <string>
 #include <vector>
+#include <bitset>
 
 #include "disassembler.hpp"
 #include "format_utils.hpp"
@@ -35,6 +36,7 @@ struct STFImemConfig {
     bool use_aliases = false;                                           /**< If true, use aliases when disassembling instructions */
     bool sort_output = false;                                           /**< If true, also output sorted version */
     bool skip_non_user = false;                                         /**< If true, skip non-user mode instructions */
+    bool local_history = false;                                         /**< If true, print local history for branches, loads, stores */
 };
 
 /**
@@ -45,12 +47,20 @@ struct STFImemConfig {
  */
 class IMemData {
     private:
+        static constexpr uint32_t MAX_LHIST_ = 50;
         bool is_16bit_ = false;     /**< If true, this is a 16 bit instruction */
         uint32_t opcode_ = 0;       /**< Opcode */
         uint64_t phys_pc_ = 0;      /**< physical pc */
         uint64_t warmup_ = 0;       /**< warmup count */
         uint64_t runlength_ = 0;    /**< runlength count */
         uint64_t count_ = 0;        /**< Access count */
+        bool is_loadstore_ = false; /**< Is load/store inst */
+        uint64_t last_address_ = 0; /**< Last memory address */
+        std::vector<int64_t> recent_strides_; /**< Recent load/store local strides */
+        uint32_t recent_strides_idx_ = 0; /**< next index to writ stride */
+        bool is_branch_ = false;    /**< Is branch inst */
+        std::bitset<MAX_LHIST_> branch_lhr_; /**< Recent local branch history */
+        uint32_t branch_lhr_idx_ = 0; /**< next index to local branch history */
 
     public:
         IMemData() = default;
@@ -63,14 +73,43 @@ class IMemData {
          * \param warmup warmup count
          * \param runlength runlength count
          * \param count access count
+         * \param is_branch is a branch instruction
+         * \param br_taken is a branch and branch was taken
+         * \param mem_addr is a load/store and its memory address
          */
-        IMemData(const bool is_16bit, const uint32_t opcode, const uint64_t phys_pc, const bool in_warmup) :
+        IMemData(const bool is_16bit, const uint32_t opcode, const uint64_t phys_pc, const bool in_warmup,
+                 const bool is_branch, const bool br_taken,
+                 const uint64_t mem_addr) :
             is_16bit_(is_16bit),
             opcode_(opcode),
             phys_pc_(phys_pc),
             warmup_(in_warmup ? 1 : 0),
             runlength_(in_warmup ? 0 : 1),
-            count_(1)
+            count_(1),
+            is_loadstore_(mem_addr != 0),
+            last_address_(mem_addr),
+            recent_strides_(MAX_LHIST_, 0),
+            is_branch_(is_branch)
+        {
+            if (is_branch_) {
+                nextBranchHistory(br_taken);
+            }
+        }
+
+        IMemData(const bool is_16bit, const uint32_t opcode, const uint64_t phys_pc, const bool in_warmup) :
+            IMemData(is_16bit, opcode, phys_pc, in_warmup, false, false, 0)
+        {
+        }
+
+        IMemData(const bool is_16bit, const uint32_t opcode, const uint64_t phys_pc, const bool in_warmup,
+                 const bool is_branch, const bool br_taken) :
+            IMemData(is_16bit, opcode, phys_pc, in_warmup, is_branch, br_taken, 0)
+        {
+        }
+
+        IMemData(const bool is_16bit, const uint32_t opcode, const uint64_t phys_pc, const bool in_warmup,
+                 const uint64_t mem_addr) :
+            IMemData(is_16bit, opcode, phys_pc, in_warmup, false, false, mem_addr)
         {
         }
 
@@ -106,6 +145,16 @@ class IMemData {
         inline uint64_t getCount() const { return count_; }
 
         /**
+         * Gets the recent strides
+         */
+        inline const auto& getStrides() const { return recent_strides_; }
+
+        /**
+         * Gets the branch local history
+         */
+        inline const auto& getBranchLhr() const { return branch_lhr_; }
+
+        /**
          * Increments the access count
          */
         inline void incCount() { ++count_; }
@@ -119,6 +168,42 @@ class IMemData {
          * Incrememnts the run length count
          */
         inline void incRunLength() { ++runlength_; }
+
+        /**
+         * Is load or store instruction
+         */
+        inline bool isLoadStore() const { return is_loadstore_; }
+
+        /**
+         * Is branch instruction
+         */
+        inline bool isBranch() const { return is_branch_; }
+
+        /**
+         * Computes next stride
+         */
+        inline void nextStride(const uint64_t curr_addr) {
+            recent_strides_[recent_strides_idx_] = static_cast<int64_t>(curr_addr - last_address_);
+            recent_strides_idx_ = recent_strides_idx_ == (MAX_LHIST_ - 1) ? 0 : recent_strides_idx_ + 1;
+            last_address_ = curr_addr;
+        }
+
+        /**
+         * Next branch taken/notTaken
+         */
+        inline void nextBranchHistory(const bool taken) {
+            // When this entry was created, it may not have been a taken branch
+            is_branch_ = true;
+            if (taken) {
+                branch_lhr_.set(branch_lhr_idx_);
+            } else {
+                branch_lhr_.reset(branch_lhr_idx_);
+            }
+            branch_lhr_idx_++;
+            if (branch_lhr_idx_ == MAX_LHIST_) {
+                branch_lhr_idx_ = 0;
+            }
+        }
 
         /**
          * Gets the opcode size in bytes
@@ -242,12 +327,30 @@ class IMemMapVec {
          * \param inst Instruction
          * \param physpc Physical PC
          * \param in_warmup if true, instruction is in warmup period
+         * \param is_branch instruction is a branch
+         * \param br_taken is a branch and branch was taken
+         * \param add memory address of load/store instruction
          */
         inline static IMemMap::value_type createIMem_(const uint64_t key,
                                                       const stf::STFInst& inst,
                                                       const uint64_t physpc,
                                                       const bool in_warmup) {
             return std::make_pair(key, IMemData(inst.isOpcode16(), inst.opcode(), physpc, in_warmup));
+        }
+        inline static IMemMap::value_type createIMem_(const uint64_t key,
+                                                      const stf::STFInst& inst,
+                                                      const uint64_t physpc,
+                                                      const bool in_warmup,
+                                                      const uint64_t addr) {
+            return std::make_pair(key, IMemData(inst.isOpcode16(), inst.opcode(), physpc, in_warmup, addr));
+        }
+        inline static IMemMap::value_type createIMem_(const uint64_t key,
+                                                      const stf::STFInst& inst,
+                                                      const uint64_t physpc,
+                                                      const bool in_warmup,
+                                                      const bool is_branch,
+                                                      const bool br_taken) {
+            return std::make_pair(key, IMemData(inst.isOpcode16(), inst.opcode(), physpc, in_warmup, is_branch, br_taken));
         }
 
         inline void printIMemItem_(OutputFileStream& os,
@@ -329,6 +432,25 @@ class IMemMapVec {
             stf::format_utils::formatSpaces(os, 2);
             dis.printDisassembly(os, inst_pc, opcode);
 
+            if (config.local_history) {
+                if (cur.second.isLoadStore()) {
+                    // Print additional info (e.g. local address stride)
+                    os << "    LStrides={";
+                    const auto& strides = cur.second.getStrides();
+                    for(auto stride = strides.begin(); stride != strides.end(); ++stride) {
+                        os << *stride << ",";
+                    } 
+                    os << "}";
+                } else if (cur.second.isBranch()) {
+                    os << "    LHR={";
+                    const auto& lhr = cur.second.getBranchLhr();
+                    for(uint32_t i = 0; i < lhr.size(); ++i) {
+                        os << (lhr[i] ? "1" : "0");
+                    }
+                    os << "}";
+                }
+            }
+            
             os << std::endl;
         }
 
@@ -345,6 +467,14 @@ class IMemMapVec {
         inline void incRunLength_(IMemData& data) {
             data.incRunLength();
             max_run_length_ = std::max(max_run_length_, data.getRunLength());
+        }
+
+        inline void nextStride_(IMemData& data, const uint64_t curr_addr) {
+            data.nextStride(curr_addr);
+        }
+
+        inline void nextBranchHistory_(IMemData& data, const bool taken) {
+            data.nextBranchHistory(taken);
         }
 
     public:
@@ -428,7 +558,10 @@ class IMemMapVec {
                             first = false;
                         }
                         else {
-                            os << "..." << std::endl;
+                            // When printing sort output, do not print the regular IMEM output
+                            if (!config.sort_output) {
+                                os << "..." << std::endl;
+                            }
                             if(config.sort_output) {
                                 sorted_map.emplace(std::piecewise_construct,
                                                    std::forward_as_tuple(block_count, current_block.front()->first),
@@ -443,7 +576,10 @@ class IMemMapVec {
                         current_block.emplace_back(imem_it);
                     }
 
-                    printIMemItem_(os, config, dis, imem_it);
+                    // When printing sort output, do not print the regular IMEM output
+                    if (!config.sort_output) {
+                        printIMemItem_(os, config, dis, imem_it);
+                    }
                     prev_pc = inst_pc;
                     prev_size = cur.second.getOpcodeSize();
                 }
@@ -577,9 +713,30 @@ class IMem : public IMemMapVecIntf<IMem> {
             auto cur = itv_->find(key);
             // non Java trace
             const bool in_warmup = inst_count_ < config.warmup_count;
+            const bool is_load_store_inst = inst.isLoad() || inst.isStore();
+            uint64_t addr = 0;
+            if (inst.isLoad()) {
+                for(const auto& m: inst.getMemoryReads()) {
+                    addr = m.getAddress();
+                }
+            } else if (inst.isStore()) {
+                for(const auto& m: inst.getMemoryWrites()) {
+                    addr = m.getAddress();
+                }
+            }
+            // Need to use STFDecoder if we want to capture branches that are never taken
+            const bool is_branch = inst.isTakenBranch();
+            const bool br_taken = inst.isTakenBranch();
+
             if (cur == itv_->end()) {
                 // Key not found
-                itv_->insert(createIMem_(key, inst, physpc, in_warmup));
+                if (is_load_store_inst) {
+                    itv_->insert(createIMem_(key, inst, physpc, in_warmup, addr));
+                } else if (is_branch) {
+                    itv_->insert(createIMem_(key, inst, physpc, in_warmup, is_branch, br_taken));
+                } else {
+                    itv_->insert(createIMem_(key, inst, physpc, in_warmup));
+                }
             }
             else if (STF_EXPECT_TRUE(cur->second.opcodeMatch(inst.opcode()))) {
                 // Key and opcode found
@@ -589,6 +746,11 @@ class IMem : public IMemMapVecIntf<IMem> {
                 }
                 else if (STF_EXPECT_TRUE(inst_count_ < config.runlength_count)) {
                     incRunLength_(cur->second);
+                }
+                if (is_load_store_inst) {
+                    nextStride_(cur->second, addr);
+                } else if (is_branch) {
+                    nextBranchHistory_(cur->second, br_taken);
                 }
             }
             else {

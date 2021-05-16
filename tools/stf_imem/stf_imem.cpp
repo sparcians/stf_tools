@@ -32,6 +32,7 @@ static STFImemConfig parse_command_line (int argc, char **argv) {
     parser.addFlag('o', "filename", "write output to <filename>. Defaults to stdout.");
     parser.addFlag('S', "sort output from largest to smallest instruction count");
     parser.addFlag('u', "skip non-user mode instructions");
+    parser.addFlag('l', "local history data for branches & load/store strides");
     parser.addPositionalArgument("trace", "trace in STF format");
 
     parser.parseArguments(argc, argv);
@@ -47,6 +48,7 @@ static STFImemConfig parse_command_line (int argc, char **argv) {
     const bool has_r = parser.getArgumentValue('r', config.runlength_count);
     const bool has_w = parser.getArgumentValue('w', config.warmup_count);
     config.track = has_r || has_w;
+    config.local_history = parser.hasArgument('l');
     if(parser.hasArgument('o')) {
         parser.getArgumentValue('o', config.output_filename);
     }
