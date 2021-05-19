@@ -558,8 +558,7 @@ class IMemMapVec {
                             first = false;
                         }
                         else {
-                            // When printing sort output, do not print the regular IMEM output
-                            if (!config.sort_output) {
+                            if(!config.sort_output) {
                                 os << "..." << std::endl;
                             }
                             if(config.sort_output) {
@@ -576,8 +575,7 @@ class IMemMapVec {
                         current_block.emplace_back(imem_it);
                     }
 
-                    // When printing sort output, do not print the regular IMEM output
-                    if (!config.sort_output) {
+                    if(!os.isStdout() || !config.sort_output) {
                         printIMemItem_(os, config, dis, imem_it);
                     }
                     prev_pc = inst_pc;
