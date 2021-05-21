@@ -27,6 +27,7 @@ struct STFExtractConfig {
     uint64_t inst_offset = 0; /**< Offset instruction PCs by this address */
     bool filter_kernel_code = false; /**< If true, filter out kernel code */
     bool dump_ptes_on_demand = false; /**< If true, dump PTEs in line with instructions that need the translation */
+    bool user_mode_counts = false; /**< If true, only count user-mode instructions when slicing, but still output non-user instructions */
 };
 
 /**
@@ -44,7 +45,10 @@ class STFExtractor {
         stf::RecordMap record_map_;
 
         const bool dump_ptes_on_demand_; /**< If true, dump PTEs in line with instructions that need the translation */
+        const bool user_mode_counts_; /**< If true, only count user-mode instructions when slicing, but still output non-user instructions */
+        const bool filter_kernel_code_; /**< If true, filter out all non-user code */
 
+        bool in_user_code_ = false; /**< If true, we are currently in user-mode code */
         std::vector<std::string> comments_; /**< Tracks comment records */
 
         /**
@@ -57,7 +61,12 @@ class STFExtractor {
         void processInst_(const stf::STFInst& inst,
                           uint64_t& inst_count,
                           const bool extracting = false) {
-            ++inst_count;
+            if(!user_mode_counts_ || (in_user_code_ && !inst.isFault())) {
+                ++inst_count;
+            }
+
+            in_user_code_ = filter_kernel_code_ || (!inst.isChangeFromUserMode() && (in_user_code_ || inst.isChangeToUserMode()));
+
             for(const auto& c: inst.getComments()) {
                 comments_.emplace_back(c->as<stf::CommentRecord>().getData());
             }
@@ -195,7 +204,7 @@ class STFExtractor {
             uint64_t overall_instcnt = extractSkip_(skip_count);
 
             stf_assert(overall_instcnt == skip_count,
-                       "Specified skip count (" << skip_count << ") was greater than the trace length (" << overall_instcnt <<").");
+                       "Specified skip count (" << skip_count << ") was greater than the trace length (" << overall_instcnt << ").");
 
             if (split_count > 0) {
                 uint32_t file_count = 0;
@@ -241,7 +250,10 @@ class STFExtractor {
             page_table_(nullptr, nullptr, true),
             regstate_(stf_reader_.getISA(), stf_reader_.getInitialIEM()),
             pc_tracker_(stf_reader_.getInitialPC(), config.inst_offset),
-            dump_ptes_on_demand_(config.dump_ptes_on_demand || stf_reader_.getTraceFeatures()->hasFeature(stf::TRACE_FEATURES::STF_CONTAIN_PTE))
+            dump_ptes_on_demand_(config.dump_ptes_on_demand || stf_reader_.getTraceFeatures()->hasFeature(stf::TRACE_FEATURES::STF_CONTAIN_PTE)),
+            user_mode_counts_(config.user_mode_counts),
+            filter_kernel_code_(config.filter_kernel_code),
+            in_user_code_(config.filter_kernel_code)
         {
         }
 };

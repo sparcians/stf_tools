@@ -32,6 +32,7 @@ static STFExtractConfig parse_command_line (int argc, char **argv)
     parser.addFlag('f', "off", "offset by which to shift inst_pc");
     parser.addFlag('l', "filter out kernel code while extracting");
     parser.addFlag('d', "for slicing (-s/-k/-t) output PTE records on demand");
+    parser.addFlag('u', "only count user-mode instructions for -s/-k/-t parameters. Non-user instructions will still be included in the extracted trace unless -l is specified.");
     parser.addPositionalArgument("trace", "trace in STF format");
     parser.appendHelpText("common usages:");
     //parser.appendHelpText("    -b <n> -e <m> -o <output> <input> -- write instructions [<n>, <m>) from <input> to <output>");
@@ -51,6 +52,8 @@ static STFExtractConfig parse_command_line (int argc, char **argv)
     }
     config.filter_kernel_code = parser.hasArgument('l');
     config.dump_ptes_on_demand = parser.hasArgument('d');
+
+    config.user_mode_counts = parser.hasArgument('u');
 
     parser.getPositionalArgument(0, config.trace_filename);
 
