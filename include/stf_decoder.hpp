@@ -229,6 +229,18 @@ namespace stf {
             }
 
             /**
+             * Returns all of the instruction types for the decoded instruction
+             */
+            inline auto getInstTypes() const {
+                try {
+                    return getDecodeInfo_()->opinfo->getInstType();
+                }
+                catch(const InvalidInstException&) {
+                    return mavis_helpers::MavisInstTypeArray::int_t(0);
+                }
+            }
+
+            /**
              * Returns whether the decoded instruction is a load
              */
             inline bool isLoad() const {

@@ -1,5 +1,6 @@
 #include <iostream>
 #include <map>
+#include <queue>
 #include <vector>
 
 #include "format_utils.hpp"
@@ -40,16 +41,15 @@ void parseCommandLine(int argc, char** argv, std::string& trace_filename, std::s
  * \param category instruction category
  * \param count category count
  * \param total_insts total number of instructions
- * \param column_width formatted column width
  */
+template<int COLUMN_WIDTH>
 inline void formatIMixEntry(OutputFileStream& os,
                             const std::string_view category,
                             const uint64_t count,
-                            const double total_insts,
-                            const int column_width) {
+                            const double total_insts) {
     static constexpr int NUM_DECIMAL_PLACES = 2;
-    stf::format_utils::formatLeft(os, category, column_width);
-    stf::format_utils::formatLeft(os, count, column_width);
+    stf::format_utils::formatLeft(os, category, COLUMN_WIDTH);
+    stf::format_utils::formatLeft(os, count, COLUMN_WIDTH);
     const auto frac = static_cast<double>(count) / total_insts;
     stf::format_utils::formatPercent(os, frac, 0, NUM_DECIMAL_PLACES);
     os << std::endl;
@@ -58,17 +58,127 @@ inline void formatIMixEntry(OutputFileStream& os,
 /**
  * Formats an instruction mix count to an std::ostream
  * \param os ostream to use
+ * \param count category count
+ * \param category instruction category
+ * \param total_insts total number of instructions
+ */
+template<int COLUMN_WIDTH>
+inline void formatIMixEntry(OutputFileStream& os,
+                            const uint64_t count,
+                            const std::string_view category,
+                            const double total_insts) {
+    formatIMixEntry<COLUMN_WIDTH>(os, count, category, total_insts);
+}
+
+/**
+ * Formats an instruction mix count to an std::ostream
+ * \param os ostream to use
  * \param category instruction category
  * \param count category count
  * \param total_insts total number of instructions
- * \param column_width formatted column width
  */
+template<int COLUMN_WIDTH>
 inline void formatIMixEntry(OutputFileStream& os,
                             const mavis_helpers::MavisInstTypeArray::enum_t category,
                             const uint64_t count,
-                            const double total_insts,
-                            const int column_width) {
-    formatIMixEntry(os, mavis_helpers::MavisInstTypeArray::getTypeString(category), count, total_insts, column_width);
+                            const double total_insts) {
+    formatIMixEntry<COLUMN_WIDTH>(os, mavis_helpers::MavisInstTypeArray::getTypeString(category), count, total_insts);
+}
+
+/**
+ * Formats an instruction mix count to an std::ostream
+ * \param os ostream to use
+ * \param count category count
+ * \param category instruction category
+ * \param total_insts total number of instructions
+ */
+template<int COLUMN_WIDTH>
+inline void formatIMixEntry(OutputFileStream& os,
+                            const uint64_t count,
+                            const mavis_helpers::MavisInstTypeArray::enum_t category,
+                            const double total_insts) {
+    formatIMixEntry<COLUMN_WIDTH>(os, category, count, total_insts);
+}
+
+/**
+ * \struct IMixSortComparer
+ * \brief Compares imix map iterators by their count values
+ */
+template<typename IteratorType>
+struct IMixSortComparer {
+    bool operator() (const IteratorType& lhs, const IteratorType& rhs) {
+        return lhs->second < rhs->second;
+    }
+};
+
+/**
+ * \typedef IMixSorter
+ * \brief Sorts imix maps by their count values
+ */
+template<typename MapIterator>
+using IMixSorter = std::priority_queue<MapIterator, std::vector<MapIterator>, IMixSortComparer<MapIterator>>;
+
+/**
+ * Prints a sorted imix to an output stream
+ * \param os output stream to use
+ * \param sorter sorted imix counts
+ * \param total_insts total # of instructions
+ */
+template<int COLUMN_WIDTH, typename MapIterator>
+inline void formatIMixMap(OutputFileStream& os,
+                          IMixSorter<MapIterator>& sorter,
+                          const double total_insts) {
+    while(!sorter.empty()) {
+        const auto& it = sorter.top();
+        formatIMixEntry<COLUMN_WIDTH>(os, it->first, it->second, total_insts);
+        sorter.pop();
+    }
+}
+
+/**
+ * Prints imix to an output stream
+ * \param os output stream to use
+ * \param imix_map imix counts
+ * \param total_insts total # of instructions
+ */
+template<int COLUMN_WIDTH, typename MapType>
+inline void formatIMixMap(OutputFileStream& os,
+                          const MapType& imix_map,
+                          const double total_insts) {
+    for(const auto& p: imix_map) {
+        formatIMixEntry<COLUMN_WIDTH>(os, p.first, p.second, total_insts);
+    }
+}
+
+/**
+ * Prints imix to an output stream, optionally sorting it first
+ * \param os output stream to use
+ * \param imix_map imix counts
+ * \param total_insts total # of instructions
+ * \param sorted if true, sort the counts before printing
+ */
+template<int COLUMN_WIDTH, typename MapType>
+void sortAndPrintIMix(OutputFileStream& os,
+                      const MapType& imix_map,
+                      const double total_insts,
+                      const bool sorted) {
+    stf::format_utils::formatLeft(os, "Type", COLUMN_WIDTH);
+    stf::format_utils::formatLeft(os, "Count", COLUMN_WIDTH);
+    os << "Percent" << std::endl;
+
+    if(sorted) {
+        // Quick and easy way to sort by instruction counts - copy them into an std::multimap
+        // with values and keys swapped
+        IMixSorter<typename MapType::const_iterator> sorted_counts;
+        for(auto it = imix_map.begin(); it != imix_map.end(); ++it) {
+            sorted_counts.push(it);
+        }
+
+        formatIMixMap<COLUMN_WIDTH>(os, sorted_counts, total_insts);
+    }
+    else {
+        formatIMixMap<COLUMN_WIDTH>(os, imix_map, total_insts);
+    }
 }
 
 int main(int argc, char** argv) {
@@ -92,76 +202,39 @@ int main(int argc, char** argv) {
 
     static constexpr int COLUMN_WIDTH = 16;
 
-    if(by_mnemonic) {
-        std::map<std::string, uint64_t> imix_counts;
-        for(const auto& inst: reader) {
-            decoder.decode(inst.opcode());
-            ++imix_counts[decoder.getMnemonic()];
-        }
+    std::unordered_map<uint32_t, uint64_t> opcode_counts;
+    std::unordered_map<std::string, uint64_t> mnemonic_counts;
+    std::unordered_map<mavis_helpers::MavisInstTypeArray::enum_t, uint64_t> category_counts;
 
-        stf::format_utils::formatLeft(output_file, "Type", COLUMN_WIDTH);
-        stf::format_utils::formatLeft(output_file, "Count", COLUMN_WIDTH);
-        output_file << "Percent" << std::endl;
+    for(const auto& inst: reader) {
+        ++opcode_counts[inst.opcode()];
+    }
 
-        const auto total_insts = static_cast<double>(reader.numInstsRead());
+    const auto total_insts = static_cast<double>(reader.numInstsRead());
 
-        if(sorted) {
-            // Quick and easy way to sort by instruction counts - copy them into an std::multimap
-            // with values and keys swapped
-            std::multimap<uint64_t, std::string> sorted_imix_counts;
-            for(const auto& p: imix_counts) {
-                sorted_imix_counts.emplace(p.second, p.first);
-            }
+    for(const auto& p: opcode_counts) {
+        decoder.decode(p.first);
 
-            for(auto it = sorted_imix_counts.rbegin(); it != sorted_imix_counts.rend(); ++it) {
-                formatIMixEntry(output_file, it->second, it->first, total_insts, COLUMN_WIDTH);
-            }
+        if(by_mnemonic) {
+            mnemonic_counts[decoder.getMnemonic()] += p.second;
         }
         else {
-            for(const auto& imix_pair: imix_counts) {
-                formatIMixEntry(output_file, imix_pair.first, imix_pair.second, total_insts, COLUMN_WIDTH);
+            auto inst_types = decoder.getInstTypes(); // Get all of the types packed into an integer
+            // This loop skips over every 0-bit until it finds the first 1 bit, then increments the corresponding
+            // category count
+            while(inst_types) {
+                const decltype(inst_types) type = 1ULL <<  __builtin_ctzl(inst_types);
+                category_counts[static_cast<mavis_helpers::MavisInstTypeArray::enum_t>(type)] += p.second;
+                inst_types ^= type; // clear the bit we found
             }
         }
     }
+
+    if(by_mnemonic) {
+        sortAndPrintIMix<COLUMN_WIDTH>(output_file, mnemonic_counts, total_insts, sorted);
+    }
     else {
-        std::map<mavis_helpers::MavisInstTypeArray::enum_t, uint64_t> imix_counts;
-
-        for(const auto type: mavis_helpers::MavisInstTypeArray()) {
-            imix_counts[type] = 0;
-        }
-
-        for(const auto& inst: reader) {
-            decoder.decode(inst.opcode());
-            for(auto& imix_pair: imix_counts) {
-                if(decoder.isInstType(imix_pair.first)) {
-                    ++imix_pair.second;
-                }
-            }
-        }
-
-        stf::format_utils::formatLeft(output_file, "Type", COLUMN_WIDTH);
-        stf::format_utils::formatLeft(output_file, "Count", COLUMN_WIDTH);
-        output_file << "Percent" << std::endl;
-
-        const auto total_insts = static_cast<double>(reader.numInstsRead());
-
-        if(sorted) {
-            // Quick and easy way to sort by instruction counts - copy them into an std::multimap
-            // with values and keys swapped
-            std::multimap<uint64_t, mavis_helpers::MavisInstTypeArray::enum_t> sorted_imix_counts;
-            for(const auto& p: imix_counts) {
-                sorted_imix_counts.emplace(p.second, p.first);
-            }
-
-            for(auto it = sorted_imix_counts.rbegin(); it != sorted_imix_counts.rend(); ++it) {
-                formatIMixEntry(output_file, it->second, it->first, total_insts, COLUMN_WIDTH);
-            }
-        }
-        else {
-            for(const auto& imix_pair: imix_counts) {
-                formatIMixEntry(output_file, imix_pair.first, imix_pair.second, total_insts, COLUMN_WIDTH);
-            }
-        }
+        sortAndPrintIMix<COLUMN_WIDTH>(output_file, category_counts, total_insts, sorted);
     }
 
     return 0;

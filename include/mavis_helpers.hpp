@@ -9,7 +9,7 @@
 
 namespace mavis_helpers {
     namespace __mavis_array {
-        static constexpr size_t NUM_INSTRUCTION_TYPES_ = 29;
+        static constexpr size_t NUM_INSTRUCTION_TYPES_ = 31;
 
         using IType = mavis::InstMetaData::InstructionTypes;
         using InstructionTypeArray = std::array<IType, NUM_INSTRUCTION_TYPES_>;
@@ -40,11 +40,13 @@ namespace mavis_helpers {
                 IType::MOVE,
                 IType::CLASSIFY,
                 IType::VECTOR,
-                IType::MASK,
+                IType::MASKABLE,
                 IType::STRIDE,
                 IType::INDEXED,
                 IType::SEGMENT,
                 IType::FAULTFIRST,
+                IType::WHOLE,
+                IType::MASK,
                 IType::CACHE,
                 IType::ATOMIC,
                 IType::FENCE,
@@ -74,11 +76,13 @@ namespace mavis_helpers {
                     case IType::MOVE:
                     case IType::CLASSIFY:
                     case IType::VECTOR:
-                    case IType::MASK:
+                    case IType::MASKABLE:
                     case IType::STRIDE:
                     case IType::INDEXED:
                     case IType::SEGMENT:
                     case IType::FAULTFIRST:
+                    case IType::WHOLE:
+                    case IType::MASK:
                     case IType::CACHE:
                     case IType::ATOMIC:
                     case IType::FENCE:
@@ -151,8 +155,8 @@ namespace mavis_helpers {
                         return "classify";
                     case enum_t::VECTOR:
                         return "vector";
-                    case enum_t::MASK:
-                        return "mask";
+                    case enum_t::MASKABLE:
+                        return "maskable";
                     case enum_t::STRIDE:
                         return "stride";
                     case enum_t::INDEXED:
@@ -161,6 +165,10 @@ namespace mavis_helpers {
                         return "segment";
                     case enum_t::FAULTFIRST:
                         return "faultfirst";
+                    case enum_t::WHOLE:
+                        return "whole";
+                    case enum_t::MASK:
+                        return "mask";
                     case enum_t::CACHE:
                         return "cache";
                     case enum_t::ATOMIC:
