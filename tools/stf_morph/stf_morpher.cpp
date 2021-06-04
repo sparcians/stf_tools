@@ -154,7 +154,8 @@ void STFMorpher::process() {
                          "Trace morphed with stf_morph");
     writer_.finalizeHeader();
 
-    for(; it_ != end_it_; ++it_) {
+    const auto& end_it = reader_.end();
+    for(; it_ != end_it; ++it_) {
         if(STF_EXPECT_FALSE(end_inst_ && it_->index() > end_inst_)) {
             break;
         }
@@ -188,7 +189,7 @@ void STFMorpher::process() {
 
             writer_ << stf::CommentRecord("BEGIN MORPH");
 
-            while(opcode_it != opcode_end_it || (orig_inst_bytes_seen < total_morph_size && it_ != end_it_)) {
+            while(opcode_it != opcode_end_it || (orig_inst_bytes_seen < total_morph_size && it_ != end_it)) {
                 // Only count an original instruction if this is the first time we've seen it
                 if(increment_instruction_size) {
                     const auto orig_inst_size = it_->opcodeSize();

@@ -85,7 +85,6 @@ class STFMorpher {
         stf::STFWriter writer_;
         stf::STFRegState reg_state_;
         stf::STFInstReader::iterator it_;
-        const stf::STFInstReader::iterator end_it_;
         const bool allow_collisions_;
         const uint64_t end_inst_;
         stf::STFDecoder decoder_;
@@ -239,7 +238,6 @@ class STFMorpher {
             writer_(output),
             reg_state_(reader_.getISA(), reader_.getInitialIEM()),
             it_(start_inst > 1 ? reader_.seekFromBeginning(start_inst - 1) : reader_.begin()),
-            end_it_(reader_.end()),
             allow_collisions_(parser.hasArgument('C')),
             end_inst_(end_inst)
         {

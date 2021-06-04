@@ -142,10 +142,9 @@ int main (int argc, char **argv)
         uint32_t pid_prev = std::numeric_limits<uint32_t>::max();
         uint32_t asid_prev = std::numeric_limits<uint32_t>::max();
 
-        auto it = config.start_inst > 1 ? stf_reader.seekFromBeginning(config.start_inst - 1) : stf_reader.begin();
-        const auto end_it = stf_reader.end();
+        const auto start_inst = config.start_inst ? config.start_inst - 1 : 0;
 
-        for (; it != end_it; ++it) {
+        for (auto it = stf_reader.begin(start_inst); it != stf_reader.end(); ++it) {
             const auto& inst = *it;
 
             if (!inst.valid()) {

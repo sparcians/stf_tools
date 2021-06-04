@@ -20,18 +20,22 @@
  * \param sorted Set to true if output should be sorted
  * \param by_mnemonic Set to true if categorization should be done by mnemonic instead of mavis category
  */
-void parseCommandLine(int argc, char** argv, std::string& trace_filename, std::string& output_filename, bool& sorted, bool& by_mnemonic) {
+void parseCommandLine(int argc, char** argv, std::string& trace_filename, std::string& output_filename, bool& sorted, bool& by_mnemonic, uint64_t& warmup, bool& skip_non_user) {
     trace_tools::CommandLineParser parser("stf_imix");
 
     parser.addFlag('o', "output", "output file (defaults to stdout)");
     parser.addFlag('s', "sort output");
     parser.addFlag('m', "categorize by mnemonic");
+    parser.addFlag('w', "warmup", "number of warmup instructions");
+    parser.addFlag('u', "only count user-mode instructions");
     parser.addPositionalArgument("trace", "trace in STF format");
     parser.parseArguments(argc, argv);
 
     parser.getArgumentValue('o', output_filename);
     sorted = parser.hasArgument('s');
     by_mnemonic = parser.hasArgument('m');
+    parser.getArgumentValue('w', warmup);
+    skip_non_user = parser.hasArgument('u');
     parser.getPositionalArgument(0, trace_filename);
 }
 
@@ -186,9 +190,11 @@ int main(int argc, char** argv) {
     std::string trace_filename;
     bool sorted = false;
     bool by_mnemonic = false;
+    uint64_t warmup = 0;
+    bool skip_non_user = false;
 
     try {
-        parseCommandLine(argc, argv, trace_filename, output_filename, sorted, by_mnemonic);
+        parseCommandLine(argc, argv, trace_filename, output_filename, sorted, by_mnemonic, warmup, skip_non_user);
     }
     catch(const trace_tools::CommandLineParser::EarlyExitException& e) {
         std::cerr << e.what() << std::endl;
@@ -198,7 +204,7 @@ int main(int argc, char** argv) {
     OutputFileStream output_file(output_filename);
 
     stf::STFDecoder decoder;
-    stf::STFInstReader reader(trace_filename);
+    stf::STFInstReader reader(trace_filename, skip_non_user);
 
     static constexpr int COLUMN_WIDTH = 16;
 
@@ -206,8 +212,8 @@ int main(int argc, char** argv) {
     std::unordered_map<std::string, uint64_t> mnemonic_counts;
     std::unordered_map<mavis_helpers::MavisInstTypeArray::enum_t, uint64_t> category_counts;
 
-    for(const auto& inst: reader) {
-        ++opcode_counts[inst.opcode()];
+    for(auto it = reader.begin(warmup); it != reader.end(); ++it) {
+        ++opcode_counts[it->opcode()];
     }
 
     const auto total_insts = static_cast<double>(reader.numInstsRead());

@@ -23,10 +23,9 @@ int main (int argc, char **argv)
 
         AddrMap::iterator amit;
 
-        auto it = config.start_inst ? stf_reader.seekFromBeginning(config.start_inst - 1) : stf_reader.begin();
-        const auto end_it = stf_reader.end();
+        const auto start_inst = config.start_inst ? (config.start_inst - 1) : 0;
 
-        for (; it != end_it; ++it) {
+        for (auto it = stf_reader.begin(start_inst); it != stf_reader.end(); ++it) {
             const auto& inst = *it;
 
             if (!inst.valid()) {
