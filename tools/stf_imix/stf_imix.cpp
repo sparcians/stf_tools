@@ -213,7 +213,9 @@ int main(int argc, char** argv) {
     std::unordered_map<mavis_helpers::MavisInstTypeArray::enum_t, uint64_t> category_counts;
 
     for(auto it = reader.begin(warmup); it != reader.end(); ++it) {
-        ++opcode_counts[it->opcode()];
+        if(STF_EXPECT_TRUE(!it->isFault())) {
+            ++opcode_counts[it->opcode()];
+        }
     }
 
     const auto total_insts = static_cast<double>(reader.numInstsRead());
