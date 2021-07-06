@@ -1,9 +1,11 @@
 set (STF_TOOL_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 
 set(CMAKE_MODULE_PATH ${STF_BASE}/cmake ${CMAKE_MODULE_PATH})
-include(GetGitRevisionDescription)
-get_git_head_revision(GIT_REFSPEC TRACE_TOOLS_GIT_SHA1)
-configure_file("${CMAKE_CURRENT_SOURCE_DIR}/trace_tools_git_version.cpp.in" "${CMAKE_CURRENT_BINARY_DIR}/trace_tools_git_version.cpp" @ONLY)
+
+include(GitVersionGenerator)
+git_version_generator("${CMAKE_CURRENT_SOURCE_DIR}/trace_tools_git_version.cpp.in"
+                      "${CMAKE_CURRENT_BINARY_DIR}/trace_tools_git_version.cpp"
+                      "TRACE_TOOLS_GIT_SHA1")
 
 add_library(trace_tools_version "${CMAKE_CURRENT_BINARY_DIR}/trace_tools_git_version.cpp")
 
