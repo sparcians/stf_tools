@@ -86,15 +86,14 @@ static void parseCommandLine(int argc,
             std::cerr << "Warning: output file format is not compressed." << std::endl;
         }
 
-        if ((generator >= stf::STF_GEN::STF_GEN_RESERVED_END) || (generator == stf::STF_GEN::STF_GEN_RESERVED)) {
-            parser.raiseErrorWithHelp("Generator is out of range");
-        }
+        parser.assertCondition((generator > stf::STF_GEN::STF_GEN_RESERVED) &&
+                               (generator < stf::STF_GEN::STF_GEN_RESERVED_END),
+                               "Generator is out of range");
 
-        if(!trace_info.isVersionSet()) {
-            // In some cases, there is no feature flag.
-            //trace_info.features ==0
-            parser.raiseErrorWithHelp("Need to specify trace info versions and features");
-        }
+        // In some cases, there is no feature flag.
+        //trace_info.features ==0
+        parser.assertCondition(trace_info.isVersionSet(), "Need to specify trace info versions and features");
+
         // check features;
         uint64_t supported = stf::enums::to_int(stf::TRACE_FEATURES::STF_CONTAIN_PHYSICAL_ADDRESS)      |
                              stf::enums::to_int(stf::TRACE_FEATURES::STF_CONTAIN_DATA_ATTRIBUTE)        |

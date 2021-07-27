@@ -42,6 +42,12 @@ static void parse_command_line(int argc,
     parser.addFlag('s', "N", "start counting at Nth instruction");
     parser.addFlag('e', "M", "stop counting at Mth instruction");
     parser.addPositionalArgument("trace", "trace in STF format");
+
+    parser.setMutuallyExclusive('s', 'v');
+    parser.setMutuallyExclusive('s', 'c');
+    parser.setMutuallyExclusive('c', 'v');
+    parser.setDependentArgument('C', 'c');
+
     parser.parseArguments(argc, argv);
 
     parser.getArgumentValue('v', verbose);
@@ -52,22 +58,6 @@ static void parse_command_line(int argc,
     parser.getArgumentValue('i', csv_interval);
     parser.getArgumentValue('s', start_inst);
     parser.getArgumentValue('e', end_inst);
-
-    if(short_output && verbose) {
-        parser.raiseErrorWithHelp("Specifying -s and -v at the same time is not allowed.");
-    }
-
-    if(short_output && csv_output) {
-        parser.raiseErrorWithHelp("Specifying -s and -c at the same time is not allowed.");
-    }
-
-    if(verbose && csv_output) {
-        parser.raiseErrorWithHelp("Specifying -c and -v at the same time is not allowed.");
-    }
-
-    if(!csv_output && cumulative_csv) {
-        parser.raiseErrorWithHelp("The -C flag is only valid when -c is specified");
-    }
 
     if(!csv_interval) {
         cumulative_csv = true; // If we aren't doing interval dumps, the CSV should always be cumulative

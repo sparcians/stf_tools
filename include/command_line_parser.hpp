@@ -3,13 +3,16 @@
 #include <algorithm>
 #include <deque>
 #include <iostream>
-#include <unordered_map>
+#include <map>
 #include <memory>
+#include <set>
 #include <sstream>
 #include <stdexcept>
 #include <string>
 #include <string_view>
 #include <vector>
+#include <unordered_map>
+#include <unordered_set>
 
 #include <unistd.h>
 
@@ -69,6 +72,9 @@ namespace trace_tools {
                     virtual bool isSet() const = 0;
 
                     virtual void addValue(const char* arg) = 0;
+
+                    virtual void checkRequired(const CommandLineParser&) const {
+                    }
             };
 
             class Argument : virtual public BaseArgument {
@@ -96,6 +102,32 @@ namespace trace_tools {
                     }
             };
 
+            class RequiredArgumentOverlay : virtual public BaseArgument {
+                protected:
+                    std::string error_message_;
+
+                public:
+                    explicit RequiredArgumentOverlay(const std::string& error_message) :
+                        error_message_(error_message)
+                    {
+                    }
+
+                    void checkRequired(const CommandLineParser& parser) const final {
+                        if(STF_EXPECT_FALSE(!isSet())) {
+                            parser.raiseErrorWithHelp(error_message_);
+                        }
+                    }
+            };
+
+            class RequiredArgument : public Argument, public RequiredArgumentOverlay {
+                public:
+                    explicit RequiredArgument(const std::string& help_message, const std::string& error_message) :
+                        Argument(help_message),
+                        RequiredArgumentOverlay(error_message)
+                    {
+                    }
+            };
+
             class NamedValueArgument : virtual public BaseArgument {
                 protected:
                     const std::string name_;
@@ -120,7 +152,7 @@ namespace trace_tools {
                     std::string value_;
 
                 public:
-                    explicit ArgumentWithValue(const std::string& name, const std::string& help_message) :
+                    ArgumentWithValue(const std::string& name, const std::string& help_message) :
                         BaseArgument(help_message),
                         NamedValueArgument(name)
                     {
@@ -190,7 +222,18 @@ namespace trace_tools {
                     }
             };
 
-            class MultiArgument : public BaseArgument {
+            class RequiredArgumentWithValue : public ArgumentWithValue, public RequiredArgumentOverlay {
+                public:
+                    RequiredArgumentWithValue(const std::string& name,
+                                              const std::string& help_message,
+                                              const std::string& error_message) :
+                        ArgumentWithValue(name, help_message),
+                        RequiredArgumentOverlay(error_message)
+                {
+                }
+            };
+
+            class MultiArgument : virtual public BaseArgument {
                 private:
                     size_t count_ = 0;
 
@@ -200,8 +243,7 @@ namespace trace_tools {
                     {
                     }
 
-                    void addValue(const char* arg) final {
-                        (void)arg;
+                    void addValue(const char*) final {
                         ++count_;
                     }
 
@@ -218,12 +260,21 @@ namespace trace_tools {
                     }
             };
 
+            class RequiredMultiArgument : public MultiArgument, public RequiredArgumentOverlay {
+                public:
+                    RequiredMultiArgument(const std::string& help_message, const std::string& error_message) :
+                        MultiArgument(help_message),
+                        RequiredArgumentOverlay(error_message)
+                    {
+                    }
+            };
+
             class MultiArgumentWithValues : public NamedValueArgument {
                 protected:
                     std::deque<std::string> values_; // Using a deque ensures that pointers to the values will be stable
 
                 public:
-                    explicit MultiArgumentWithValues(const std::string& name, const std::string& help_message) :
+                    MultiArgumentWithValues(const std::string& name, const std::string& help_message) :
                         BaseArgument(help_message),
                         NamedValueArgument(name)
                     {
@@ -245,6 +296,19 @@ namespace trace_tools {
                         return true;
                     }
             };
+
+            class RequiredMultiArgumentWithValues : public MultiArgumentWithValues, public RequiredArgumentOverlay {
+                public:
+                    RequiredMultiArgumentWithValues(const std::string& name,
+                                                    const std::string& help_message,
+                                                    const std::string& error_message) :
+                        MultiArgumentWithValues(name, help_message),
+                        RequiredArgumentOverlay(error_message)
+                    {
+                    }
+            };
+
+            template<typename T> struct is_argument_with_value : std::is_base_of<NamedValueArgument, T> {};
 
             // This class gives an ordered view of the arguments as the parser encountered them
             // Used by tools like stf_merge that have order-sensitive arguments
@@ -338,6 +402,34 @@ namespace trace_tools {
                     }
             };
 
+            class ArgumentDependency {
+                private:
+                    std::map<char, std::string> exclusive_; // Arguments that are mutually exclusive with this argument
+                    std::map<char, std::string> dependencies_; // Arguments that this argument depends on
+
+                public:
+                    void addExclusive(const char other_arg, const std::string& error_msg) {
+                        exclusive_.emplace(other_arg, error_msg);
+                    }
+
+                    void addDependency(const char other_arg, const std::string& error_msg) {
+                        dependencies_.emplace(other_arg, error_msg);
+                    }
+
+                    void checkDependencies(const CommandLineParser& parser) const {
+                        for(const auto& p: exclusive_) {
+                            if(STF_EXPECT_FALSE(parser.hasArgument(p.first))) {
+                                parser.raiseErrorWithHelp(p.second);
+                            }
+                        }
+
+                        for(const auto& p: dependencies_) {
+                            if(STF_EXPECT_FALSE(!parser.hasArgument(p.first))) {
+                                parser.raiseErrorWithHelp(p.second);
+                            }
+                        }
+                    }
+            };
 
             const std::string program_name_;
             const bool allow_hidden_arguments_;
@@ -350,9 +442,14 @@ namespace trace_tools {
 
             std::vector<std::unique_ptr<NamedValueArgument>> positional_arguments_;
             OrderedArgumentView ordered_arguments_;
+            std::unordered_set<char> active_arguments_;
+            std::set<char> required_arguments_;
             std::stringstream help_addendum_; // String that will be appended to the end of the help string
             std::ostringstream arg_str_;
             size_t max_argument_width_ = 1;
+
+            using ArgumentDependencyMap = std::map<char, ArgumentDependency>;
+            ArgumentDependencyMap argument_dependencies_;
 
             class InvalidArgumentException : public std::exception {
                 private:
@@ -380,6 +477,51 @@ namespace trace_tools {
                 }
 
                 return a;
+            }
+
+            template<typename FlagType, typename ... FlagArgs>
+            void addFlag_(const char flag,
+                          const std::string& first_arg,
+                          FlagArgs&&... args)
+            {
+                if(is_argument_with_value<FlagType>::value) {
+                    arg_str_ << flag << ':';
+                }
+                else {
+                    arg_str_ << flag;
+                }
+                const auto result = arguments_.emplace(flag, std::make_unique<FlagType>(first_arg, args...));
+                if(STF_EXPECT_FALSE(!result.second)) {
+                    std::ostringstream ss;
+                    ss << "Attempted to add flag -" << flag << " multiple times." << std::endl;
+                    throw InvalidArgumentException(ss.str());
+                }
+
+                if(STF_EXPECT_FALSE(result.first->second->isHidden() && !allow_hidden_arguments_)) {
+                    std::ostringstream ss;
+                    ss << "Attempted to add hidden flag -" << flag << " without enabling hidden arguments." << std::endl;
+                    throw InvalidArgumentException(ss.str());
+                }
+
+                arguments_insertion_ordered_.emplace_back(result.first);
+
+                // The first argument is the arg name for flags with values
+                if(is_argument_with_value<FlagType>::value) {
+                    max_argument_width_ = std::max(max_argument_width_, first_arg.size() + 3);
+                }
+            }
+
+            template<typename FlagType, typename ... FlagArgs>
+            void addRequiredFlag_(std::string_view error_message,
+                                  const char flag,
+                                  FlagArgs&&... args) {
+                std::ostringstream ss;
+                if(error_message.empty()) {
+                    ss << "Required argument -" << flag << " was not specified.";
+                    error_message = ss.str();
+                }
+                addFlag_<FlagType>(flag, args..., std::string(error_message));
+                required_arguments_.emplace(flag);
             }
 
         public:
@@ -416,82 +558,75 @@ namespace trace_tools {
                 addFlag('V', "show the STF version the tool is built with");
             }
 
-            void addFlag(const char flag, const std::string& arg_name, const std::string& help_message) {
-                arg_str_ << flag << ':';
-                const auto result = arguments_.emplace(flag, std::make_unique<ArgumentWithValue>(arg_name, help_message));
-                if(STF_EXPECT_FALSE(!result.second)) {
-                    std::ostringstream ss;
-                    ss << "Attempted to add flag -" << flag << " multiple times." << std::endl;
-                    throw InvalidArgumentException(ss.str());
+            void addFlag(const char flag,
+                         const std::string& arg_name,
+                         const std::string& help_message,
+                         const bool required = false,
+                         std::string_view error_message = {}) {
+                if(!required) {
+                    addFlag_<ArgumentWithValue>(flag, arg_name, help_message);
                 }
-
-                if(STF_EXPECT_FALSE(result.first->second->isHidden() && !allow_hidden_arguments_)) {
-                    std::ostringstream ss;
-                    ss << "Attempted to add hidden flag -" << flag << " without enabling hidden arguments." << std::endl;
-                    throw InvalidArgumentException(ss.str());
+                else {
+                    addRequiredFlag_<RequiredArgumentWithValue>(error_message, flag, arg_name, help_message);
                 }
-
-                arguments_insertion_ordered_.emplace_back(result.first);
-                max_argument_width_ = std::max(max_argument_width_, arg_name.size() + 3);
             }
 
-            void addMultiFlag(const char flag, const std::string& arg_name, const std::string& help_message) {
-                arg_str_ << flag << ':';
-                const auto result = arguments_.emplace(flag,
-                                                       std::make_unique<MultiArgumentWithValues>(arg_name, help_message));
-                if(STF_EXPECT_FALSE(!result.second)) {
-                    std::ostringstream ss;
-                    ss << "Attempted to add flag -" << flag << " multiple times." << std::endl;
-                    throw InvalidArgumentException(ss.str());
-                }
-
-                if(STF_EXPECT_FALSE(result.first->second->isHidden() && !allow_hidden_arguments_)) {
-                    std::ostringstream ss;
-                    ss << "Attempted to add hidden flag -" << flag << " without enabling hidden arguments." << std::endl;
-                    throw InvalidArgumentException(ss.str());
-                }
-
-                arguments_insertion_ordered_.emplace_back(result.first);
-                max_argument_width_ = std::max(max_argument_width_, arg_name.size() + 3);
+            void addFlag(const char flag,
+                         const std::string& arg_name,
+                         const char* help_message,
+                         const bool required = false,
+                         std::string_view error_message = {}) {
+                addFlag(flag, arg_name, std::string(help_message), required, error_message);
             }
 
-            void addFlag(const char flag, const std::string& help_message) {
-                arg_str_ << flag;
-                const auto result = arguments_.emplace(flag, std::make_unique<Argument>(help_message));
-                if(STF_EXPECT_FALSE(!result.second)) {
-                    std::ostringstream ss;
-                    ss << "Attempted to add flag -" << flag << " multiple times." << std::endl;
-                    throw InvalidArgumentException(ss.str());
+            void addMultiFlag(const char flag,
+                              const std::string& arg_name,
+                              const std::string& help_message,
+                              const bool required = false,
+                              std::string_view error_message = {}) {
+                if(!required) {
+                    addFlag_<MultiArgumentWithValues>(flag, arg_name, help_message);
                 }
-
-                if(STF_EXPECT_FALSE(result.first->second->isHidden() && !allow_hidden_arguments_)) {
-                    std::ostringstream ss;
-                    ss << "Attempted to add hidden flag -" << flag << " without enabling hidden arguments." << std::endl;
-                    throw InvalidArgumentException(ss.str());
+                else {
+                    addRequiredFlag_<RequiredMultiArgumentWithValues>(error_message, flag, arg_name, help_message);
                 }
-
-                arguments_insertion_ordered_.emplace_back(result.first);
             }
 
-            void addMultiFlag(const char flag, const std::string& help_message) {
-                arg_str_ << flag;
-                const auto result = arguments_.emplace(flag, std::make_unique<MultiArgument>(help_message));
-                if(STF_EXPECT_FALSE(!result.second)) {
-                    std::ostringstream ss;
-                    ss << "Attempted to add flag -" << flag << " multiple times." << std::endl;
-                    throw InvalidArgumentException(ss.str());
-                }
-
-                if(STF_EXPECT_FALSE(result.first->second->isHidden() && !allow_hidden_arguments_)) {
-                    std::ostringstream ss;
-                    ss << "Attempted to add hidden flag -" << flag << " without enabling hidden arguments." << std::endl;
-                    throw InvalidArgumentException(ss.str());
-                }
-
-                arguments_insertion_ordered_.emplace_back(result.first);
+            void addMultiFlag(const char flag,
+                              const std::string& arg_name,
+                              const char* help_message,
+                              const bool required = false,
+                              std::string_view error_message = {}) {
+                addMultiFlag(flag, arg_name, std::string(help_message), required, error_message);
             }
 
-            void addPositionalArgument(const std::string& argument_name, const std::string& help_message, const bool multiple_value = false) {
+            void addFlag(const char flag,
+                         const std::string& help_message,
+                         const bool required = false,
+                         std::string_view error_message = {}) {
+                if(!required) {
+                    addFlag_<Argument>(flag, help_message);
+                }
+                else {
+                    addRequiredFlag_<RequiredArgument>(error_message, flag, help_message);
+                }
+            }
+
+            void addMultiFlag(const char flag,
+                              const std::string& help_message,
+                              const bool required = false,
+                              std::string_view error_message = {}) {
+                if(!required) {
+                    addFlag_<MultiArgument>(flag, help_message);
+                }
+                else {
+                    addRequiredFlag_<RequiredMultiArgument>(error_message, flag, help_message);
+                }
+            }
+
+            void addPositionalArgument(const std::string& argument_name,
+                                       const std::string& help_message,
+                                       const bool multiple_value = false) {
                 if(STF_EXPECT_FALSE(!positional_arguments_.empty() &&
                                     positional_arguments_.back()->hasMultipleValues())) {
                     if(multiple_value) {
@@ -595,13 +730,13 @@ namespace trace_tools {
                         if(const auto it = arguments_.find(c_char); STF_EXPECT_TRUE(it != arguments_.end())) {
                             it->second->addValue(optarg);
                             ordered_arguments_.add(c_char, *it->second);
+                            active_arguments_.emplace(c_char);
                             continue;
                         }
 
                         stf_assert(c_char == '?', "Argument parser is broken");
                         std::ostringstream ss;
                         ss << "Unknown option specified: -" << static_cast<char>(optopt) << std::endl;
-                        getHelpMessage(ss);
                         throw InvalidArgumentException(ss.str());
                     }
 
@@ -615,7 +750,6 @@ namespace trace_tools {
                                 ss << ' ' << argv[i];
                             }
                             ss << std::endl;
-                            getHelpMessage(ss);
                             throw InvalidArgumentException(ss.str());
                         }
                     }
@@ -627,12 +761,23 @@ namespace trace_tools {
                             ss << ' ' << positional_arguments_[i]->getArgumentName();
                         }
                         ss << std::endl;
-                        getHelpMessage(ss);
                         throw InvalidArgumentException(ss.str());
                     }
                 }
                 catch(const InvalidArgumentException& e) {
-                    throw EarlyExitException(1, e.what());
+                    raiseErrorWithHelp(e.what());
+                }
+
+                // Check for any missing required arguments
+                for(const auto arg: required_arguments_) {
+                    arguments_.at(arg)->checkRequired(*this);
+                }
+
+                // Check for any mutually exclusive arguments or missing argument dependencies
+                for(const auto& p: argument_dependencies_) {
+                    if(hasArgument(p.first)) {
+                        p.second.checkDependencies(*this);
+                    }
                 }
 
                 for(size_t i = 0; i < positional_arguments_.size(); ++i) {
@@ -649,11 +794,7 @@ namespace trace_tools {
             }
 
             bool hasArgument(const char arg) const {
-                if(const auto it = arguments_.find(arg); it != arguments_.end()) {
-                    return it->second->isSet();
-                }
-
-                return false;
+                return active_arguments_.count(arg) != 0;
             }
 
             template<typename T>
@@ -784,6 +925,39 @@ namespace trace_tools {
                 ss << msg << std::endl;
                 getHelpMessage(ss);
                 throw EarlyExitException(1, ss.str());
+            }
+
+            /**
+             * Throws an exception if the condition is false.
+             */
+            template<typename ... MsgArgs>
+            inline void assertCondition(const bool cond, MsgArgs&&... msg_args) const {
+                if(STF_EXPECT_FALSE(!cond)) {
+                    std::ostringstream ss;
+                    (ss << ... << std::forward<MsgArgs>(msg_args));
+                    raiseErrorWithHelp(ss.str());
+                }
+            }
+
+            void setMutuallyExclusive(const char arg1, const char arg2) {
+                std::ostringstream ss;
+                ss << "-" << arg1 << " and -" << arg2 << " flags are mutually exclusive";
+                setMutuallyExclusive(arg1, arg2, ss.str());
+            }
+
+            void setMutuallyExclusive(const char arg1, const char arg2, const std::string& msg) {
+                argument_dependencies_[arg1].addExclusive(arg2, msg);
+                argument_dependencies_[arg2].addExclusive(arg1, msg);
+            }
+
+            void setDependentArgument(const char dependent_arg, const char dependency_arg) {
+                std::ostringstream ss;
+                ss << "-" << dependent_arg << " requires the -" << dependency_arg << " flag";
+                setDependentArgument(dependent_arg, dependency_arg, ss.str());
+            }
+
+            void setDependentArgument(const char dependent_arg, const char dependency_arg, const std::string& msg) {
+                argument_dependencies_[dependent_arg].addDependency(dependency_arg, msg);
             }
 
             auto begin() const {

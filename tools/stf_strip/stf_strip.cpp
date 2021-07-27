@@ -37,16 +37,12 @@ void parseCommandLine(int argc,
     for(const auto& arg: parser.getMultipleValueArgument('r')) {
         const auto it = STF_DESCRIPTOR_NAME_MAP.find(arg);
 
-        if(STF_EXPECT_FALSE(it == STF_DESCRIPTOR_NAME_MAP.end())) {
-            parser.raiseErrorWithHelp("Invalid record type specified: " + arg);
-        }
+        parser.assertCondition(it != STF_DESCRIPTOR_NAME_MAP.end(), "Invalid record type specified: ", arg);
 
         stripped_records.insert(it->second);
     }
 
-    if(STF_EXPECT_FALSE(stripped_records.empty())) {
-        parser.raiseErrorWithHelp("No records were specified for removal. Exiting.");
-    }
+    parser.assertCondition(!stripped_records.empty(), "No records were specified for removal. Exiting.");
 
     overwrite = parser.hasArgument('f');
     parser.getArgumentValue('c', compression_level);

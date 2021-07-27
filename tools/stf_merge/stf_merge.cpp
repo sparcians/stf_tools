@@ -27,7 +27,7 @@ static std::pair<FileList, std::string> parseCommandLine (int argc, char **argv)
     // Parse options
     uint64_t bcount = 1;
     uint64_t ecount = std::numeric_limits<uint64_t>::max();
-    uint64_t repeat = 0;
+    uint64_t repeat = 1;
     std::string output_filename = "-";
     FileList tracelist;
 
@@ -35,16 +35,12 @@ static std::pair<FileList, std::string> parseCommandLine (int argc, char **argv)
 
     parser.addMultiFlag('b', "N", "starting from the n instruction (inclusive) of input trace. Default is 1.");
     parser.addMultiFlag('e', "M", "ending at the nth instruction (exclusive) of input trace");
-    parser.addMultiFlag('r', "K", "repeat the specified intruction interval [N, M) K times. Default is 0.");
-    parser.addMultiFlag('f', "trace", "filename of input trace");
+    parser.addMultiFlag('r', "K", "repeat the specified intruction interval [N, M) K times. Default is 1.");
+    parser.addMultiFlag('f', "trace", "filename of input trace", true, "Must specify at least 1 input trace.");
     parser.addFlag('o', "trace", "output trace filename. stdout is default");
     parser.appendHelpText("-b, -e, -r, and -f flags can be specified multiple times for merging multiple traces");
 
     parser.parseArguments(argc, argv);
-
-    if(STF_EXPECT_FALSE(!parser.hasArgument('f'))) {
-        parser.raiseErrorWithHelp("Must specify at least 1 input trace.");
-    }
 
     parser.getArgumentValue('o', output_filename);
 
@@ -52,21 +48,23 @@ static std::pair<FileList, std::string> parseCommandLine (int argc, char **argv)
         switch(arg.getFlag()) {
             case 'b':
                 bcount = parseInt<uint64_t>(arg.getValue());
+                parser.assertCondition(bcount >= 1, "Start count must be at least 1.");
                 break;
             case 'e':
                 ecount = parseInt<uint64_t>(arg.getValue());
+                parser.assertCondition(ecount >= 2, "End count must be at least 2.");
                 break;
             case 'r':
                 repeat = parseInt<uint64_t>(arg.getValue());
                 break;
             case 'f':
-                stf_assert(ecount > bcount, "End count must be greater than start count");
+                parser.assertCondition(ecount > bcount, "End count must be greater than start count");
                 tracelist.emplace_back(bcount, ecount, repeat, arg.getValue());
 
                 // clear it for next trace input;
                 bcount = 1;
                 ecount = std::numeric_limits<uint64_t>::max();
-                repeat = 0;
+                repeat = 1;
                 break;
         }
     }
@@ -74,75 +72,47 @@ static std::pair<FileList, std::string> parseCommandLine (int argc, char **argv)
     return std::make_pair(tracelist, output_filename);
 }
 
-/**
- * \brief process merge request from same intput file;
- * return 0 on success; otherwise -1;
- */
-int processSameFile(stf::STFWriter& writer, const FileList& tracelist) {
-    int retcode = 0;
-
+void processFiles(stf::STFWriter& writer, const FileList& tracelist) {
     stf::STF_PTE page_table(nullptr, nullptr, true);
-    auto fit = tracelist.begin();
-    // Open stf trace reader
-    stf::STFReader stf_reader(fit->filename);
-    if (!stf_reader) {
-        return -1;
-    }
-
-    // TODO: check overlap here;
-    uint64_t totalcount = 0;
+    stf::STFReader reader;
     STFMergeExtractor extractor;
-    for (fit = tracelist.begin(); fit != tracelist.end(); ++fit) {
-        if (fit->start -1 < totalcount) {
-            std::cerr << "Error 1: required to skip to "
-                      << fit->start - 1
-                      << ", actually skip to "
-                      << totalcount
-                      << std::endl;
-            retcode = -1;
-            break;
-        }
-        uint64_t skipCount = fit->start - totalcount -1;
-        totalcount += extractor.extractSkip(stf_reader, skipCount, page_table);
+    bool reopen_trace = true;
+    auto last_it = tracelist.begin();
 
-        if (totalcount != fit->start - 1) {
-            std::cerr << "Error 2: required to skip to "
-                      << fit->start - 1
-                      << ", actually skip to "
-                      << totalcount
-                      << std::endl;
-            retcode = -1;
-            break;
+    for (auto it = tracelist.begin(); it != tracelist.end(); ++it) {
+        const auto& f = *it;
+        uint64_t num_to_skip = f.start - 1;
+        const uint64_t num_to_extract = f.end - f.start;
+
+        if(!reopen_trace) {
+            if(f.filename != last_it->filename || f.start < last_it->end) {
+                reopen_trace = true;
+            }
+            else {
+                num_to_skip = f.start - last_it->end;
+            }
         }
 
-        totalcount += extractor.extractInsts(stf_reader, writer, (fit->end - fit->start), page_table);
-    }
-
-    stf_reader.close();
-
-    return retcode;
-}
-
-int processDiffFiles(stf::STFWriter& writer, const FileList& tracelist) {
-    stf::STF_PTE page_table(nullptr, nullptr, true);
-    stf::STFReader stf_reader;
-    STFMergeExtractor extractor;
-    for (const auto& f: tracelist) {
-        stf_reader.open(f.filename);
-        // Open stf trace reader
-        for (uint64_t i = 0; i < f.repeat + 1; i++) {
-            if (!stf_reader) {
-                break;
+        for(uint64_t i = 0; i < f.repeat; ++i) {
+            if(reopen_trace || i > 0) {
+                if(reader) {
+                    reader.close();
+                }
+                reader.open(f.filename);
             }
 
-            if (extractor.extractSkip(stf_reader, f.start - 1, page_table) == f.start - 1) {
-                extractor.extractInsts(stf_reader, writer, (f.end - f.start), page_table);
-            }
-            stf_reader.close();
-        }
-    }
+            stf_assert(reader, "Failed to open input trace " << f.filename);
 
-    return 0;
+            stf_assert(extractor.extractSkip(reader, num_to_skip, page_table) == num_to_skip,
+                       "Tried to skip past the end of the trace.");
+
+            stf_assert(extractor.extractInsts(reader, writer, num_to_extract, page_table) == num_to_extract,
+                       "Tried to extract past the end of the trace.");
+        }
+
+        last_it = it;
+        reopen_trace = false;
+    }
 }
 
 int main(int argc, char **argv) {
@@ -157,31 +127,13 @@ int main(int argc, char **argv) {
         return e.getCode();
     }
 
-    bool sameInput = true;
-    std::string_view inputfilename = tracelist.begin()->filename;
-    uint64_t repeat = tracelist.begin()->repeat;
-    for (const auto& f: tracelist) {
-        if (inputfilename != f.filename || repeat != f.repeat) {
-            sameInput = false;
-            break;
-        }
-        inputfilename = f.filename;
-        repeat = f.repeat;
-    }
-
     // open output file to write;
     stf::STFWriter writer(output_filename);
-    if (!writer) {
-        return -1;
-    }
+    stf_assert(writer, "Failed to open output trace.");
 
-    if (sameInput) {
-        processSameFile(writer, tracelist);
-    }
-    else {
-        processDiffFiles(writer, tracelist);
-    }
+    processFiles(writer, tracelist);
 
     writer.close();
+
     return 0;
 }

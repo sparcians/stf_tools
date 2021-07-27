@@ -92,18 +92,16 @@ void STFMorpher::processOpcodeMorphArguments_(const trace_tools::CommandLinePars
                 const auto morph_it = result.first;
                 while(getline(opcode_stream, opcode_str, ',')) {
                     const auto at_pos = opcode_str.find('@');
+                    const bool has_at = at_pos != std::string::npos;
                     uint32_t opcode = 0;
                     uint64_t address = 0;
                     uint16_t size = 0;
-                    if(at_pos != std::string::npos) {
+                    if(has_at) {
                         const auto colon_pos = opcode_str.find(':');
                         if(STF_EXPECT_FALSE(colon_pos == std::string::npos)) {
-                            if(has_global_size) {
-                                size = global_size;
-                            }
-                            else {
-                                parser.raiseErrorWithHelp("Did not specify an access size for an LS op: " + opcode_str);
-                            }
+                            parser.assertCondition(has_global_size,
+                                                   "Did not specify an access size for an LS op: ", opcode_str);
+                            size = global_size;
                         }
                         address = std::stoull(opcode_str.substr(at_pos + 1, colon_pos - at_pos - 1), 0, 16);
                         size = static_cast<uint16_t>(std::stoul(opcode_str.substr(colon_pos + 1)));
@@ -112,21 +110,26 @@ void STFMorpher::processOpcodeMorphArguments_(const trace_tools::CommandLinePars
                     else {
                         opcode = static_cast<uint32_t>(std::stoul(opcode_str, 0, 16));
                     }
+
                     decoder_.decode(opcode);
 
-                    if(STF_EXPECT_FALSE(decoder_.isBranch())) {
-                        parser.raiseErrorWithHelp("Instructions cannot be replaced with branches. Opcode " + opcode_str + " is a branch.");
+                    parser.assertCondition(!decoder_.isBranch(),
+                                           "Instructions cannot be replaced with branches. Opcode ",
+                                           opcode_str,
+                                           " is a branch.");
+
+                    const bool ls_op = decoder_.isLoad() || decoder_.isStore();
+
+                    if(has_at) {
+                        parser.assertCondition(ls_op,
+                                               "Specified a destination/source address for a non-LS op: ",
+                                               opcode_str);
                     }
-                    else if(STF_EXPECT_FALSE(at_pos != std::string::npos && !(decoder_.isLoad() || decoder_.isStore()))) {
-                        parser.raiseErrorWithHelp("Specified a destination/source address for a non-LS op: " + opcode_str);
-                    }
-                    else if(STF_EXPECT_FALSE(at_pos == std::string::npos && (decoder_.isLoad() || decoder_.isStore()))) {
-                        if(has_global_address) {
-                            address = global_address;
-                        }
-                        else {
-                            parser.raiseErrorWithHelp("Attempted to add a load/store op without specifying the destination/source address: " + opcode_str);
-                        }
+                    else if(ls_op) {
+                        parser.assertCondition(has_global_address,
+                                               "Attempted to add a load/store op without specifying the destination/source address: ",
+                                               opcode_str);
+                        address = global_address;
                     }
 
                     const size_t inst_size = decoder_.isCompressed() ? 2 : 4;

@@ -40,6 +40,9 @@ static STFExtractConfig parse_command_line (int argc, char **argv)
     parser.appendHelpText("    -s <n> -o <output> <input> -- skip the first <n> instructions and write the rest to <output>");
     parser.appendHelpText("    -s <n> -t <m> <output> <input> -- skip the first <n> instructions and write every <m> instructions to <output.xxxxx.inst.stf.xz>");
     parser.appendHelpText("    -t <m> -o <output> <input> -- write every <m> instructions to <output.xxxxx.inst.stf.xz>");
+
+    parser.setMutuallyExclusive('k', 't');
+
     parser.parseArguments(argc, argv);
 
     parser.getArgumentValue('s', config.skip_count);
@@ -56,10 +59,6 @@ static STFExtractConfig parse_command_line (int argc, char **argv)
     config.user_mode_counts = parser.hasArgument('u');
 
     parser.getPositionalArgument(0, config.trace_filename);
-
-    if (config.split_count > 0 && config.head_count > 0) {
-        parser.raiseErrorWithHelp("The option '-k' conflicts with the option '-t'. See usage for detail!");
-    }
 
     return config;
 }

@@ -48,6 +48,11 @@ struct STFDiffConfig {
         parser.addFlag('t', "begin diff after first tracepoint");
         parser.addPositionalArgument("trace1", "first STF trace to compare");
         parser.addPositionalArgument("trace2", "second STF trace to compare");
+
+        parser.setMutuallyExclusive('A', 'p');
+        parser.setMutuallyExclusive('A', 'P');
+        parser.setMutuallyExclusive('m', 't');
+
         parser.parseArguments(argc, argv);
 
         parser.getArgumentValue('1', start1);
@@ -69,21 +74,8 @@ struct STFDiffConfig {
         parser.getPositionalArgument(0, trace1);
         parser.getPositionalArgument(1, trace2);
 
-        if (!start1) {
-            parser.raiseErrorWithHelp("-1 parameter must be nonzero");
-        }
-
-        if (!start2) {
-            parser.raiseErrorWithHelp("-2 parameter must be nonzero");
-        }
-
-        if (ignore_addresses && (diff_physical_data || diff_physical_pc)) {
-            parser.raiseErrorWithHelp("-A and -p/-P parameters are mutually exclusive");
-        }
-
-        if(diff_markpointed_region && diff_tracepointed_region) {
-            parser.raiseErrorWithHelp("-m and -t parameters are mutually exclusive");
-        }
+        parser.assertCondition(start1, "-1 parameter must be nonzero");
+        parser.assertCondition(start2, "-2 parameter must be nonzero");
     }
 };
 

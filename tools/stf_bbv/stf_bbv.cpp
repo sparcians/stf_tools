@@ -41,9 +41,7 @@ static void parseCommandLine(int argc,
     parser.getArgumentValue('m', min_user_insts);
     parser.getPositionalArgument(0, trace_filename);
 
-    if(end_inst && (end_inst <= start_inst)) {
-        parser.raiseErrorWithHelp("End inst must be greater than start inst");
-    }
+    parser.assertCondition(!end_inst || (end_inst <= start_inst), "End inst must be greater than start inst");
 }
 
 class BasicBlockTracker {

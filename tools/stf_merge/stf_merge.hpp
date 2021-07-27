@@ -1,8 +1,8 @@
 #pragma once
 
 #include <cstdint>
-#include <list>
 #include <string>
+#include <vector>
 
 #include "stf_pte.hpp"
 #include "stf_reader.hpp"
@@ -28,7 +28,7 @@ struct ExtractFileInfo {
     }
 };
 
-using FileList = std::list<ExtractFileInfo>;
+using FileList = std::vector<ExtractFileInfo>;
 
 class STFMergeExtractor {
     private:
@@ -106,9 +106,10 @@ class STFMergeExtractor {
             stf::STFRecord::UniqueHandle rec;
 
             const uint64_t num_insts_read = stf_reader.numInstsRead();
+            const uint64_t end_inst = num_insts_read + skipcount;
             // Process trace records
             try {
-                while ((stf_reader.numInstsRead() < skipcount) && (stf_reader >> rec)) {
+                while ((stf_reader.numInstsRead() < end_inst) && (stf_reader >> rec)) {
                     processRecord(rec, page_table, stf_reader.numInstsRead()) ;
                 }
             }

@@ -2,7 +2,7 @@
 
 static STFMorpher parseCommandLine(int argc, char **argv) {
     trace_tools::CommandLineParser parser("stf_morph");
-    parser.addFlag('o', "trace", "output filename");
+    parser.addFlag('o', "trace", "output filename", true, "No output file specified.");
     parser.addFlag('s', "N", "start at instruction N");
     parser.addFlag('e', "M", "end at instruction M");
     STFMorpher::addMorphArguments(parser);
@@ -19,17 +19,11 @@ static STFMorpher parseCommandLine(int argc, char **argv) {
     parser.getArgumentValue('s', start_inst);
     parser.getArgumentValue('e', end_inst);
 
-    if(STF_EXPECT_FALSE(output.empty())) {
-        parser.raiseErrorWithHelp("No output file specified.");
-    }
-
     parser.getPositionalArgument(0, trace);
 
     STFMorpher morphs(parser, trace, output, start_inst, end_inst);
 
-    if(STF_EXPECT_FALSE(morphs.empty())) {
-        parser.raiseErrorWithHelp("No modifications specified.");
-    }
+    parser.assertCondition(!morphs.empty(), "No modifications specified.");
 
     return morphs;
 }
