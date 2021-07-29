@@ -85,7 +85,6 @@ namespace stf {
              * Gets a default path to Mavis
              */
             static std::string getDefaultPath_() {
-                static constexpr std::string_view DEFAULT_GLOBAL_JSON_PATH_ = "/work/sparta/tools/mavis"; /**< Default path to Mavis JSON files on gamma machines*/
                 static constexpr std::string_view DEFAULT_RELATIVE_JSON_PATH_ = "../../../mavis"; /**< Default path to Mavis JSON files if building locally*/
 
                 const auto mavis_path_env = getenv("MAVIS_PATH");
@@ -99,9 +98,13 @@ namespace stf {
                     return relative_path;
                 }
 
+#ifdef MAVIS_GLOBAL_PATH
+                static constexpr std::string_view DEFAULT_GLOBAL_JSON_PATH_ = MAVIS_GLOBAL_PATH; /**< Default path to globally installed Mavis JSON files*/
+
                 if(fs::exists(DEFAULT_GLOBAL_JSON_PATH_)) {
                     return std::string(DEFAULT_GLOBAL_JSON_PATH_);
                 }
+#endif
 
                 stf_throw("Could not find Mavis JSON files anywhere. Please define the MAVIS_PATH environment variable to point to your Mavis checkout.");
             }
