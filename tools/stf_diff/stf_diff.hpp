@@ -23,6 +23,8 @@ struct STFDiffConfig {
     bool diff_physical_data = false;
     bool diff_physical_pc = false;
     bool diff_registers = false;
+    bool diff_dest_registers = false;
+    bool diff_state_registers = false;
     bool unified_diff = false;
     bool only_count = false;
     bool use_aliases = false;
@@ -40,6 +42,8 @@ struct STFDiffConfig {
         parser.addFlag('p', "compare all physical addresses");
         parser.addFlag('P', "only compare data physical addresses");
         parser.addFlag('R', "compare register records");
+        parser.addFlag('D', "compare destination register records");
+        parser.addFlag('S', "compare register state records");
         parser.addFlag('c', "N", "Exit after the Nth difference");
         parser.addFlag('C', "Just report the number of differences");
         parser.addFlag('u', "run unified diff");
@@ -52,6 +56,7 @@ struct STFDiffConfig {
         parser.setMutuallyExclusive('A', 'p');
         parser.setMutuallyExclusive('A', 'P');
         parser.setMutuallyExclusive('m', 't');
+        parser.setMutuallyExclusive('R', 'D');
 
         parser.parseArguments(argc, argv);
 
@@ -65,6 +70,8 @@ struct STFDiffConfig {
         diff_physical_pc = parser.hasArgument('p');
         diff_physical_data = diff_physical_pc || parser.hasArgument('P');
         diff_registers = parser.hasArgument('R');
+        diff_dest_registers = parser.hasArgument('D');
+        diff_state_registers = parser.hasArgument('D');
         unified_diff = parser.hasArgument('u');
         only_count = parser.hasArgument('C');
         use_aliases = parser.hasArgument('a');
@@ -176,32 +183,41 @@ class STFDiffInst {
         std::vector<Operand> operands_;
         const stf::Disassembler* dis_ = nullptr;
 
+        template<typename OperandVectorType>
+        inline void addOperands_(const OperandVectorType& operands) {
+            operands_.reserve(operands.size());
+            for(const auto& op: operands) {
+                operands_.emplace_back(op);
+            }
+        }
+
     public:
         STFDiffInst(const stf::STFInst& inst,
-                    bool pData,
-                    bool pPC,
-                    bool diff_memory,
-                    bool diff_registers,
-                    bool ignore_addresses,
+                    const STFDiffConfig& config,
                     const stf::Disassembler* dis) :
-            pc_(ignore_addresses ? stf::page_utils::INVALID_PHYS_ADDR : inst.pc()),
+            pc_(config.ignore_addresses ? stf::page_utils::INVALID_PHYS_ADDR : inst.pc()),
             opcode_(inst.opcode()),
             index_(inst.index()),
             dis_(dis)
         {
             //physPC_ = pPC ? inst->physPc() : INVALID_PHYS_ADDR;
             // Ignore data on syscalls
-            if (diff_memory && !inst.isSyscall()) {
+            if (config.diff_memory && !inst.isSyscall()) {
                 for(const auto& mit: inst.getMemoryAccesses()) {
-                    mem_accesses_.emplace_back(mit, ignore_addresses);
+                    mem_accesses_.emplace_back(mit, config.ignore_addresses);
                 }
             }
 
             // If registers are on, check those
-            if (diff_registers) {
-                for(const auto& rit: inst.getOperands()) {
-                    operands_.emplace_back(rit);
-                }
+            if (config.diff_registers) {
+                addOperands_(inst.getOperands());
+            }
+            else if(config.diff_dest_registers) {
+                addOperands_(inst.getDestOperands());
+            }
+
+            if(config.diff_state_registers) {
+                addOperands_(inst.getRegisterStates());
             }
         }
 

@@ -46,18 +46,22 @@ std::ostream& operator<<(std::ostream& os, const STFDiffInst& inst) {
         os << " MEM ";
         stf::format_utils::formatHex(os, inst.mem_accesses_.front().getAddress());
         os << ": [";
-    }
 
-    for (const auto &mit : inst.mem_accesses_) {
-        os << ' ';
-        stf::format_utils::formatHex(os, mit.getData());
-    }
+        for (const auto &mit : inst.mem_accesses_) {
+            os << ' ';
+            stf::format_utils::formatHex(os, mit.getData());
+        }
 
-    if (!inst.mem_accesses_.empty()) {
         os << " ]";
     }
 
     for (const auto &rit : inst.operands_) {
+        // If there are state records, there should (generally) be a record for every single register in the machine.
+        // Space them out to make the output more readable.
+        if(STF_EXPECT_FALSE(rit.getType() == stf::Registers::STF_REG_OPERAND_TYPE::REG_STATE)) {
+            os << std::endl;
+        }
+
         if(STF_EXPECT_FALSE(rit.isVector())) {
             std::ostringstream ss;
             ss << "   " << rit.getLabel() << ": " << rit.getReg() << " : ";
@@ -97,8 +101,8 @@ int streamingDiff(const STFDiffConfig &config,
                   const std::string &trace1,
                   const std::string &trace2) {
     // Open stf trace reader
-    stf::STFInstReader rdr1(trace1);
-    stf::STFInstReader rdr2(trace2);
+    stf::STFInstReader rdr1(trace1, config.ignore_kernel);
+    stf::STFInstReader rdr2(trace2, config.ignore_kernel);
 
     auto reader1 = getBeginIterator(config.start1, config.diff_markpointed_region, config.diff_tracepointed_region, rdr1);
     auto reader2 = getBeginIterator(config.start2, config.diff_markpointed_region, config.diff_tracepointed_region, rdr2);
@@ -127,11 +131,7 @@ int streamingDiff(const STFDiffConfig &config,
                 const auto& inst2 = *reader2;
                 std::cout << "+ "
                           << STFDiffInst(inst2,
-                                         config.diff_physical_data,
-                                         config.diff_physical_pc,
-                                         config.diff_memory && !inst2.getMemoryAccesses().empty(),
-                                         config.diff_registers,
-                                         config.ignore_addresses,
+                                         config,
                                          &dis)
                           << std::endl;
             }
@@ -147,11 +147,7 @@ int streamingDiff(const STFDiffConfig &config,
                 const auto& inst1 = *reader1;
                 std::cout << "- "
                           << STFDiffInst(inst1,
-                                         config.diff_physical_data,
-                                         config.diff_physical_pc,
-                                         config.diff_memory && !inst1.getMemoryAccesses().empty(),
-                                         config.diff_registers,
-                                         config.ignore_addresses,
+                                         config,
                                          &dis)
                           << std::endl;
             }
@@ -163,33 +159,11 @@ int streamingDiff(const STFDiffConfig &config,
         const auto& inst1 = *reader1;
         const auto& inst2 = *reader2;
 
-        // Check on the kernel code
-        if (config.ignore_kernel) {
-            // Skip any kernel code
-            if (inst1.isKernelCode()) {
-                reader1++;
-                continue;
-            }
-
-            if (inst2.isKernelCode()) {
-                reader2++;
-                continue;
-            }
-        }
-
         STFDiffInst diff1(inst1,
-                          config.diff_physical_data,
-                          config.diff_physical_pc,
-                          config.diff_memory && !inst1.getMemoryAccesses().empty(),
-                          config.diff_registers,
-                          config.ignore_addresses,
+                          config,
                           &dis);
         STFDiffInst diff2(inst2,
-                          config.diff_physical_data,
-                          config.diff_physical_pc,
-                          config.diff_memory && !inst2.getMemoryAccesses().empty(),
-                          config.diff_registers,
-                          config.ignore_addresses,
+                          config,
                           &dis);
 
         if (diff1 != diff2) {
@@ -217,7 +191,7 @@ void extractInstructions(const std::string &trace,
                          const uint64_t start,
                          const STFDiffConfig &config) {
     // Open stf trace reader
-    stf::STFInstReader rdr(trace);
+    stf::STFInstReader rdr(trace, config.ignore_kernel);
     stf::Disassembler dis(rdr.getISA(), config.use_aliases);
     auto reader = getBeginIterator(start, config.diff_markpointed_region, config.diff_tracepointed_region, rdr);
 
@@ -226,27 +200,8 @@ void extractInstructions(const std::string &trace,
     while (reader != rdr.end()) {
         const auto& inst = *reader;
 
-        // Check if we're in kernel
-        if (config.ignore_kernel) {
-            if (inst.isKernelCode()) {
-                reader++;
-                continue;
-            }
-
-            // We want the replayed instruction after the page
-            // fault, not the first one with no memory records
-            if (inst.pc() == last_user_pc) {
-                vec.pop_back();
-                count--;
-            }
-        }
-
         vec.emplace_back(inst,
-                         config.diff_physical_data,
-                         config.diff_physical_pc,
-                         config.diff_memory && !inst.getMemoryAccesses().empty(),
-                         config.diff_registers,
-                         config.ignore_addresses,
+                         config,
                          &dis);
 
         last_user_pc = inst.pc();
