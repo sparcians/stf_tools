@@ -20,7 +20,7 @@
  * \param sorted Set to true if output should be sorted
  * \param by_mnemonic Set to true if categorization should be done by mnemonic instead of mavis category
  */
-void parseCommandLine(int argc, char** argv, std::string& trace_filename, std::string& output_filename, bool& sorted, bool& by_mnemonic, uint64_t& warmup, bool& skip_non_user) {
+void parseCommandLine(int argc, char** argv, std::string& trace_filename, std::string& output_filename, bool& sorted, bool& by_mnemonic, uint64_t& warmup, bool& skip_non_user, uint64_t& run_length) {
     trace_tools::CommandLineParser parser("stf_imix");
 
     parser.addFlag('o', "output", "output file (defaults to stdout)");
@@ -28,6 +28,7 @@ void parseCommandLine(int argc, char** argv, std::string& trace_filename, std::s
     parser.addFlag('m', "categorize by mnemonic");
     parser.addFlag('w', "warmup", "number of warmup instructions");
     parser.addFlag('u', "only count user-mode instructions");
+    parser.addFlag('r', "run_length", "limit to the first run_length instructions (includes warmup). Default is 0, for no limit.");
     parser.addPositionalArgument("trace", "trace in STF format");
     parser.parseArguments(argc, argv);
 
@@ -36,7 +37,12 @@ void parseCommandLine(int argc, char** argv, std::string& trace_filename, std::s
     by_mnemonic = parser.hasArgument('m');
     parser.getArgumentValue('w', warmup);
     skip_non_user = parser.hasArgument('u');
+    parser.getArgumentValue('r', run_length);
     parser.getPositionalArgument(0, trace_filename);
+
+    if(run_length) {
+        parser.assertCondition(run_length > warmup, "run_length must be greater than warmup");
+    }
 }
 
 /**
@@ -192,9 +198,10 @@ int main(int argc, char** argv) {
     bool by_mnemonic = false;
     uint64_t warmup = 0;
     bool skip_non_user = false;
+    uint64_t run_length = 0;
 
     try {
-        parseCommandLine(argc, argv, trace_filename, output_filename, sorted, by_mnemonic, warmup, skip_non_user);
+        parseCommandLine(argc, argv, trace_filename, output_filename, sorted, by_mnemonic, warmup, skip_non_user, run_length);
     }
     catch(const trace_tools::CommandLineParser::EarlyExitException& e) {
         std::cerr << e.what() << std::endl;
@@ -212,13 +219,20 @@ int main(int argc, char** argv) {
     std::unordered_map<std::string, uint64_t> mnemonic_counts;
     std::unordered_map<mavis_helpers::MavisInstTypeArray::enum_t, uint64_t> category_counts;
 
+    uint64_t num_insts_read = 0;
+    const uint64_t post_warmup_run_length = run_length == 0 ? std::numeric_limits<uint64_t>::max() : run_length - warmup;
+
     for(auto it = reader.begin(warmup); it != reader.end(); ++it) {
         if(STF_EXPECT_TRUE(!it->isFault())) {
             ++opcode_counts[it->opcode()];
+            ++num_insts_read;
+        }
+        if(STF_EXPECT_FALSE(num_insts_read >= post_warmup_run_length)) {
+            break;
         }
     }
 
-    const auto total_insts = static_cast<double>(reader.numInstsRead());
+    const auto total_insts = static_cast<double>(num_insts_read);
 
     for(const auto& p: opcode_counts) {
         decoder.decode(p.first);
