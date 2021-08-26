@@ -1,6 +1,6 @@
 project(stf_imix)
 
-include(${STF_CMAKE_DIR}/stf_decoder.cmake)
+include(${STF_TOOLS_CMAKE_DIR}/stf_decoder.cmake)
 
 add_executable(stf_imix stf_imix.cpp)
 

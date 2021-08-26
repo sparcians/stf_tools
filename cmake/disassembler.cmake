@@ -5,4 +5,4 @@ if(_ENABLE_BINUTILS_DISASM)
     set (STF_LINK_LIBS ${STF_LINK_LIBS} opcodes bfd iberty intl dl z ${Iconv_LIBRARIES})
 endif()
 
-include(${STF_CMAKE_DIR}/stf_decoder.cmake)
+include(${STF_TOOLS_CMAKE_DIR}/stf_decoder.cmake)

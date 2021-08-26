@@ -1,6 +1,6 @@
 project(stf_check)
 
-include(${STF_CMAKE_DIR}/stf_decoder.cmake)
+include(${STF_TOOLS_CMAKE_DIR}/stf_decoder.cmake)
 
 add_executable(stf_check stf_check.cpp)
 

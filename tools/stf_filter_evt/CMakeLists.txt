@@ -1,6 +1,6 @@
 project(stf_filter_evt)
 
-include(${STF_CMAKE_DIR}/stf_decoder.cmake)
+include(${STF_TOOLS_CMAKE_DIR}/stf_decoder.cmake)
 
 add_executable(stf_filter_evt stf_filter_evt.cpp)
 

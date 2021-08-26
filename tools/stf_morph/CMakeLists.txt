@@ -1,6 +1,6 @@
 project(stf_morph)
 
-include(${STF_CMAKE_DIR}/stf_decoder.cmake)
+include(${STF_TOOLS_CMAKE_DIR}/stf_decoder.cmake)
 
 add_executable(stf_morph stf_morph.cpp stf_morpher.cpp)
 

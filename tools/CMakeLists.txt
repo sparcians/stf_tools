@@ -11,7 +11,7 @@ add_library(trace_tools_version "${CMAKE_CURRENT_BINARY_DIR}/trace_tools_git_ver
 
 set (STF_LINK_LIBS ${EXTRA_LIBS} ${STF_LINK_LIBS} trace_tools_version stdc++)
 
-include(${STF_CMAKE_DIR}/FindDisassemblers.cmake)
+include(${STF_TOOLS_CMAKE_DIR}/FindDisassemblers.cmake)
 
 add_subdirectory(stf_dump)
 add_subdirectory(stf_check)

@@ -1,6 +1,6 @@
 project(gen_mavis_json_list)
 
-include(${STF_CMAKE_DIR}/mavis.cmake)
+include(${STF_TOOLS_CMAKE_DIR}/mavis.cmake)
 
 add_executable(gen_mavis_json_list gen_mavis_json_list.cpp)
 
