@@ -18,4 +18,5 @@ struct STFDumpConfig {
     uint64_t end_inst = 0; /**< End instruction */
     bool use_aliases = false; /**< Use aliases when disassembling */
     bool show_pte = false; /**< Show PTE records */
+    bool omit_header = false; /**< If true, do not dump the header information */
 };

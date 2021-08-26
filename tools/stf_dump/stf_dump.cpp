@@ -35,6 +35,7 @@ static STFDumpConfig parseCommandLine (int argc, char **argv) {
     parser.addFlag('s', "N", "start dumping at N-th instruction");
     parser.addFlag('e', "M", "end dumping at M-th instruction");
     parser.addFlag('y', "*_symTab.yaml", "YAML symbol table file to show annotation");
+    parser.addFlag('H', "omit the header information");
     parser.addPositionalArgument("trace", "trace in STF format");
 
     parser.parseArguments(argc, argv);
@@ -50,10 +51,11 @@ static STFDumpConfig parseCommandLine (int argc, char **argv) {
     parser.getArgumentValue('e', config.end_inst);
     parser.getArgumentValue('y', config.symbol_filename);
     config.show_annotation = !config.symbol_filename.empty();
+    config.omit_header = parser.hasArgument('H');
     parser.getPositionalArgument(0, config.trace_filename);
 
-    stf_assert(!config.end_inst || (config.end_inst > config.start_inst),
-               "End inst (" << config.end_inst << ") must be greater than start inst (" << config.start_inst << ')');
+    stf_assert(!config.end_inst || (config.end_inst >= config.start_inst),
+               "End inst (" << config.end_inst << ") must be greater than or equal to start inst (" << config.start_inst << ')');
 
     return config;
 }
@@ -104,27 +106,29 @@ int main (int argc, char **argv)
         // Create disassembler
         stf::Disassembler dis(stf_reader.getISA(), config.use_aliases);
 
-        // Print Version info
-        stf::print_utils::printLabel("VERSION");
-        std::cout << stf_reader.major() << '.' << stf_reader.minor() << std::endl;
+        if(!config.omit_header) {
+            // Print Version info
+            stf::print_utils::printLabel("VERSION");
+            std::cout << stf_reader.major() << '.' << stf_reader.minor() << std::endl;
 
-        // Print trace info
-        for(const auto& i: stf_reader.getTraceInfo()) {
-            std::cout << *i;
-        }
-
-        // Print Instruction set info
-        stf::print_utils::printLabel("INST_IEM");
-        std::cout << stf_reader.getISA() << std::endl;
-
-        if(config.start_inst || config.end_inst) {
-            std::cout << "Start Inst:" << config.start_inst;
-
-            if(config.end_inst) {
-                std::cout << "  End Inst:" << config.end_inst << std::endl;
+            // Print trace info
+            for(const auto& i: stf_reader.getTraceInfo()) {
+                std::cout << *i;
             }
-            else {
-                std::cout << std::endl;
+
+            // Print Instruction set info
+            stf::print_utils::printLabel("INST_IEM");
+            std::cout << stf_reader.getISA() << std::endl;
+
+            if(config.start_inst || config.end_inst) {
+                std::cout << "Start Inst:" << config.start_inst;
+
+                if(config.end_inst) {
+                    std::cout << "  End Inst:" << config.end_inst << std::endl;
+                }
+                else {
+                    std::cout << std::endl;
+                }
             }
         }
 
@@ -147,18 +151,14 @@ int main (int argc, char **argv)
         for (auto it = stf_reader.begin(start_inst); it != stf_reader.end(); ++it) {
             const auto& inst = *it;
 
-            if (!inst.valid()) {
+            if (STF_EXPECT_FALSE(!inst.valid())) {
                 std::cerr << "ERROR: " << inst.index() << " invalid instruction " << std::hex << inst.opcode() << " PC " << inst.pc() << std::endl;
-            }
-
-            if (config.end_inst && (inst.index() > config.end_inst)) {
-                break;
             }
 
             tid = inst.tid();
             pid = inst.tgid();
             asid = inst.asid();
-            if (tid != tid_prev || pid != pid_prev || asid != asid_prev) {
+            if (STF_EXPECT_FALSE(!config.concise_mode && (tid != tid_prev || pid != pid_prev || asid != asid_prev))) {
                 stf::print_utils::printLabel("PID");
                 stf::print_utils::printTID(pid);
                 std::cout << ':';
@@ -185,7 +185,7 @@ int main (int argc, char **argv)
             }
             stf::print_utils::printSpaces(1);
 
-            if (inst.isTakenBranch()) {
+            if (STF_EXPECT_FALSE(inst.isTakenBranch())) {
                 std::cout << "PC ";
                 stf::print_utils::printVA(inst.branchTarget());
                 if (stf::format_utils::showPhys()) {
@@ -242,6 +242,10 @@ int main (int argc, char **argv)
                     stf::print_utils::printOperandLabel("ReadyReg ");
                     std::cout << std::dec << reg->as<stf::InstReadyRegRecord>().getReg() << std::endl;
                 }
+            }
+
+            if (STF_EXPECT_FALSE(config.end_inst && (inst.index() >= config.end_inst))) {
+                break;
             }
         }
     }
