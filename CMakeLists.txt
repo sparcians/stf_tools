@@ -13,21 +13,21 @@ include_directories(${STF_TOOLS_BASE}/include)
 set(STF_TOOLS_CMAKE_DIR ${STF_TOOLS_BASE}/cmake)
 set(STF_LIB_CMAKE_DIR ${STF_TOOLS_BASE}/stf_lib/cmake)
 
+set(CMAKE_MODULE_PATH ${STF_TOOLS_CMAKE_DIR} ${STF_LIB_CMAKE_DIR} ${CMAKE_MODULE_PATH})
+
 if(NOT EXISTS ${STF_TOOLS_BASE}/stf_lib/.git)
     message(FATAL_ERROR "stf_lib hasn't been checked out. Please run git submodule update --init --recursive")
 endif()
 
 add_compile_options(-Werror -std=c++17 -fPIC -Wall -Wextra -pedantic -Wconversion -Wno-unused-parameter -Wno-unused-function -pipe)
 
-if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    add_compile_options(-mllvm -inline-threshold=1024)
-endif()
+include(std_filesystem)
 
-include(${STF_TOOLS_CMAKE_DIR}/std_filesystem.cmake)
+include(stf_linker_setup)
 
-set(FULL_LTO 1)
+set(FULL_LTO true)
 
-include(${STF_LIB_CMAKE_DIR}/stf_linker_setup.cmake)
+setup_stf_linker(true)
 
 set (DISABLE_STF_DOXYGEN ON)
 

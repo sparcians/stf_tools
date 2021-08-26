@@ -1,7 +1,5 @@
 set (STF_TOOL_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 
-set(CMAKE_MODULE_PATH ${STF_BASE}/cmake ${CMAKE_MODULE_PATH})
-
 include(GitVersionGenerator)
 git_version_generator("${CMAKE_CURRENT_SOURCE_DIR}/trace_tools_git_version.cpp.in"
                       "${CMAKE_CURRENT_BINARY_DIR}/trace_tools_git_version.cpp"
