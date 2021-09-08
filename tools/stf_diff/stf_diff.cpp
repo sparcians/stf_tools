@@ -95,6 +95,39 @@ auto getBeginIterator(const uint64_t start, const bool diff_markpointed_region, 
     return it;
 }
 
+inline bool isSC(stf::STFDecoder& decoder, const stf::STFInst& inst) {
+    decoder.decode(inst.opcode());
+    return decoder.isAtomic() && decoder.isStore();
+}
+
+inline bool isFailedSC(stf::STFDecoder& decoder, const stf::STFInst& inst) {
+    if(STF_EXPECT_FALSE(isSC(decoder, inst))) {
+        bool inst_is_failed_sc = true;
+        for(const auto& m: inst.getMemoryAccesses()) {
+            if(m.getType() == stf::INST_MEM_ACCESS::WRITE) {
+                inst_is_failed_sc = false;
+                break;
+            }
+        }
+
+        return inst_is_failed_sc;
+    }
+
+    return false;
+}
+
+inline void advanceToCompletedSC(stf::STFDecoder& decoder,
+                                 stf::STFInstReader::iterator& it,
+                                 const stf::STFInstReader::iterator& end_it) {
+    do {
+        ++it;
+        if(STF_EXPECT_FALSE(it == end_it)) {
+            break;
+        }
+    }
+    while(STF_EXPECT_TRUE(!isSC(decoder, *it) || isFailedSC(decoder, *it)));
+}
+
 // Given two traces (and some config info), report the first n differences
 // between the two. n == config.diff_count.
 int streamingDiff(const STFDiffConfig &config,
@@ -113,11 +146,28 @@ int streamingDiff(const STFDiffConfig &config,
     const auto inst_set = rdr1.getISA();
     stf_assert(inst_set == rdr2.getISA(), "Traces must have the same instruction set in order to be compared!");
 
+    stf::STFDecoder decoder;
     stf::Disassembler dis(inst_set, config.use_aliases);
+
+    const bool spike_lr_sc_workaround = config.workarounds.at("spike_lr_sc");
 
     while ((!config.length) || (count < config.length)) {
         if (diff_count >= config.diff_count) {
             break;
+        }
+
+        if (spike_lr_sc_workaround && reader1 != rdr1.end() && reader2 != rdr2.end()) {
+            const bool inst1_was_failed_sc = isFailedSC(decoder, *reader1);
+            const bool inst2_was_failed_sc = isFailedSC(decoder, *reader2);
+
+            if(STF_EXPECT_FALSE(inst1_was_failed_sc != inst2_was_failed_sc)) {
+                if(inst1_was_failed_sc) {
+                    advanceToCompletedSC(decoder, reader1, rdr1.end());
+                }
+                else {
+                    advanceToCompletedSC(decoder, reader2, rdr2.end());
+                }
+            }
         }
 
         if(reader1 == rdr1.end()) {

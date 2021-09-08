@@ -10,80 +10,96 @@
 #include "stf_vlen.hpp"
 #include "util.hpp"
 
-struct STFDiffConfig {
-    std::string trace1;
-    std::string trace2;
-    uint64_t start1 = 1;
-    uint64_t start2 = 1;
-    uint64_t length = 0;
-    unsigned int diff_count = 1;
-    bool ignore_kernel = false;
-    bool ignore_addresses = false;
-    bool diff_memory= false;
-    bool diff_physical_data = false;
-    bool diff_physical_pc = false;
-    bool diff_registers = false;
-    bool diff_dest_registers = false;
-    bool diff_state_registers = false;
-    bool unified_diff = false;
-    bool only_count = false;
-    bool use_aliases = false;
-    bool diff_markpointed_region = false;
-    bool diff_tracepointed_region = false;
+class STFDiffConfig {
+    public:
+        std::string trace1;
+        std::string trace2;
+        uint64_t start1 = 1;
+        uint64_t start2 = 1;
+        uint64_t length = 0;
+        unsigned int diff_count = 1;
+        bool ignore_kernel = false;
+        bool ignore_addresses = false;
+        bool diff_memory= false;
+        bool diff_physical_data = false;
+        bool diff_physical_pc = false;
+        bool diff_registers = false;
+        bool diff_dest_registers = false;
+        bool diff_state_registers = false;
+        bool unified_diff = false;
+        bool only_count = false;
+        bool use_aliases = false;
+        bool diff_markpointed_region = false;
+        bool diff_tracepointed_region = false;
+        std::map<std::string_view, bool> workarounds {
+            {"spike_lr_sc", false}
+        };
 
-    STFDiffConfig(int argc, char **argv) {
-        trace_tools::CommandLineParser parser("stf_diff");
-        parser.addFlag('1', "N", "start diff on Nth instruction of trace1");
-        parser.addFlag('2', "N", "start diff on Nth instruction of trace2");
-        parser.addFlag('l', "len", "run diff for <len> instructions");
-        parser.addFlag('k', "ignore kernel instructions");
-        parser.addFlag('A', "ignore addresses");
-        parser.addFlag('M', "compare memory records");
-        parser.addFlag('p', "compare all physical addresses");
-        parser.addFlag('P', "only compare data physical addresses");
-        parser.addFlag('R', "compare register records");
-        parser.addFlag('D', "compare destination register records");
-        parser.addFlag('S', "compare register state records");
-        parser.addFlag('c', "N", "Exit after the Nth difference");
-        parser.addFlag('C', "Just report the number of differences");
-        parser.addFlag('u', "run unified diff");
-        parser.addFlag('a', "use register aliases in disassembly");
-        parser.addFlag('m', "begin diff after first markpoint");
-        parser.addFlag('t', "begin diff after first tracepoint");
-        parser.addPositionalArgument("trace1", "first STF trace to compare");
-        parser.addPositionalArgument("trace2", "second STF trace to compare");
+        STFDiffConfig(int argc, char **argv) {
+            trace_tools::CommandLineParser parser("stf_diff");
+            parser.addFlag('1', "N", "start diff on Nth instruction of trace1");
+            parser.addFlag('2', "N", "start diff on Nth instruction of trace2");
+            parser.addFlag('l', "len", "run diff for <len> instructions");
+            parser.addFlag('k', "ignore kernel instructions");
+            parser.addFlag('A', "ignore addresses");
+            parser.addFlag('M', "compare memory records");
+            parser.addFlag('p', "compare all physical addresses");
+            parser.addFlag('P', "only compare data physical addresses");
+            parser.addFlag('R', "compare register records");
+            parser.addFlag('D', "compare destination register records");
+            parser.addFlag('S', "compare register state records");
+            parser.addFlag('c', "N", "Exit after the Nth difference");
+            parser.addFlag('C', "Just report the number of differences");
+            parser.addFlag('u', "run unified diff");
+            parser.addFlag('a', "use register aliases in disassembly");
+            parser.addFlag('m', "begin diff after first markpoint");
+            parser.addFlag('t', "begin diff after first tracepoint");
+            parser.addMultiFlag('W', "workaround", "enable specified workaround");
+            parser.addPositionalArgument("trace1", "first STF trace to compare");
+            parser.addPositionalArgument("trace2", "second STF trace to compare");
+            parser.appendHelpText("Workarounds:\n"
+                                  "    spike_lr_sc: If a mismatch occurs due to a failed LR/SC pair, realign the traces and continue\n");
 
-        parser.setMutuallyExclusive('A', 'p');
-        parser.setMutuallyExclusive('A', 'P');
-        parser.setMutuallyExclusive('m', 't');
-        parser.setMutuallyExclusive('R', 'D');
+            parser.setMutuallyExclusive('A', 'p');
+            parser.setMutuallyExclusive('A', 'P');
+            parser.setMutuallyExclusive('m', 't');
+            parser.setMutuallyExclusive('R', 'D');
 
-        parser.parseArguments(argc, argv);
+            parser.parseArguments(argc, argv);
 
-        parser.getArgumentValue('1', start1);
-        parser.getArgumentValue('2', start2);
-        parser.getArgumentValue('l', length);
-        parser.getArgumentValue('c', diff_count);
-        ignore_kernel = parser.hasArgument('k');
-        ignore_addresses = parser.hasArgument('A');
-        diff_memory = parser.hasArgument('M');
-        diff_physical_pc = parser.hasArgument('p');
-        diff_physical_data = diff_physical_pc || parser.hasArgument('P');
-        diff_registers = parser.hasArgument('R');
-        diff_dest_registers = parser.hasArgument('D');
-        diff_state_registers = parser.hasArgument('D');
-        unified_diff = parser.hasArgument('u');
-        only_count = parser.hasArgument('C');
-        use_aliases = parser.hasArgument('a');
-        diff_markpointed_region = parser.hasArgument('m');
-        diff_tracepointed_region = parser.hasArgument('t');
+            parser.getArgumentValue('1', start1);
+            parser.getArgumentValue('2', start2);
+            parser.getArgumentValue('l', length);
+            parser.getArgumentValue('c', diff_count);
+            ignore_kernel = parser.hasArgument('k');
+            ignore_addresses = parser.hasArgument('A');
+            diff_memory = parser.hasArgument('M');
+            diff_physical_pc = parser.hasArgument('p');
+            diff_physical_data = diff_physical_pc || parser.hasArgument('P');
+            diff_registers = parser.hasArgument('R');
+            diff_dest_registers = parser.hasArgument('D');
+            diff_state_registers = parser.hasArgument('D');
+            unified_diff = parser.hasArgument('u');
+            only_count = parser.hasArgument('C');
+            use_aliases = parser.hasArgument('a');
+            diff_markpointed_region = parser.hasArgument('m');
+            diff_tracepointed_region = parser.hasArgument('t');
 
-        parser.getPositionalArgument(0, trace1);
-        parser.getPositionalArgument(1, trace2);
+            for(const auto& workaround: parser.getMultipleValueArgument('W')) {
+                if(auto it = workarounds.find(workaround); it != workarounds.end()) {
+                    it->second = true;
+                }
+                else {
+                    parser.raiseErrorWithHelp("Invalid workaround specified: " + workaround);
+                }
+            }
 
-        parser.assertCondition(start1, "-1 parameter must be nonzero");
-        parser.assertCondition(start2, "-2 parameter must be nonzero");
-    }
+            parser.getPositionalArgument(0, trace1);
+            parser.getPositionalArgument(1, trace2);
+
+            parser.assertCondition(start1, "-1 parameter must be nonzero");
+            parser.assertCondition(start2, "-2 parameter must be nonzero");
+        }
 };
 
 class STFDiffInst {
