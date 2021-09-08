@@ -439,7 +439,7 @@ class IMemMapVec {
                     const auto& strides = cur.second.getStrides();
                     for(auto stride = strides.begin(); stride != strides.end(); ++stride) {
                         os << *stride << ",";
-                    } 
+                    }
                     os << "}";
                 } else if (cur.second.isBranch()) {
                     os << "    LHR={";
@@ -450,7 +450,7 @@ class IMemMapVec {
                     os << "}";
                 }
             }
-            
+
             os << std::endl;
         }
 
@@ -686,8 +686,8 @@ class IMemMapVecIntf : public IMemMapVec {
                     continue;
                 }
 
-                // ignore instructions with events
-                if (STF_EXPECT_FALSE(!inst.getEvents().empty())) {
+                // ignore faulting instructions since they will be replayed
+                if (STF_EXPECT_FALSE(inst.isFault())) {
                     continue;
                 }
 
