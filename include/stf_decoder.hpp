@@ -42,6 +42,10 @@ namespace stf {
                         }
                         return opcode_hex.c_str();
                     }
+
+                    uint32_t getOpcode() const {
+                        return opcode_;
+                    }
             };
 
         private:
@@ -364,8 +368,10 @@ namespace stf {
                         disasm_ = decode_info->opinfo->dasmString();
                     }
                 }
-                catch(const InvalidInstException&) {
-                    unknown_disasm_ = true;
+                catch(const InvalidInstException& e) {
+                    if(e.getOpcode() != 0) { // opcode == 0 usually implies a fault/interrupt in the trace
+                        unknown_disasm_ = true;
+                    }
                     return UNIMP_;
                 }
 
