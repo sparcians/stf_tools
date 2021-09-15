@@ -42,19 +42,25 @@ static void parseCommandLine(int argc,
     parser.addPositionalArgument("trace", "trace in STF format");
 
     parser.appendHelpText("Trace Feature Codes:");
-    parser.appendHelpText("    STF_CONTAIN_PHYSICAL_ADDRESS        0x0001");
-    parser.appendHelpText("    STF_CONTAIN_DATA_ATTRIBUTE          0x0002");
-    parser.appendHelpText("    STF_CONTAIN_OPERAND_VALUE           0x0004");
-    parser.appendHelpText("    STF_CONTAIN_EVENT                   0x0008");
-    parser.appendHelpText("    STF_CONTAIN_SYSTEMCALL_VALUE        0x0010");
-    parser.appendHelpText("    STF_CONTAIN_INT_DIV_OPERAND_VALUE   0x0040");
-    parser.appendHelpText("    STF_CONTAIN_SAMPLING                0x0080");
-    parser.appendHelpText("    STF_CONTAIN_EMBEDDED_PTE            0x0100");
-    parser.appendHelpText("    STF_CONTAIN_SIMPOINT                0x0200");
-    parser.appendHelpText("    STF_CONTAIN_PROCESS_ID              0x0400");
-    parser.appendHelpText("    STF_CONTAIN_PTE_ONLY                0x0800");
-    parser.appendHelpText("    STF_NEED_POST_PROCESS               0x1000");
-    parser.appendHelpText("    STF_CONTAIN_REG_STATE               0x2000");
+    parser.appendHelpText("    STF_CONTAIN_PHYSICAL_ADDRESS        0x00001");
+    parser.appendHelpText("    STF_CONTAIN_DATA_ATTRIBUTE          0x00002");
+    parser.appendHelpText("    STF_CONTAIN_OPERAND_VALUE           0x00004");
+    parser.appendHelpText("    STF_CONTAIN_EVENT                   0x00008");
+    parser.appendHelpText("    STF_CONTAIN_SYSTEMCALL_VALUE        0x00010");
+    parser.appendHelpText("    STF_CONTAIN_INT_DIV_OPERAND_VALUE   0x00040");
+    parser.appendHelpText("    STF_CONTAIN_SAMPLING                0x00080");
+    parser.appendHelpText("    STF_CONTAIN_EMBEDDED_PTE            0x00100");
+    parser.appendHelpText("    STF_CONTAIN_SIMPOINT                0x00200");
+    parser.appendHelpText("    STF_CONTAIN_PROCESS_ID              0x00400");
+    parser.appendHelpText("    STF_CONTAIN_PTE_ONLY                0x00800");
+    parser.appendHelpText("    STF_NEED_POST_PROCESS               0x01000");
+    parser.appendHelpText("    STF_CONTAIN_REG_STATE               0x02000");
+    parser.appendHelpText("    STF_CONTAIN_MICROOP                 0x04000");
+    parser.appendHelpText("    STF_CONTAIN_MULTI_THREAD            0x08000");
+    parser.appendHelpText("    STF_CONTAIN_MULTI_CORE              0x10000");
+    parser.appendHelpText("    STF_CONTAIN_PTE_HW_AD               0x20000");
+    parser.appendHelpText("    STF_CONTAIN_VEC                     0x40000");
+    parser.appendHelpText("    STF_CONTAIN_EVENT64                 0x80000");
     parser.parseArguments(argc, argv);
 
     parser.getArgumentValue('o', output_filename);
