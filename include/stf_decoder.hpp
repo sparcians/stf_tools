@@ -160,17 +160,22 @@ namespace stf {
             };
 
         public:
-            STFDecoder() :
-                STFDecoder(getDefaultPath_())
+            /**
+             * Constructs an STFDecoder
+             * \param iem Instruction encoding
+             */
+            explicit STFDecoder(const stf::INST_IEM iem) :
+                STFDecoder(iem, getDefaultPath_())
             {
             }
 
             /**
              * Constructs an STFDecoder
+             * \param iem Instruction encoding
              * \param mavis_path Path to Mavis checkout
              */
-            explicit STFDecoder(const std::string& mavis_path) :
-                mavis_(mavis_helpers::getMavisJSONs(mavis_path), {})
+            STFDecoder(const stf::INST_IEM iem, const std::string& mavis_path) :
+                mavis_(mavis_helpers::getMavisJSONs(mavis_path, iem), {})
             {
             }
 
@@ -598,6 +603,19 @@ namespace stf {
              */
             bool hasUnknownDisasm() const {
                 return unknown_disasm_;
+            }
+
+            /**
+             * Returns whether the last decode operation failed
+             */
+            bool decodeFailed() const {
+                try {
+                    getDecodeInfo_();
+                    return false;
+                }
+                catch(const InvalidInstException&) {
+                    return true;
+                }
             }
     };
 } // end namespace stf

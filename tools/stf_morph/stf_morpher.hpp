@@ -239,7 +239,8 @@ class STFMorpher {
             reg_state_(reader_.getISA(), reader_.getInitialIEM()),
             it_(start_inst > 1 ? reader_.seekFromBeginning(start_inst - 1) : reader_.begin()),
             allow_collisions_(parser.hasArgument('C')),
-            end_inst_(end_inst)
+            end_inst_(end_inst),
+            decoder_(reader_.getInitialIEM())
         {
             processOpcodeMorphArguments_(parser);
         }

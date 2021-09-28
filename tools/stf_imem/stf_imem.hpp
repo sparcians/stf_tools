@@ -320,6 +320,7 @@ class IMemMapVec {
         uint64_t inst_count_skipped_ = 0; /**< Skipped instruction count */
         bool is_rv64_ = false; /**< If true, trace is RV64 */
         stf::ISA inst_set_ = stf::ISA::RESERVED; /**< Instruction set */
+        stf::INST_IEM iem_ = stf::INST_IEM::STF_INST_IEM_INVALID; /**< Instruction encoding */
 
         /**
          * Constructs an IMemMap entry
@@ -535,7 +536,7 @@ class IMemMapVec {
 
             std::multimap<SortedMapKey, SortedVector> sorted_map;
             bool first = true;
-            stf::Disassembler dis(inst_set_, config.use_aliases);
+            stf::Disassembler dis(inst_set_, iem_, config.use_aliases);
             uint64_t block_count = 0;
 
             for (auto it = imem_mapvec_.rbegin(); it != imem_mapvec_.rend(); it ++) {
@@ -660,7 +661,8 @@ class IMemMapVecIntf : public IMemMapVec {
 
             uint64_t inst_count_skipped = 0;
             inst_set_ = stf_reader.getISA();
-            is_rv64_ = stf_reader.getInitialIEM() == stf::INST_IEM::STF_INST_IEM_RV64;
+            iem_ = stf_reader.getInitialIEM();
+            is_rv64_ = iem_ == stf::INST_IEM::STF_INST_IEM_RV64;
 
             for (const auto& inst: stf_reader) {
                 if (STF_EXPECT_FALSE(inst_count_skipped < config.skip_count)) {

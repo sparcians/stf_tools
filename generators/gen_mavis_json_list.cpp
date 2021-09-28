@@ -27,10 +27,7 @@ class LineIteratorData {
 
 using LineIterator = std::istream_iterator<LineIteratorData>;
 
-int main(int argc, char* argv[]) {
-    static const char* CACHE_FILE = ".mavis_json_cache";
-    static const char* CPP_FILE = "mavis_json_files.cpp";
-
+std::vector<std::string> getJSONs(const char* arch_size) {
     std::vector<std::string> json_files;
     std::vector<std::string> jsons_with_expands;
     std::vector<std::string> excluded_files;
@@ -39,11 +36,11 @@ int main(int argc, char* argv[]) {
     std::copy_if(fs::directory_iterator(MAVIS_JSON_PATH),
                  fs::directory_iterator(),
                  std::back_inserter(mavis_json_files),
-                 [](const fs::directory_entry& f) {
+                 [arch_size](const fs::directory_entry& f) {
                      const auto& json_path = f.path();
                      return fs::is_regular_file(f.status()) &&
                             json_path.extension() == ".json" &&
-                            json_path.filename().string().find("64") != std::string::npos;
+                            json_path.filename().string().find(arch_size) != std::string::npos;
                  });
 
     std::sort(mavis_json_files.begin(),
@@ -92,10 +89,26 @@ int main(int argc, char* argv[]) {
         final_jsons.emplace_back(fs::path(f).filename().string());
     }
 
+    return final_jsons;
+}
+
+int main(int argc, char* argv[]) {
+    static const char* CACHE_FILE = ".mavis_json_cache";
+    static const char* CPP_FILE = "mavis_json_files.cpp";
+    static const std::array<const char*, 2> ARCH_SIZES {"32", "64"};
+
+    std::map<const char*, std::vector<std::string>> jsons;
+    for(const auto& arch_size: ARCH_SIZES) {
+        jsons.emplace(arch_size, getJSONs(arch_size));
+    }
+
     bool write_files = true;
 
     if(fs::exists(CACHE_FILE)) {
-        std::set<std::string> current_jsons(final_jsons.begin(), final_jsons.end());
+        std::set<std::string> current_jsons;
+        for(const auto& p: jsons) {
+            std::copy(p.second.begin(), p.second.end(), std::inserter(current_jsons, current_jsons.end()));
+        }
         std::set<std::string> cached_jsons;
 
         std::ifstream cache(CACHE_FILE);
@@ -112,31 +125,42 @@ int main(int argc, char* argv[]) {
                        (fs::last_write_time(CPP_FILE) < fs::last_write_time(exe_path)));
     }
 
-    try {
-        mavis_helpers::Mavis mavis(json_files, {}); // Create a Mavis object to make sure we have a valid set of JSONs
-    }
-    catch(const mavis::BaseException&) { // Something went wrong - remove all output files
-        fs::remove(CPP_FILE);
-        fs::remove(CACHE_FILE);
+    for(const auto& p: jsons) {
+        try {
+            std::vector<std::string> test_paths;
+            test_paths.reserve(p.second.size());
+            std::transform(p.second.begin(),
+                           p.second.end(),
+                           std::back_inserter(test_paths),
+                           [](const std::string& s) { return MAVIS_JSON_PATH "/" + s; });
+            mavis_helpers::Mavis mavis(test_paths, {}); // Create a Mavis object to make sure we have a valid set of JSONs
+        }
+        catch(const mavis::BaseException&) { // Something went wrong - remove all output files
+            fs::remove(CPP_FILE);
+            fs::remove(CACHE_FILE);
+            throw;
+        }
     }
 
     if(write_files) {
         std::ofstream cpp_os(CPP_FILE);
         std::ofstream cache_os(CACHE_FILE);
 
-        cpp_os << "#include <array>" << std::endl
-               << "#include \"mavis_json_files.hpp\"" << std::endl
-               << "namespace mavis_helpers {" << std::endl
-               << "    const size_t NUM_MAVIS_JSON_FILES = " << final_jsons.size() << ';' << std::endl
-               << "    const char* MAVIS_JSON_FILES[NUM_MAVIS_JSON_FILES] = {" << std::endl;
+        cpp_os << "#include \"mavis_json_files.hpp\"" << std::endl
+               << "namespace mavis_helpers {" << std::endl;
 
-        for(const auto& f: final_jsons) {
-            cpp_os << "        \"" << f << "\"," << std::endl;
-            cache_os << f << std::endl;
+        for(const auto& p: jsons) {
+            cpp_os << "    const std::vector<std::string> MAVIS_JSON_FILES_RV" << p.first << " {" << std::endl;
+
+            for(const auto& f: p.second) {
+                cpp_os << "        \"" << f << "\"," << std::endl;
+                cache_os << f << std::endl;
+            }
+
+            cpp_os << "    };" << std::endl;
         }
 
-        cpp_os << "    };" << std::endl
-               << "} // end namespace mavis_helpers" << std::endl;
+        cpp_os << "} // end namespace mavis_helpers" << std::endl;
     }
 
     return 0;

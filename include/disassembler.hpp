@@ -50,8 +50,8 @@ namespace stf {
             /**
              * Constructs a Disassembler
              */
-            Disassembler(const ISA inst_set, const bool use_aliases) :
-                BaseDisassembler(inst_set, use_aliases)
+            Disassembler(const ISA inst_set, const INST_IEM iem, const bool use_aliases) :
+                BaseDisassembler(inst_set, iem, use_aliases)
             {
                 STFEnvVar disasm_var("STF_DISASM",
                                      {"MAVIS",
@@ -62,11 +62,13 @@ namespace stf {
                                      "MAVIS");
                 if(const auto& disasm = disasm_var.get(); disasm == "MAVIS") {
                     dis_ = std::make_unique<disassemblers::MavisDisassembler>(inst_set,
+                                                                              iem,
                                                                               use_aliases);
                 }
 #ifdef ENABLE_BINUTILS_DISASM
                 else if(disasm == "BINUTILS") {
                     dis_ = std::make_unique<disassemblers::BinutilsDisassembler>(inst_set,
+                                                                                 iem,
                                                                                  use_aliases);
                 }
 #endif

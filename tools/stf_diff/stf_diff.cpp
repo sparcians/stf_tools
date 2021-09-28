@@ -82,7 +82,7 @@ auto getBeginIterator(const uint64_t start, const bool diff_markpointed_region, 
     auto it = std::next(reader.begin(), static_cast<ssize_t>(start) - 1);
 
     if(diff_markpointed_region || diff_tracepointed_region) {
-        stf::STFDecoder decoder;
+        stf::STFDecoder decoder(reader.getInitialIEM());
         while(it != reader.end()) {
             decoder.decode(it->opcode());
             ++it;
@@ -146,8 +146,11 @@ int streamingDiff(const STFDiffConfig &config,
     const auto inst_set = rdr1.getISA();
     stf_assert(inst_set == rdr2.getISA(), "Traces must have the same instruction set in order to be compared!");
 
-    stf::STFDecoder decoder;
-    stf::Disassembler dis(inst_set, config.use_aliases);
+    const auto iem = rdr1.getInitialIEM();
+    stf_assert(iem == rdr2.getInitialIEM(), "Traces must have the same instruction encoding in order to be compared!");
+
+    stf::STFDecoder decoder(iem);
+    stf::Disassembler dis(inst_set, iem, config.use_aliases);
 
     const bool spike_lr_sc_workaround = config.workarounds.at("spike_lr_sc");
 
@@ -242,7 +245,7 @@ void extractInstructions(const std::string &trace,
                          const STFDiffConfig &config) {
     // Open stf trace reader
     stf::STFInstReader rdr(trace, config.ignore_kernel);
-    stf::Disassembler dis(rdr.getISA(), config.use_aliases);
+    stf::Disassembler dis(rdr.getISA(), rdr.getInitialIEM(), config.use_aliases);
     auto reader = getBeginIterator(start, config.diff_markpointed_region, config.diff_tracepointed_region, rdr);
 
     uint64_t count = 0;

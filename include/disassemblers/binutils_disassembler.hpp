@@ -222,8 +222,8 @@ namespace stf {
                 /**
                  * \brief Construct a BinutilsDisassembler
                  */
-                explicit BinutilsDisassembler(const ISA inst_set, const bool use_aliases) :
-                    BaseDisassembler(inst_set, use_aliases)
+                explicit BinutilsDisassembler(const ISA inst_set, const INST_IEM iem, const bool use_aliases) :
+                    BaseDisassembler(inst_set, iem, use_aliases)
                 {
                     init_disassemble_info (&dis_info_, 0, static_cast<fprintf_ftype>(fprintf_));
                     dis_info_.read_memory_func = readMemoryStaticWrapper_;

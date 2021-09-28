@@ -22,7 +22,7 @@ namespace stf {
                                                const uint64_t pc,
                                                const uint32_t opcode) const = 0;
             public:
-                BaseDisassembler(const ISA inst_set, const bool use_aliases) {
+                BaseDisassembler(const ISA inst_set, const INST_IEM iem, const bool use_aliases) {
                     stf_assert(inst_set == ISA::RISCV, "Invalid instruction set: " << inst_set);
                 }
 

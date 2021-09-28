@@ -92,7 +92,6 @@ int main (int argc, char **argv) {
         uint64_t embed_pte_count = 0;       // Number of embedded pte entries found in trace.
         uint64_t pa_count = 0;              // Number of mem PA records found in trace.
         uint64_t phys_pc_count = 0;         // Number of inst_phys_pc values in trace.
-        uint64_t rv64_inst_count = 0;        // Number of 64 bit instructions in trace.
         uint64_t memAccesspack = 0;         // Number of memory access record could be packed in 8 bytes
 
         const STFCheckConfig config = parse_command_line (argc, argv);
@@ -113,7 +112,7 @@ int main (int argc, char **argv) {
 
         // Open stf trace reader
         stf::STFInstReader stf_reader(config.trace_filename);
-        stf::STFDecoder decoder;
+        stf::STFDecoder decoder(stf_reader.getInitialIEM());
         /* FIXME Because we have not kept up with STF versioning, this is currently broken and must be loosened.
         if (!stf_reader.checkVersion()) {
             exit(1);
@@ -138,6 +137,7 @@ int main (int argc, char **argv) {
         }
 
         const auto& trace_features = stf_reader.getTraceFeatures();
+        const bool has_rv64_inst = stf_reader.getInitialIEM() == stf::INST_IEM::STF_INST_IEM_RV64;
 
         for(const auto& info: stf_reader.getTraceInfo()) {
             if (info->getGenerator() != stf::STF_GEN::STF_GEN_RESERVED) {      // Check for a valid header.
@@ -184,6 +184,13 @@ int main (int argc, char **argv) {
             const auto& inst_prev = thread_pc_prev[thread_id];
             decoder.decode(inst_prev.opcode());
 
+            if(STF_EXPECT_FALSE(decoder.decodeFailed())) {
+                ecount.countError(ErrorCode::DECODER_FAILURE);
+                auto& msg = ecount.reportError(ErrorCode::DECODER_FAILURE);
+                stf::format_utils::formatDecLeft(msg, inst.index(), MAX_COUNT_LENGTH);
+                msg << " Failed to decode instruction." << std::endl;
+            }
+
             //check if trace has physical address translations
             /*if (check_phys_addr && ((trace_features & STF_CONTAIN_PHYSICAL_ADDRESS) == 0)) {
                 stringstream msg;
@@ -194,9 +201,10 @@ msg     << "STF_CONTAIN_PHYSICAL_ADDRESS not set, but is required as part of the
 
             const auto& prev_events = inst_prev.getEvents();
             //check if inst is_load or is_store and doesn't have memory accesses when it should
-            if (decoder.isLoad() && // it decodes as a load
-                (!inst_prev.isLoad() || inst_prev.getMemoryReads().empty()) && // but it isn't doing any loads
-                prev_events.empty()) { // and there are no events stopping it from doing a load
+            if (STF_EXPECT_FALSE(
+                    decoder.isLoad() && // it decodes as a load
+                    (!inst_prev.isLoad() || inst_prev.getMemoryReads().empty()) && // but it isn't doing any loads
+                    prev_events.empty())) { // and there are no events stopping it from doing a load
                 bool found = false;
                 // Commenting this out for now since RISC-V doesn't have software prefetches
                 /*
@@ -212,7 +220,7 @@ msg     << "STF_CONTAIN_PHYSICAL_ADDRESS not set, but is required as part of the
                 // If the VL register is 0, the load won't do any accesses (this is allowed by the spec)
                 found = isVLZero(inst_prev);
 
-                if(!found) {
+                if(STF_EXPECT_FALSE(!found)) {
                     ecount.countError(ErrorCode::MISS_MEM);
                     ecount.countError(ErrorCode::MISS_MEM_LOAD);
                     auto& msg = ecount.reportError(ErrorCode::MISS_MEM_LOAD);
@@ -220,9 +228,11 @@ msg     << "STF_CONTAIN_PHYSICAL_ADDRESS not set, but is required as part of the
                     msg << " Load instruction missing memory access record in stf." << std::endl;
                 }
             }
-            if (decoder.isStore() && // it decodes as a store
-                (!inst_prev.isStore() || inst_prev.getMemoryWrites().empty()) && // but it isn't doing any stores
-                prev_events.empty()) { // and there are no events stopping it from doing a store
+            if (STF_EXPECT_FALSE(
+                    decoder.isStore() && // it decodes as a store
+                    (!inst_prev.isStore() || inst_prev.getMemoryWrites().empty()) && // but it isn't doing any stores
+                    prev_events.empty() && // and there are no events stopping it from doing a store
+                    !decoder.isAtomic())) { // and this isn't an atomic inst (store-conditional)
                 bool found = false;
                 // Commenting this out for now since RISC-V doesn't have software prefetches
                 /*
@@ -247,19 +257,19 @@ msg     << "STF_CONTAIN_PHYSICAL_ADDRESS not set, but is required as part of the
                 }
             }
 
-            if (config.end_inst && (inst.index() > config.end_inst)) {
+            if (STF_EXPECT_FALSE(config.end_inst && (inst.index() > config.end_inst))) {
                 break;
             }
 
-            if((inst.pc() & 1) != 0) {
+            if(STF_EXPECT_FALSE((inst.pc() & 1) != 0)) {
                 if(inst.isOpcode16()) {
-                        ecount.countError(ErrorCode::INVALID_PC_16);
-                        auto& msg = ecount.reportError(ErrorCode::INVALID_PC_16);
-                        msg << "Invalid pc value found in mode at instruction #";
-                        stf::format_utils::formatDec(msg, inst.index());
-                        msg << " pc value: ";
-                        stf::format_utils::formatVA(msg, inst.pc());
-                        msg << std::endl;
+                    ecount.countError(ErrorCode::INVALID_PC_16);
+                    auto& msg = ecount.reportError(ErrorCode::INVALID_PC_16);
+                    msg << "Invalid pc value found in mode at instruction #";
+                    stf::format_utils::formatDec(msg, inst.index());
+                    msg << " pc value: ";
+                    stf::format_utils::formatVA(msg, inst.pc());
+                    msg << std::endl;
                 }
                 else {
                     ecount.countError(ErrorCode::INVALID_PC_32);
@@ -278,7 +288,7 @@ msg     << "STF_CONTAIN_PHYSICAL_ADDRESS not set, but is required as part of the
             for(const auto& mem_access: mem_accesses) {
                 mem_access_size += mem_access.getSize();
                 // Check if accesses address zero
-                if (mem_access.getAddress() == 0) {
+                if (STF_EXPECT_FALSE(mem_access.getAddress() == 0)) {
                     ecount.countError(ErrorCode::MEM_POINT_TO_ZERO);
                     if (config.print_memory_zero_warnings) {
                         auto& msg = ecount.reportError(ErrorCode::MEM_POINT_TO_ZERO);
@@ -289,7 +299,7 @@ msg     << "STF_CONTAIN_PHYSICAL_ADDRESS not set, but is required as part of the
                         msg << std::endl;
                     }
                 }
-                if (mem_access.getAttr() == 0) {
+                if (STF_EXPECT_FALSE(mem_access.getAttr() == 0)) {
                     ecount.countError(ErrorCode::MEM_ATTR);
                     auto& msg = ecount.reportError(ErrorCode::MEM_ATTR);
                     msg << "The Instruction accesses memory. But there is no memory access attribute record at instruction index " << inst.index() << std::endl;
@@ -373,9 +383,9 @@ msg     << "STF_CONTAIN_PHYSICAL_ADDRESS not set, but is required as part of the
 
             // check if unconditional branch contains PC_TARGET
             // If last instruction is an unconditional branch, it will not have PC TARGET.
-            if (!thread_switch) {
-                if (decoder.isBranch() && !decoder.isConditional()) {
-                    if (prev_events.empty() && (!inst_prev.isTakenBranch())) {
+            if (STF_EXPECT_TRUE(!thread_switch)) {
+                if (STF_EXPECT_FALSE(decoder.isBranch() && !decoder.isConditional())) {
+                    if (STF_EXPECT_FALSE(prev_events.empty() && (!inst_prev.isTakenBranch()))) {
                         ecount.countError(ErrorCode::UNCOND_BR);
                         auto& msg = ecount.reportError(ErrorCode::UNCOND_BR);
                         stf::format_utils::formatDecLeft(msg, inst_prev.index(), MAX_COUNT_LENGTH);
@@ -384,12 +394,11 @@ msg     << "STF_CONTAIN_PHYSICAL_ADDRESS not set, but is required as part of the
                         msg << " Unconditional Branch instr does not have PC Target(no event)." << std::endl;
                     }
                 }
-            }
-            // if switch to user mode; check if previous instruction is sret or mret;
-            if (!thread_switch) {
+
+                // if switch to user mode; check if previous instruction is sret or mret;
                 const bool is_mode_change_to_user = inst_prev.isChangeToUserMode();
 
-                if (is_mode_change_to_user && !decoder.isExceptionReturn()) {
+                if (STF_EXPECT_FALSE(is_mode_change_to_user && !decoder.isExceptionReturn())) {
                     ecount.countError(ErrorCode::SWITCH_USR);
                     auto& msg = ecount.reportError(ErrorCode::SWITCH_USR);
                     stf::format_utils::formatDecLeft(msg, inst_prev.index(), MAX_COUNT_LENGTH);
@@ -455,14 +464,12 @@ msg     << "STF_CONTAIN_PHYSICAL_ADDRESS not set, but is required as part of the
         }
 
         // Check to see if the STF_CONTAIN_RV64 feature is set correctly.
-        if ((rv64_inst_count > 0) && !trace_features->hasFeature(stf::TRACE_FEATURES::STF_CONTAIN_RV64)) {
+        if (has_rv64_inst && !trace_features->hasFeature(stf::TRACE_FEATURES::STF_CONTAIN_RV64)) {
             ecount.countError(ErrorCode::RV64_INSTS);
             auto& msg = ecount.reportError(ErrorCode::RV64_INSTS);
-            msg << "STF_CONTAIN_RV64 not set, but ";
-            stf::format_utils::formatDec(msg, rv64_inst_count);
-            msg << " RV64 instructions are present" << std::endl;
+            msg << "STF_CONTAIN_RV64 not set, but RV64 instructions are present" << std::endl;
         }
-        else if ((rv64_inst_count == 0) && trace_features->hasFeature(stf::TRACE_FEATURES::STF_CONTAIN_RV64)) {
+        else if (!has_rv64_inst && trace_features->hasFeature(stf::TRACE_FEATURES::STF_CONTAIN_RV64)) {
             ecount.countError(ErrorCode::RV64_INSTS);
             ecount.reportError(ErrorCode::RV64_INSTS) << "STF_CONTAIN_RV64 set, but no RV64 instructions are present" << std::endl;
         }

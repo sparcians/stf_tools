@@ -104,7 +104,7 @@ int main (int argc, char **argv)
         stf_reader.checkVersion();
 
         // Create disassembler
-        stf::Disassembler dis(stf_reader.getISA(), config.use_aliases);
+        stf::Disassembler dis(stf_reader.getISA(), stf_reader.getInitialIEM(), config.use_aliases);
 
         if(!config.omit_header) {
             // Print Version info

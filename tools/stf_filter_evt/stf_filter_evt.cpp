@@ -60,8 +60,7 @@ int main (int argc, char **argv)
     try {
         const auto config = parse_command_line (argc, argv);
 
-        stf::KernelCodeTracer kernel_tracer;
-        kernel_tracer.ConsumeTraceFile(config.trace_filename, config.startInst, config.endInst);
+        stf::KernelCodeTracer kernel_tracer(config.trace_filename, config.startInst, config.endInst);
         // kernel_tracer.Print(true);
 
         // Open stf trace reader
@@ -78,7 +77,7 @@ int main (int argc, char **argv)
             exit(-1);
         }
 
-        STFEventFilter filter;
+        STFEventFilter filter(stf_reader.getInitialIEM());
         stf_reader.copyHeader(stf_writer);
         stf_writer.addTraceInfo(stf::STF_GEN::STF_GEN_STF_FILTER_EVT,
                                 TRACE_TOOLS_VERSION_MAJOR,
@@ -123,20 +122,20 @@ int main (int argc, char **argv)
                 break;
             }
 
-            stf::KernelCodeTracer::ExecBlock::BlockType block_type = kernel_tracer.GetInstType(inst.index());
+            const auto block_type = kernel_tracer.GetInstType(inst.index());
 
             switch (block_type) {
-                case stf::KernelCodeTracer::ExecBlock::USER:
+                case stf::KernelCodeTracer::ExecBlock::BlockType::USER:
                     instFiltered = false;
                     break;
 
-                case stf::KernelCodeTracer::ExecBlock::KERN_SVC:
+                case stf::KernelCodeTracer::ExecBlock::BlockType::KERN_SVC:
                     instFiltered = config.filterSyscalls;
                     break;
 
-                case stf::KernelCodeTracer::ExecBlock::USER_DUPLICATE:
-                case stf::KernelCodeTracer::ExecBlock::KERN_OTHER:
-                case stf::KernelCodeTracer::ExecBlock::KERN_UNKNOWN:
+                case stf::KernelCodeTracer::ExecBlock::BlockType::USER_DUPLICATE:
+                case stf::KernelCodeTracer::ExecBlock::BlockType::KERN_OTHER:
+                case stf::KernelCodeTracer::ExecBlock::BlockType::KERN_UNKNOWN:
                     instFiltered = config.filterKernel;
                     break;
 

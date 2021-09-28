@@ -40,6 +40,7 @@ enum class ErrorCode : uint8_t {
     UNCOND_BR           = 18,   // unconditional branch instr does not have PC target
     SWITCH_USR          = 19,   // switch to user mode wihtout sret/mret instr
     MEM_POINT_TO_ZERO   = 20,   // store write to vaddr zero
+    DECODER_FAILURE     = 21,   // decoder failed to recognize an instruction
     RESERVED_NUM_ERRORS
 };
 
@@ -113,6 +114,9 @@ std::ostream& operator<<(std::ostream& os, const ErrorCode code) {
         case ErrorCode::MEM_POINT_TO_ZERO:
             os << "MEM_POINT_TO_ZERO";
             return os;
+        case ErrorCode::DECODER_FAILURE:
+            os << "DECODER_FAILURE";
+            return os;
         case ErrorCode::RESERVED_NUM_ERRORS:
             break;
     };
@@ -122,70 +126,39 @@ std::ostream& operator<<(std::ostream& os, const ErrorCode code) {
     return os;
 }
 
-ErrorCode parseErrorCode(const std::string_view err_code_str) {
-    if(err_code_str == "INVALID_PC_32") {
-        return ErrorCode::INVALID_PC_32;
-    }
-    if(err_code_str == "INVALID_PC_16") {
-        return ErrorCode::INVALID_PC_16;
-    }
-    if(err_code_str == "HEADER") {
-        return ErrorCode::HEADER;
-    }
-    if(err_code_str == "INVALID_INST") {
-        return ErrorCode::INVALID_INST;
-    }
-    if(err_code_str == "EMBED_PTE") {
-        return ErrorCode::EMBED_PTE;
-    }
-    if(err_code_str == "PA_EQ_0") {
-        return ErrorCode::PA_EQ_0;
-    }
-    if(err_code_str == "PA_NE_VA") {
-        return ErrorCode::PA_NE_VA;
-    }
-    if(err_code_str == "INVALID_PHYS") {
-        return ErrorCode::INVALID_PHYS;
-    }
-    if(err_code_str == "PHYS_ADDR") {
-        return ErrorCode::PHYS_ADDR;
-    }
-    if(err_code_str == "PTE_HEADER") {
-        return ErrorCode::PTE_HEADER;
-    }
-    if(err_code_str == "RV64_INSTS") {
-        return ErrorCode::RV64_INSTS;
-    }
-    if(err_code_str == "MEM_ATTR") {
-        return ErrorCode::MEM_ATTR;
-    }
-    if(err_code_str == "PREFETCH") {
-        return ErrorCode::PREFETCH;
-    }
-    if(err_code_str == "INEFF_MEM_ACC") {
-        return ErrorCode::INEFF_MEM_ACC;
-    }
-    if(err_code_str == "MISS_MEM") {
-        return ErrorCode::MISS_MEM;
-    }
-    if(err_code_str == "MISS_MEM_LOAD") {
-        return ErrorCode::MISS_MEM_LOAD;
-    }
-    if(err_code_str == "MISS_MEM_STR") {
-        return ErrorCode::MISS_MEM_STR;
-    }
-    if(err_code_str == "UNCOND_BR") {
-        return ErrorCode::UNCOND_BR;
-    }
-    if(err_code_str == "SWITCH_USR") {
-        return ErrorCode::SWITCH_USR;
-    }
-    if(err_code_str == "MEM_POINT_TO_ZERO") {
-        return ErrorCode::MEM_POINT_TO_ZERO;
-    }
+#define PARSER_ENTRY(x) { #x, ErrorCode::x }
 
-    stf_throw("Invalid error code specified: " << err_code_str);
+ErrorCode parseErrorCode(const std::string_view err_code_str) {
+    static const std::unordered_map<std::string_view, ErrorCode> string_map {
+        PARSER_ENTRY(INVALID_PC_32),
+        PARSER_ENTRY(INVALID_PC_16),
+        PARSER_ENTRY(HEADER),
+        PARSER_ENTRY(INVALID_INST),
+        PARSER_ENTRY(EMBED_PTE),
+        PARSER_ENTRY(PA_EQ_0),
+        PARSER_ENTRY(PA_NE_VA),
+        PARSER_ENTRY(INVALID_PHYS),
+        PARSER_ENTRY(PHYS_ADDR),
+        PARSER_ENTRY(PTE_HEADER),
+        PARSER_ENTRY(RV64_INSTS),
+        PARSER_ENTRY(MEM_ATTR),
+        PARSER_ENTRY(PREFETCH),
+        PARSER_ENTRY(INEFF_MEM_ACC),
+        PARSER_ENTRY(MISS_MEM),
+        PARSER_ENTRY(MISS_MEM_LOAD),
+        PARSER_ENTRY(MISS_MEM_STR),
+        PARSER_ENTRY(UNCOND_BR),
+        PARSER_ENTRY(SWITCH_USR),
+        PARSER_ENTRY(MEM_POINT_TO_ZERO),
+        PARSER_ENTRY(DECODER_FAILURE),
+    };
+
+    const auto it = string_map.find(err_code_str);
+    stf_assert(it != string_map.end(), "Invalid error code specified: " << err_code_str);
+    return it->second;
 }
+
+#undef PARSER_ENTRY
 
 /**
  * \class ErrorTracker

@@ -210,8 +210,8 @@ int main(int argc, char** argv) {
 
     OutputFileStream output_file(output_filename);
 
-    stf::STFDecoder decoder;
     stf::STFInstReader reader(trace_filename, skip_non_user);
+    stf::STFDecoder decoder(reader.getInitialIEM());
 
     static constexpr int COLUMN_WIDTH = 16;
 

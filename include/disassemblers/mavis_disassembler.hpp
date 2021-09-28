@@ -31,8 +31,9 @@ namespace stf {
                 /**
                  * \brief Construct a MavisDisassembler
                  */
-                explicit MavisDisassembler(const ISA inst_set, const bool use_aliases) :
-                    BaseDisassembler(inst_set, use_aliases)
+                explicit MavisDisassembler(const ISA inst_set, const INST_IEM iem, const bool use_aliases) :
+                    BaseDisassembler(inst_set, iem, use_aliases),
+                    decoder_(iem)
                 {
                 }
 

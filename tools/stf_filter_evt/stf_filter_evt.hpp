@@ -137,6 +137,11 @@ class STFEventFilter {
         stf::STFDecoder decoder_;
 
     public:
+        STFEventFilter(const stf::INST_IEM iem) :
+            decoder_(iem)
+        {
+        }
+
         void writeLastInst(stf::STFWriter& stf_writer, bool keep_event) {
             prev_inst_.invalidateBranchTarget();
             prev_inst_.keepEvents(keep_event);

@@ -64,7 +64,7 @@ int main(int argc, char** argv) {
 
     stf::STFInstReader reader(trace, skip_non_user);
 
-    stf::STFDecoder decoder;
+    stf::STFDecoder decoder(reader.getInitialIEM());
     std::map<uint64_t, BranchInfo> branch_counts;
 
     for(const auto& inst: reader) {

@@ -40,7 +40,7 @@ namespace stf {
 
             // Defines if the block is user or kernel code, and if it is kernel
             // code, whether it is a syscall or not
-            enum BlockType {
+            enum class BlockType {
                 USER = 0,       /**< user code */
 
                 USER_DUPLICATE, /**< user code, but PC is duplicated after the following kernel block */
@@ -78,6 +78,14 @@ namespace stf {
             std::string TypeToString () const;
         };
 
+        KernelCodeTracer(const std::string_view trace_filename, uint64_t start_inst, uint64_t end_inst) :
+            inst_reader_(trace_filename),
+            decoder_(inst_reader_.getInitialIEM())
+        {
+            inst_reader_.checkVersion();
+            ConsumeInstReader(start_inst, end_inst);
+        }
+
         /**
          * \brief Consume one instruction in the sequence
          *
@@ -89,13 +97,7 @@ namespace stf {
          * \brief Consume instructions from an STFInstReader
          *
          */
-        void ConsumeInstReader(stf::STFInstReader& inst_reader, uint64_t start_inst, uint64_t end_inst);
-
-        /**
-         * \brief Consume instructions from a trace file
-         *
-         */
-        void ConsumeTraceFile(const std::string_view trace_filename, uint64_t start_inst, uint64_t end_inst);
+        void ConsumeInstReader(uint64_t start_inst, uint64_t end_inst);
 
         /**
          * \brief Print the kernel code statistics that have been gathered
@@ -153,6 +155,7 @@ namespace stf {
 
         std::deque<ExecBlock::BlockType> blockTypeStack_;
         std::deque<ExecBlock> execBlocks_;
+        STFInstReader inst_reader_;
         mutable STFDecoder decoder_;
         bool prevInstWasSyscall_ = false;
         bool prevInstWasEret_ = false;
@@ -184,29 +187,23 @@ namespace stf {
 
     std::string KernelCodeTracer::ExecBlock::TypeToString() const {
         switch (type) {
-            case KernelCodeTracer::ExecBlock::USER:
+            case KernelCodeTracer::ExecBlock::BlockType::USER:
                 return "user";
-                break;
 
-            case KernelCodeTracer:: ExecBlock::USER_DUPLICATE:
+            case KernelCodeTracer:: ExecBlock::BlockType::USER_DUPLICATE:
                 return "user-duplicate";
-                break;
 
-            case KernelCodeTracer::ExecBlock::KERN_SVC:
+            case KernelCodeTracer::ExecBlock::BlockType::KERN_SVC:
                 return "kernel-syscall";
-                break;
 
-            case KernelCodeTracer::ExecBlock::KERN_UNKNOWN:
+            case KernelCodeTracer::ExecBlock::BlockType::KERN_UNKNOWN:
                 return "kernel-unknown";
-                break;
 
-            case KernelCodeTracer::ExecBlock::KERN_OTHER:
+            case KernelCodeTracer::ExecBlock::BlockType::KERN_OTHER:
                 return "kernel";
-                break;
-            default:
-                std::cerr << "ERROR: UNDEFINED stf::KernelCodeTracer::ExecBlock::BlockType" << std::endl;
-                exit(1);
-                break;
+
+            case KernelCodeTracer::ExecBlock::BlockType::UNDEFINED:
+                stf_throw("ERROR: UNDEFINED stf::KernelCodeTracer::ExecBlock::BlockType");
         }
     }
 
@@ -217,10 +214,10 @@ namespace stf {
             }
         }
 
-        return KernelCodeTracer::ExecBlock::UNDEFINED;
+        return KernelCodeTracer::ExecBlock::BlockType::UNDEFINED;
     }
 
-    static const KernelCodeTracer::ExecBlock EXEC_BLOCK_UNDEFINED(0, 0, 0, 0, KernelCodeTracer::ExecBlock::UNDEFINED);
+    static const KernelCodeTracer::ExecBlock EXEC_BLOCK_UNDEFINED(0, 0, 0, 0, KernelCodeTracer::ExecBlock::BlockType::UNDEFINED);
 
     const KernelCodeTracer::ExecBlock& KernelCodeTracer::GetInstBlock(uint64_t index) const {
         for (const KernelCodeTracer::ExecBlock& block : execBlocks_) {
@@ -234,35 +231,23 @@ namespace stf {
     }
 
     void KernelCodeTracer::InitFirstBlock(const stf::STFInst& inst) {
-        ExecBlock::BlockType firstBlockType = ExecBlock::USER;
+        ExecBlock::BlockType firstBlockType = ExecBlock::BlockType::USER;
 
         if (inst.isKernelCode()) {
-            firstBlockType = ExecBlock::KERN_UNKNOWN;
+            firstBlockType = ExecBlock::BlockType::KERN_UNKNOWN;
         } else if (instIsDuplicate(inst)) {
-            firstBlockType = ExecBlock::USER_DUPLICATE;
+            firstBlockType = ExecBlock::BlockType::USER_DUPLICATE;
         }
 
-        blockTypeStack_.push_back(firstBlockType);
-        execBlocks_.push_back(ExecBlock(inst.pc(), inst.pc(), 1,
-                    inst.index(), firstBlockType));
+        blockTypeStack_.emplace_back(firstBlockType);
+        execBlocks_.emplace_back(inst.pc(), inst.pc(), 1, inst.index(), firstBlockType);
     }
 
-    void KernelCodeTracer::ConsumeTraceFile(const std::string_view trace_filename, uint64_t start_inst, uint64_t end_inst) {
-        STFInstReader inst_reader(trace_filename);
-        inst_reader.checkVersion();
-
-        ConsumeInstReader(inst_reader, start_inst, end_inst);
-    }
-
-    void KernelCodeTracer::ConsumeInstReader(stf::STFInstReader& inst_reader, uint64_t start_inst, uint64_t end_inst) {
-        stf::STFInstReader::iterator it = inst_reader.begin();
-
-        // Skip to the start instruction
-        while (it->index() < start_inst)
-            it++;
+    void KernelCodeTracer::ConsumeInstReader(uint64_t start_inst, uint64_t end_inst) {
+        stf::STFInstReader::iterator it = inst_reader_.begin(start_inst);
 
         // Read instructions until we reach the end
-        for (; it != inst_reader.end(); it++) {
+        for (; it != inst_reader_.end(); it++) {
             const auto& inst = *it;
 
             // Quit when the end is reached
@@ -281,35 +266,34 @@ namespace stf {
 
     void KernelCodeTracer::ConsumeInst(const stf::STFInst& inst) {
         if (blockTypeStack_.size() > 0) {
-            bool instIsKernel = inst.isKernelCode();
-            // bool execBlockIsKernel = blockTypeStack.back() != ExecBlock::USER;
-            bool execBlockIsKernel = (execBlocks_.back().type != ExecBlock::USER && execBlocks_.back().type != ExecBlock::USER_DUPLICATE);
+            const bool instIsKernel = inst.isKernelCode();
+            const bool execBlockIsKernel = (execBlocks_.back().type != ExecBlock::BlockType::USER &&
+                                            execBlocks_.back().type != ExecBlock::BlockType::USER_DUPLICATE);
 
             // If current execution block is user space and this inst is in the
             // kernel, we need to start a new kernel execution block
             if (instIsKernel != execBlockIsKernel || (prevInstWasSyscall_ && execBlockIsKernel) || prevInstWasEvent_) {
-                ExecBlock::BlockType newBlockType = ExecBlock::KERN_OTHER;
+                ExecBlock::BlockType newBlockType = ExecBlock::BlockType::KERN_OTHER;
 
                 // In some rare cases, kernel code can call user code
                 if (!instIsKernel) {
                     if (instIsDuplicate(inst)) {
-                        newBlockType = ExecBlock::USER_DUPLICATE;
+                        newBlockType = ExecBlock::BlockType::USER_DUPLICATE;
                         userDuplicateInsts_++;
                     } else {
-                        newBlockType = ExecBlock::USER;
+                        newBlockType = ExecBlock::BlockType::USER;
                     }
 
                 } else if (prevInstWasSyscall_) {
-                    newBlockType = ExecBlock::KERN_SVC;
+                    newBlockType = ExecBlock::BlockType::KERN_SVC;
                 }
 
 
                 // Only push a new execution block if it is a different type than
                 // the current one
                 if (execBlocks_.back().type != newBlockType) {
-                    execBlocks_.push_back(ExecBlock(inst.pc(), inst.pc(),
-                                1, inst.index(), newBlockType));
-                    blockTypeStack_.push_back(newBlockType);
+                    execBlocks_.emplace_back(inst.pc(), inst.pc(), 1, inst.index(), newBlockType);
+                    blockTypeStack_.emplace_back(newBlockType);
                 } else {
                     execBlocks_.back().count++;
                     execBlocks_.back().end_addr = inst.pc();
@@ -329,36 +313,28 @@ namespace stf {
                 // instruction, then the return address for the event we just
                 // returned from may have been overwritten. If so, we need to
                 // clear the stack since it is now invalid.
-                } else if (instIsKernel == ((blockTypeStack_.back() == ExecBlock::USER) || (blockTypeStack_.back() == ExecBlock::USER_DUPLICATE))) {
+                } else if (instIsKernel == ((blockTypeStack_.back() == ExecBlock::BlockType::USER) ||
+                                            (blockTypeStack_.back() == ExecBlock::BlockType::USER_DUPLICATE))) {
                     blockTypeStack_.clear();
                     InitFirstBlock(inst);
 
                 // Otherwise, the block type left on the stack is used for the
                 // next execution block
                 } else if (execBlocks_.back().type != blockTypeStack_.back()) {
-                    execBlocks_.push_back(
-                        ExecBlock(inst.pc(), inst.pc(), 1, inst.index(),
-                            blockTypeStack_.back())
-                    );
+                    execBlocks_.emplace_back(inst.pc(), inst.pc(), 1, inst.index(), blockTypeStack_.back());
                 } else {
                     std::cerr << "ERROR: previous inst was ERET, but no ExecBlock type change occurred" << std::endl;
                     exit(1);
                 }
 
-            } else if ((blockTypeStack_.back() == ExecBlock::USER) && instIsDuplicate(inst)) {
-                execBlocks_.push_back(
-                    ExecBlock(inst.pc(), inst.pc(), 1, inst.index(),
-                        ExecBlock::USER_DUPLICATE)
-                );
-                blockTypeStack_.push_back(ExecBlock::USER_DUPLICATE);
+            } else if ((blockTypeStack_.back() == ExecBlock::BlockType::USER) && instIsDuplicate(inst)) {
+                execBlocks_.emplace_back(inst.pc(), inst.pc(), 1, inst.index(), ExecBlock::BlockType::USER_DUPLICATE);
+                blockTypeStack_.emplace_back(ExecBlock::BlockType::USER_DUPLICATE);
                 userDuplicateInsts_++;
 
-            } else if ((blockTypeStack_.back() == ExecBlock::USER_DUPLICATE) && !instIsDuplicate(inst)) {
-                execBlocks_.push_back(
-                    ExecBlock(inst.pc(), inst.pc(), 1, inst.index(),
-                        ExecBlock::USER)
-                );
-                blockTypeStack_.push_back(ExecBlock::USER);
+            } else if ((blockTypeStack_.back() == ExecBlock::BlockType::USER_DUPLICATE) && !instIsDuplicate(inst)) {
+                execBlocks_.emplace_back(inst.pc(), inst.pc(), 1, inst.index(), ExecBlock::BlockType::USER);
+                blockTypeStack_.emplace_back(ExecBlock::BlockType::USER);
 
 
             // Otherwise, we remain in the same execution block
@@ -385,7 +361,7 @@ namespace stf {
         if (inst.isKernelCode()) {
             kernelInsts_++;
 
-            if (blockTypeStack_.back() == ExecBlock::KERN_SVC) {
+            if (blockTypeStack_.back() == ExecBlock::BlockType::KERN_SVC) {
                 kernelSyscallInsts_++;
             }
         }
@@ -443,8 +419,10 @@ namespace stf {
         kern_file << "idx\tidx\tinsts\tuser/kernel" << std::endl;
 
         for (const auto& execBlock : GetExecBlocks()) {
-            if ((execBlock.type == ExecBlock::USER) || (execBlock.type == ExecBlock::USER_DUPLICATE))
+            if ((execBlock.type == ExecBlock::BlockType::USER) ||
+                (execBlock.type == ExecBlock::BlockType::USER_DUPLICATE)) {
                 continue;
+            }
 
             kern_file << execBlock.idx << "\t"
                 << execBlock.idx - start_index + start_delay << "\t"
