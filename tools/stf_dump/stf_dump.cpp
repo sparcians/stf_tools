@@ -200,7 +200,7 @@ int main (int argc, char **argv)
                 }
             }
 
-            stf::print_utils::printSpaces(6); // Additional padding so that opcode lines up with operand values
+            stf::print_utils::printSpaces(9); // Additional padding so that opcode lines up with operand values
             printOpcodeWithDisassembly(dis, inst.opcode(), inst.pc());
 
 
