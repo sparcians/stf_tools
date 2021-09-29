@@ -184,13 +184,6 @@ int main (int argc, char **argv) {
             const auto& inst_prev = thread_pc_prev[thread_id];
             decoder.decode(inst_prev.opcode());
 
-            if(STF_EXPECT_FALSE(decoder.decodeFailed())) {
-                ecount.countError(ErrorCode::DECODER_FAILURE);
-                auto& msg = ecount.reportError(ErrorCode::DECODER_FAILURE);
-                stf::format_utils::formatDecLeft(msg, inst.index(), MAX_COUNT_LENGTH);
-                msg << " Failed to decode instruction." << std::endl;
-            }
-
             //check if trace has physical address translations
             /*if (check_phys_addr && ((trace_features & STF_CONTAIN_PHYSICAL_ADDRESS) == 0)) {
                 stringstream msg;
@@ -200,6 +193,15 @@ msg     << "STF_CONTAIN_PHYSICAL_ADDRESS not set, but is required as part of the
             }*/
 
             const auto& prev_events = inst_prev.getEvents();
+
+            // Check for decoder failures on non-faulting instructions
+            if(STF_EXPECT_FALSE(decoder.decodeFailed() && prev_events.empty())) {
+                ecount.countError(ErrorCode::DECODER_FAILURE);
+                auto& msg = ecount.reportError(ErrorCode::DECODER_FAILURE);
+                stf::format_utils::formatDecLeft(msg, inst.index(), MAX_COUNT_LENGTH);
+                msg << " Failed to decode instruction." << std::endl;
+            }
+
             //check if inst is_load or is_store and doesn't have memory accesses when it should
             if (STF_EXPECT_FALSE(
                     decoder.isLoad() && // it decodes as a load
