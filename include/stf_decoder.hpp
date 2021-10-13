@@ -617,5 +617,29 @@ namespace stf {
                     return true;
                 }
             }
+
+            /**
+             * Returns whether the instruction is from the bitmanip ISA extension
+             */
+            bool isBitmanip() const {
+                try {
+                    return getDecodeInfo_()->opinfo->isISA(mavis::OpcodeInfo::ISAExtension::B);
+                }
+                catch(const InvalidInstException&) {
+                    return false;
+                }
+            }
+
+            /**
+             * Returns all of the ISA extensions an instruction belongs to
+             */
+            inline auto getISAExtensions() const {
+                try {
+                    return getDecodeInfo_()->opinfo->getISA();
+                }
+                catch(const InvalidInstException&) {
+                    return mavis_helpers::MavisISAExtensionTypeArray::int_t(0);
+                }
+            }
     };
 } // end namespace stf

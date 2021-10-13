@@ -97,6 +97,57 @@ namespace mavis_helpers {
             static_assert(arr.back() == END_VALUE, "NUM_INSTRUCTION_TYPES_ is too large");
             return arr;
         }
+
+        static constexpr size_t NUM_ISA_EXTENSION_TYPES_ = 11;
+
+        using ISAExtensionType = mavis::InstMetaData::ISAExtension;
+        using ISAExtensionTypeArray = std::array<ISAExtensionType, NUM_ISA_EXTENSION_TYPES_>;
+
+        static constexpr ISAExtensionTypeArray generateISAExtensionTypes_() {
+
+            // Used to check the array size is correct
+            constexpr auto END_VALUE = ISAExtensionType::V;
+
+            // Manually initializing the array ensures that NUM_INSTRUCTION_TYPES_ is big enough
+            // to fit all of the IType values
+            constexpr ISAExtensionTypeArray arr = {
+                ISAExtensionType::A,
+                ISAExtensionType::B,
+                ISAExtensionType::C,
+                ISAExtensionType::D,
+                ISAExtensionType::F,
+                ISAExtensionType::G,
+                ISAExtensionType::H,
+                ISAExtensionType::I,
+                ISAExtensionType::M,
+                ISAExtensionType::Q,
+                ISAExtensionType::V
+            };
+
+            // This looks silly, but it ensures that arr has every enumerated value in IType
+            for(const auto i: arr) {
+                switch(i) {
+                    case ISAExtensionType::A:
+                    case ISAExtensionType::B:
+                    case ISAExtensionType::C:
+                    case ISAExtensionType::D:
+                    case ISAExtensionType::F:
+                    case ISAExtensionType::G:
+                    case ISAExtensionType::H:
+                    case ISAExtensionType::I:
+                    case ISAExtensionType::M:
+                    case ISAExtensionType::Q:
+                    case ISAExtensionType::V:
+                        break;
+                };
+            }
+
+            // Finally, check that the last value in the array matches the expected end value
+            // Otherwise the array is too large
+            static_assert(arr.back() == END_VALUE, "NUM_ISA_EXTENSION_TYPES_ is too large");
+            return arr;
+        }
+
     } // end namespace __mavis_array
 
     class MavisInstTypeArray {
@@ -182,6 +233,52 @@ namespace mavis_helpers {
                 };
 
                 stf_throw("Invalid instruction type specified: " << stf::enums::to_printable_int(type));
+            }
+    };
+
+    class MavisISAExtensionTypeArray {
+        private:
+            static constexpr __mavis_array::ISAExtensionTypeArray isa_extension_type_array_ = __mavis_array::generateISAExtensionTypes_();
+
+        public:
+            using enum_t = __mavis_array::ISAExtensionType;
+            using int_t = stf::enums::int_t<enum_t>;
+
+            static constexpr auto begin() {
+                return isa_extension_type_array_.begin();
+            }
+
+            static constexpr auto end() {
+                return isa_extension_type_array_.end();
+            }
+
+            static const char* getTypeString(const enum_t type) {
+                switch(type) {
+                    case enum_t::A:
+                        return "A";
+                    case enum_t::B:
+                        return "B";
+                    case enum_t::C:
+                        return "C";
+                    case enum_t::D:
+                        return "D";
+                    case enum_t::F:
+                        return "F";
+                    case enum_t::G:
+                        return "G";
+                    case enum_t::H:
+                        return "H";
+                    case enum_t::I:
+                        return "I";
+                    case enum_t::M:
+                        return "M";
+                    case enum_t::Q:
+                        return "Q";
+                    case enum_t::V:
+                        return "V";
+                };
+
+                stf_throw("Invalid ISA extension type specified: " << stf::enums::to_printable_int(type));
             }
     };
 

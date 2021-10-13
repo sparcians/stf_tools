@@ -20,21 +20,33 @@
  * \param sorted Set to true if output should be sorted
  * \param by_mnemonic Set to true if categorization should be done by mnemonic instead of mavis category
  */
-void parseCommandLine(int argc, char** argv, std::string& trace_filename, std::string& output_filename, bool& sorted, bool& by_mnemonic, uint64_t& warmup, bool& skip_non_user, uint64_t& run_length) {
+void parseCommandLine(int argc,
+                      char** argv,
+                      std::string& trace_filename,
+                      std::string& output_filename,
+                      bool& sorted,
+                      bool& by_mnemonic,
+                      bool& by_isa_ext,
+                      uint64_t& warmup,
+                      bool& skip_non_user,
+                      uint64_t& run_length) {
     trace_tools::CommandLineParser parser("stf_imix");
 
     parser.addFlag('o', "output", "output file (defaults to stdout)");
     parser.addFlag('s', "sort output");
     parser.addFlag('m', "categorize by mnemonic");
+    parser.addFlag('e', "categorize by ISA extension");
     parser.addFlag('w', "warmup", "number of warmup instructions");
     parser.addFlag('u', "only count user-mode instructions");
     parser.addFlag('r', "run_length", "limit to the first run_length instructions (includes warmup). Default is 0, for no limit.");
     parser.addPositionalArgument("trace", "trace in STF format");
+    parser.setMutuallyExclusive('m', 'e');
     parser.parseArguments(argc, argv);
 
     parser.getArgumentValue('o', output_filename);
     sorted = parser.hasArgument('s');
     by_mnemonic = parser.hasArgument('m');
+    by_isa_ext = parser.hasArgument('e');
     parser.getArgumentValue('w', warmup);
     skip_non_user = parser.hasArgument('u');
     parser.getArgumentValue('r', run_length);
@@ -106,6 +118,39 @@ template<int COLUMN_WIDTH>
 inline void formatIMixEntry(OutputFileStream& os,
                             const uint64_t count,
                             const mavis_helpers::MavisInstTypeArray::enum_t category,
+                            const double total_insts) {
+    formatIMixEntry<COLUMN_WIDTH>(os, category, count, total_insts);
+}
+
+/**
+ * Formats an instruction mix count to an std::ostream
+ * \param os ostream to use
+ * \param isa_extension ISA extension
+ * \param count category count
+ * \param total_insts total number of instructions
+ */
+template<int COLUMN_WIDTH>
+inline void formatIMixEntry(OutputFileStream& os,
+                            const mavis_helpers::MavisISAExtensionTypeArray::enum_t category,
+                            const uint64_t count,
+                            const double total_insts) {
+    formatIMixEntry<COLUMN_WIDTH>(os,
+                                  mavis_helpers::MavisISAExtensionTypeArray::getTypeString(category),
+                                  count,
+                                  total_insts);
+}
+
+/**
+ * Formats an instruction mix count to an std::ostream
+ * \param os ostream to use
+ * \param count category count
+ * \param isa_extension ISA extension
+ * \param total_insts total number of instructions
+ */
+template<int COLUMN_WIDTH>
+inline void formatIMixEntry(OutputFileStream& os,
+                            const uint64_t count,
+                            const mavis_helpers::MavisISAExtensionTypeArray::enum_t category,
                             const double total_insts) {
     formatIMixEntry<COLUMN_WIDTH>(os, category, count, total_insts);
 }
@@ -191,17 +236,40 @@ void sortAndPrintIMix(OutputFileStream& os,
     }
 }
 
+template<typename MavisEnum>
+inline void countMavisEnums(stf::enums::int_t<MavisEnum> packed_types,
+                            std::unordered_map<MavisEnum, uint64_t>& count_map,
+                            const uint64_t count) {
+    // This loop skips over every 0-bit until it finds the first 1 bit, then increments the corresponding
+    // category count
+    while(packed_types) {
+        const decltype(packed_types) type = 1ULL <<  __builtin_ctzl(packed_types);
+        count_map[static_cast<MavisEnum>(type)] += count;
+        packed_types ^= type; // clear the bit we found
+    }
+}
+
 int main(int argc, char** argv) {
     std::string output_filename = "-";
     std::string trace_filename;
     bool sorted = false;
     bool by_mnemonic = false;
+    bool by_isa_ext = false;
     uint64_t warmup = 0;
     bool skip_non_user = false;
     uint64_t run_length = 0;
 
     try {
-        parseCommandLine(argc, argv, trace_filename, output_filename, sorted, by_mnemonic, warmup, skip_non_user, run_length);
+        parseCommandLine(argc,
+                         argv,
+                         trace_filename,
+                         output_filename,
+                         sorted,
+                         by_mnemonic,
+                         by_isa_ext,
+                         warmup,
+                         skip_non_user,
+                         run_length);
     }
     catch(const trace_tools::CommandLineParser::EarlyExitException& e) {
         std::cerr << e.what() << std::endl;
@@ -218,6 +286,7 @@ int main(int argc, char** argv) {
     std::unordered_map<uint32_t, uint64_t> opcode_counts;
     std::unordered_map<std::string, uint64_t> mnemonic_counts;
     std::unordered_map<mavis_helpers::MavisInstTypeArray::enum_t, uint64_t> category_counts;
+    std::unordered_map<mavis_helpers::MavisISAExtensionTypeArray::enum_t, uint64_t> isa_extension_counts;
 
     uint64_t num_insts_read = 0;
     const uint64_t post_warmup_run_length = run_length == 0 ? std::numeric_limits<uint64_t>::max() : run_length - warmup;
@@ -240,20 +309,19 @@ int main(int argc, char** argv) {
         if(by_mnemonic) {
             mnemonic_counts[decoder.getMnemonic()] += p.second;
         }
+        else if(by_isa_ext) {
+            countMavisEnums(decoder.getISAExtensions(), isa_extension_counts, p.second);
+        }
         else {
-            auto inst_types = decoder.getInstTypes(); // Get all of the types packed into an integer
-            // This loop skips over every 0-bit until it finds the first 1 bit, then increments the corresponding
-            // category count
-            while(inst_types) {
-                const decltype(inst_types) type = 1ULL <<  __builtin_ctzl(inst_types);
-                category_counts[static_cast<mavis_helpers::MavisInstTypeArray::enum_t>(type)] += p.second;
-                inst_types ^= type; // clear the bit we found
-            }
+            countMavisEnums(decoder.getInstTypes(), category_counts, p.second);
         }
     }
 
     if(by_mnemonic) {
         sortAndPrintIMix<COLUMN_WIDTH>(output_file, mnemonic_counts, total_insts, sorted);
+    }
+    else if(by_isa_ext) {
+        sortAndPrintIMix<COLUMN_WIDTH>(output_file, isa_extension_counts, total_insts, sorted);
     }
     else {
         sortAndPrintIMix<COLUMN_WIDTH>(output_file, category_counts, total_insts, sorted);
