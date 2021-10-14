@@ -33,14 +33,13 @@ enum class ErrorCode : uint8_t {
     RV64_INSTS          = 11,   // stf contains/doesn't contain RV64 instructions when it should/shouldn't
     MEM_ATTR            = 12,   // instruction accesses memory but missing access attribute record
     PREFETCH            = 13,   // prefetch instruction does not have data virtual address
-    INEFF_MEM_ACC       = 14,   // instructions with inefficient memory access record
-    MISS_MEM            = 15,   // missing memory access record
-    MISS_MEM_LOAD       = 16,   // missing memory access record for load
-    MISS_MEM_STR        = 17,   // missing memory access record for store
-    UNCOND_BR           = 18,   // unconditional branch instr does not have PC target
-    SWITCH_USR          = 19,   // switch to user mode wihtout sret/mret instr
-    MEM_POINT_TO_ZERO   = 20,   // store write to vaddr zero
-    DECODER_FAILURE     = 21,   // decoder failed to recognize an instruction
+    MISS_MEM            = 14,   // missing memory access record
+    MISS_MEM_LOAD       = 15,   // missing memory access record for load
+    MISS_MEM_STR        = 16,   // missing memory access record for store
+    UNCOND_BR           = 17,   // unconditional branch instr does not have PC target
+    SWITCH_USR          = 18,   // switch to user mode wihtout sret/mret instr
+    MEM_POINT_TO_ZERO   = 19,   // store write to vaddr zero
+    DECODER_FAILURE     = 20,   // decoder failed to recognize an instruction
     RESERVED_NUM_ERRORS
 };
 
@@ -93,9 +92,6 @@ std::ostream& operator<<(std::ostream& os, const ErrorCode code) {
         case ErrorCode::PREFETCH:
             os << "PREFETCH";
             return os;
-        case ErrorCode::INEFF_MEM_ACC:
-            os << "INEFF_MEM_ACC";
-            return os;
         case ErrorCode::MISS_MEM:
             os << "MISS_MEM";
             return os;
@@ -143,7 +139,6 @@ ErrorCode parseErrorCode(const std::string_view err_code_str) {
         PARSER_ENTRY(RV64_INSTS),
         PARSER_ENTRY(MEM_ATTR),
         PARSER_ENTRY(PREFETCH),
-        PARSER_ENTRY(INEFF_MEM_ACC),
         PARSER_ENTRY(MISS_MEM),
         PARSER_ENTRY(MISS_MEM_LOAD),
         PARSER_ENTRY(MISS_MEM_STR),
@@ -487,7 +482,6 @@ const std::map<ErrorCode, const char*> ErrorTracker::error_code_msgs_ = {
     {ErrorCode::RV64_INSTS, "stf contains/doesn't contain RV64 instructions when it should/shouldn't"},
     {ErrorCode::MEM_ATTR, "instruction accesses memory but missing access attribute record"},
     {ErrorCode::PREFETCH, "prefetch instruction does not have data virtual address"},
-    {ErrorCode::INEFF_MEM_ACC, "instructions with inefficient memory access record"},
     {ErrorCode::MISS_MEM, "missing memory access record"},
     {ErrorCode::MISS_MEM_LOAD, "missing memory access record for load"},
     {ErrorCode::MISS_MEM_STR, "missing memory access record for store"},

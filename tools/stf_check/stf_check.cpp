@@ -92,7 +92,6 @@ int main (int argc, char **argv) {
         uint64_t embed_pte_count = 0;       // Number of embedded pte entries found in trace.
         uint64_t pa_count = 0;              // Number of mem PA records found in trace.
         uint64_t phys_pc_count = 0;         // Number of inst_phys_pc values in trace.
-        uint64_t memAccesspack = 0;         // Number of memory access record could be packed in 8 bytes
 
         const STFCheckConfig config = parse_command_line (argc, argv);
         ErrorTracker ecount(config.ignored_errors);
@@ -347,11 +346,6 @@ msg     << "STF_CONTAIN_PHYSICAL_ADDRESS not set, but is required as part of the
 #endif
             }
 
-            if ((mem_access_size <= 4) && (mem_accesses.size() > 1)) {
-                memAccesspack++;
-            }
-
-
             // Commenting this out until we get translation figured out
             /*
             // Check for invalid inst_phys_pc value.
@@ -474,14 +468,6 @@ msg     << "STF_CONTAIN_PHYSICAL_ADDRESS not set, but is required as part of the
         else if (!has_rv64_inst && trace_features->hasFeature(stf::TRACE_FEATURES::STF_CONTAIN_RV64)) {
             ecount.countError(ErrorCode::RV64_INSTS);
             ecount.reportError(ErrorCode::RV64_INSTS) << "STF_CONTAIN_RV64 set, but no RV64 instructions are present" << std::endl;
-        }
-
-        if (memAccesspack) {
-            ecount.countError(ErrorCode::INEFF_MEM_ACC);
-            auto& msg = ecount.reportError(ErrorCode::INEFF_MEM_ACC);
-            msg << "There are ";
-            stf::format_utils::formatDec(msg, memAccesspack);
-            msg << " instructions that have inefficient memory access record." << std::endl;
         }
 
         // Print a summary of findings.
