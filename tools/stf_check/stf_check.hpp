@@ -33,7 +33,7 @@ enum class ErrorCode : uint8_t {
     RV64_INSTS          = 11,   // stf contains/doesn't contain RV64 instructions when it should/shouldn't
     MEM_ATTR            = 12,   // instruction accesses memory but missing access attribute record
     PREFETCH            = 13,   // prefetch instruction does not have data virtual address
-    INEFF_MEM_ACC       = 14,   // instructiosn with inefficient memory access record
+    INEFF_MEM_ACC       = 14,   // instructions with inefficient memory access record
     MISS_MEM            = 15,   // missing memory access record
     MISS_MEM_LOAD       = 16,   // missing memory access record for load
     MISS_MEM_STR        = 17,   // missing memory access record for store
@@ -487,7 +487,7 @@ const std::map<ErrorCode, const char*> ErrorTracker::error_code_msgs_ = {
     {ErrorCode::RV64_INSTS, "stf contains/doesn't contain RV64 instructions when it should/shouldn't"},
     {ErrorCode::MEM_ATTR, "instruction accesses memory but missing access attribute record"},
     {ErrorCode::PREFETCH, "prefetch instruction does not have data virtual address"},
-    {ErrorCode::INEFF_MEM_ACC, "instructiosn with inefficient memory access record"},
+    {ErrorCode::INEFF_MEM_ACC, "instructions with inefficient memory access record"},
     {ErrorCode::MISS_MEM, "missing memory access record"},
     {ErrorCode::MISS_MEM_LOAD, "missing memory access record for load"},
     {ErrorCode::MISS_MEM_STR, "missing memory access record for store"},
