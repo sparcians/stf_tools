@@ -6,6 +6,7 @@
 #include <cxxabi.h>
 
 #include "command_line_parser.hpp"
+#include "stf_branch_reader.hpp"
 #include "stf_inst_reader.hpp"
 
 std::string demangle(const char* name) {
@@ -72,7 +73,7 @@ int main(int argc, char* argv[]) {
         int reader = 0;
 
         trace_tools::CommandLineParser parser("stf_bench");
-        parser.addFlag('r', "reader", "Reader to test (0 = all, 1 = STFReader, 2 = STFInstReader)");
+        parser.addFlag('r', "reader", "Reader to test (0 = all, 1 = STFReader, 2 = STFInstReader, 3 = STFBranchReader)");
         parser.addPositionalArgument("trace", "STF to test with");
         parser.parseArguments(argc, argv);
 
@@ -83,12 +84,16 @@ int main(int argc, char* argv[]) {
             case 0:
                 readerBench<stf::STFReader>(trace);
                 readerBench<stf::STFInstReader>(trace);
+                readerBench<stf::STFBranchReader>(trace);
                 break;
             case 1:
                 readerBench<stf::STFReader>(trace);
                 break;
             case 2:
                 readerBench<stf::STFInstReader>(trace);
+                break;
+            case 3:
+                readerBench<stf::STFBranchReader>(trace);
                 break;
         };
     }

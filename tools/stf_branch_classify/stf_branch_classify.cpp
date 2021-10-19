@@ -7,7 +7,7 @@
 #include "stf_decoder.hpp"
 
 #include "print_utils.hpp"
-#include "stf_inst_reader.hpp"
+#include "stf_branch_reader.hpp"
 #include "command_line_parser.hpp"
 
 void processCommandLine(int argc,
@@ -62,44 +62,20 @@ int main(int argc, char** argv) {
         return e.getCode();
     }
 
-    stf::STFInstReader reader(trace, skip_non_user);
+    stf::STFBranchReader reader(trace, skip_non_user);
 
-    stf::STFDecoder decoder(reader.getInitialIEM());
     std::map<uint64_t, BranchInfo> branch_counts;
 
-    for(const auto& inst: reader) {
-        // We can avoid decoding the instruction if we know for a fact it isn't a branch or a move
-        if(STF_EXPECT_FALSE(inst.isLoad() || inst.isStore() || inst.isSyscall())) {
-            continue;
-        }
+    for(const auto& branch: reader) {
+        auto& branch_info = branch_counts[branch.getPC()];
 
-        decoder.decode(inst.opcode());
+        const bool is_taken = branch.isTaken();
+        branch_info.taken += is_taken;
+        branch_info.not_taken += !is_taken;
+        branch_info.targets[branch.getTargetPC()] += is_taken;
+        branch_info.indirect = branch.isIndirect();
 
-        if(STF_EXPECT_TRUE(!decoder.isBranch())) {
-            continue;
-        }
-
-        const auto pc = inst.pc();
-        uint64_t target = 0;
-        auto& branch_info = branch_counts[pc];
-
-        if(inst.isTakenBranch()) {
-            target = inst.branchTarget();
-            ++branch_info.taken;
-        }
-        // Compute the real target
-        else {
-            stf_assert(!decoder.isInstType(mavis::InstMetaData::InstructionTypes::JALR) &&
-                       !decoder.isInstType(mavis::InstMetaData::InstructionTypes::JAL),
-                       "JAL and JALR branches should be unconditional");
-            target = inst.pc() + static_cast<uint64_t>(decoder.getSignedImmediate());
-            ++branch_info.not_taken;
-        }
-
-        branch_info.targets[target] += inst.isTakenBranch();
-        branch_info.indirect = decoder.isInstType(mavis::InstMetaData::InstructionTypes::JALR);
-
-        const Direction new_dir = target <= pc ? Direction::BACKWARD : Direction::FORWARD;
+        const Direction new_dir = branch.isBackwards() ? Direction::BACKWARD : Direction::FORWARD;
         if(branch_info.direction == Direction::INVALID) {
             branch_info.direction = new_dir;
         }
