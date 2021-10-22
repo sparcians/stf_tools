@@ -10,8 +10,7 @@ void processCommandLine(int argc,
                         std::string& trace,
                         std::string& output,
                         bool& skip_non_user) {
-    trace_tools::CommandLineParser parser("stf_branch_classify");
-    parser.addFlag('v', "verbose mode (prints indirect branch targets)");
+    trace_tools::CommandLineParser parser("stf_branch_hdf5");
     parser.addFlag('u', "skip non user-mode instructions");
     parser.addPositionalArgument("trace", "trace in STF format");
     parser.addPositionalArgument("output", "output HDF5");
