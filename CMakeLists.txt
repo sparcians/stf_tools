@@ -31,6 +31,8 @@ setup_stf_linker(true)
 
 set (DISABLE_STF_DOXYGEN ON)
 
+set(BUILD_STF_PYTHON_LIB ON)
+
 add_subdirectory(stf_lib)
 
 include_directories(${STF_BASE}/stf-inc)

@@ -4,8 +4,6 @@
 #include <set>
 #include <string>
 
-#include "stf_decoder.hpp"
-
 #include "print_utils.hpp"
 #include "stf_branch_reader.hpp"
 #include "command_line_parser.hpp"
