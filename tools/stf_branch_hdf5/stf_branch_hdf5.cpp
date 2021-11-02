@@ -41,6 +41,7 @@ struct HDF5Branch {
         target(branch.getTargetPC()),
         opcode(branch.getOpcode()),
         target_opcode(branch.getTargetOpcode()),
+        taken(branch.isTaken()),
         cond(branch.isConditional()),
         call(branch.isCall()),
         ret(branch.isReturn()),

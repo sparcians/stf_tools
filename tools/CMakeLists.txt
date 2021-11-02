@@ -33,8 +33,9 @@ add_subdirectory(stf_bbv)
 add_subdirectory(stf_diff)
 add_subdirectory(stf_morph)
 add_subdirectory(stf_branch_hdf5)
+add_subdirectory(stf_branch_dump)
 
 if(STF_INSTALL_DIR)
-    install(TARGETS stf_dump stf_check stf_extract stf_trace_info stf_count stf_find stf_verify_pc stf_merge stf_filter_evt stf_imem stf_imix stf_bench stf_recompress stf_count_multi_process stf_record_dump stf_strip stf_address_map stf_branch_classify stf_bbv stf_diff stf_morph stf_branch_hdf5
+    install(TARGETS stf_dump stf_check stf_extract stf_trace_info stf_count stf_find stf_verify_pc stf_merge stf_filter_evt stf_imem stf_imix stf_bench stf_recompress stf_count_multi_process stf_record_dump stf_strip stf_address_map stf_branch_classify stf_bbv stf_diff stf_morph stf_branch_hdf5 stf_branch_dump
             DESTINATION ${STF_INSTALL_DIR})
 endif()
