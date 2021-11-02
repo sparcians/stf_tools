@@ -205,6 +205,8 @@ namespace stf {
             case KernelCodeTracer::ExecBlock::BlockType::UNDEFINED:
                 stf_throw("ERROR: UNDEFINED stf::KernelCodeTracer::ExecBlock::BlockType");
         }
+
+        stf_throw("ERROR: Unknown stf::KernelCodeTracer::ExecBlock::BlockType value: " << stf::enums::to_printable_int(type));
     }
 
     KernelCodeTracer::ExecBlock::BlockType KernelCodeTracer::GetInstType(uint64_t index) const {

@@ -249,15 +249,12 @@ void extractInstructions(const std::string &trace,
     auto reader = getBeginIterator(start, config.diff_markpointed_region, config.diff_tracepointed_region, rdr);
 
     uint64_t count = 0;
-    uint64_t last_user_pc = 0xffffffffffffffffULL;
     while (reader != rdr.end()) {
         const auto& inst = *reader;
 
         vec.emplace_back(inst,
                          config,
                          &dis);
-
-        last_user_pc = inst.pc();
 
         reader++;
         count++;
