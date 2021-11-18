@@ -1,5 +1,7 @@
 #include <array>
 #include <iostream>
+#include <map>
+#include <unordered_map>
 #include <H5Cpp.h>
 
 #include "stf_branch_reader.hpp"
@@ -9,29 +11,51 @@ void processCommandLine(int argc,
                         char** argv,
                         std::string& trace,
                         std::string& output,
-                        bool& skip_non_user) {
+                        bool& skip_non_user,
+                        bool& use_unsigned_bool,
+                        size_t& limit_top_branches) {
     trace_tools::CommandLineParser parser("stf_branch_hdf5");
     parser.addFlag('u', "skip non user-mode instructions");
+    parser.addFlag('l', "N", "limit output to the top N most frequent branches");
+    parser.addFlag('U', "use unsigned ({0,1}) encoding for boolean values. The default behavior encodes boolean values to {-1,1}. The taken field is *always* encoded to {0,1}.");
     parser.addPositionalArgument("trace", "trace in STF format");
     parser.addPositionalArgument("output", "output HDF5");
     parser.parseArguments(argc, argv);
     skip_non_user = parser.hasArgument('u');
+    use_unsigned_bool = parser.hasArgument('U');
+    parser.getArgumentValue('l', limit_top_branches);
 
     parser.getPositionalArgument(0, trace);
     parser.getPositionalArgument(1, output);
 }
 
+template<bool use_unsigned_bool>
 struct HDF5Branch {
+    using BoolType = std::conditional_t<use_unsigned_bool, bool, int8_t>;
+
+    static const BoolType False;
+
+    static const BoolType True;
+
+    static inline BoolType encodeBool(const bool val) {
+        return val ? True : False;
+    }
+
     uint64_t index = 0;
     uint64_t pc = 0;
     uint64_t target = 0;
     uint32_t opcode = 0;
     uint32_t target_opcode = 0;
     bool taken = false;
-    bool cond = false;
-    bool call = false;
-    bool ret = false;
-    bool indirect = false;
+    BoolType cond = False;
+    BoolType call = False;
+    BoolType ret = False;
+    BoolType indirect = False;
+    BoolType compare_eq = False;
+    BoolType compare_not_eq = False;
+    BoolType compare_greater_than_or_equal = False;
+    BoolType compare_less_than = False;
+    BoolType compare_unsigned = False;
 
     HDF5Branch() = default;
 
@@ -42,15 +66,32 @@ struct HDF5Branch {
         opcode(branch.getOpcode()),
         target_opcode(branch.getTargetOpcode()),
         taken(branch.isTaken()),
-        cond(branch.isConditional()),
-        call(branch.isCall()),
-        ret(branch.isReturn()),
-        indirect(branch.isIndirect())
+        cond(encodeBool(branch.isConditional())),
+        call(encodeBool(branch.isCall())),
+        ret(encodeBool(branch.isReturn())),
+        indirect(encodeBool(branch.isIndirect())),
+        compare_eq(encodeBool(branch.isCompareEqual())),
+        compare_not_eq(encodeBool(branch.isCompareNotEqual())),
+        compare_greater_than_or_equal(encodeBool(branch.isCompareGreaterThanOrEqual())),
+        compare_less_than(encodeBool(branch.isCompareLessThan())),
+        compare_unsigned(encodeBool(branch.isCompareUnsigned()))
     {
     }
 };
 
-template<size_t CHUNK_SIZE>
+template<>
+const HDF5Branch<true>::BoolType HDF5Branch<true>::False = false;
+
+template<>
+const HDF5Branch<true>::BoolType HDF5Branch<true>::True = true;
+
+template<>
+const HDF5Branch<false>::BoolType HDF5Branch<false>::False = -1;
+
+template<>
+const HDF5Branch<false>::BoolType HDF5Branch<false>::True = 1;
+
+template<size_t CHUNK_SIZE, bool use_unsigned_bool>
 class HDF5BranchWriter {
     private:
         static constexpr int RANK_ = 1;
@@ -59,7 +100,9 @@ class HDF5BranchWriter {
         static constexpr int ZLIB_COMPRESSION_LEVEL = 7;
         static inline const H5std_string DATASET_NAME_{"branch_info"};
 
-        using BufferT = std::array<HDF5Branch, CHUNK_SIZE>;
+        using BranchType = HDF5Branch<use_unsigned_bool>;
+
+        using BufferT = std::array<BranchType, CHUNK_SIZE>;
         BufferT branch_buffer_{};
         typename BufferT::iterator it_ = branch_buffer_.begin();
 
@@ -84,17 +127,25 @@ class HDF5BranchWriter {
         }
 
         static H5::CompType initBranchType_() {
-            H5::CompType branch_type(sizeof(HDF5Branch));
-            branch_type.insertMember("index", HOFFSET(HDF5Branch, index), H5::PredType::NATIVE_UINT64);
-            branch_type.insertMember("pc", HOFFSET(HDF5Branch, pc), H5::PredType::NATIVE_UINT64);
-            branch_type.insertMember("target", HOFFSET(HDF5Branch, target), H5::PredType::NATIVE_UINT64);
-            branch_type.insertMember("opcode", HOFFSET(HDF5Branch, opcode), H5::PredType::NATIVE_UINT32);
-            branch_type.insertMember("target_opcode", HOFFSET(HDF5Branch, target_opcode), H5::PredType::NATIVE_UINT32);
-            branch_type.insertMember("taken", HOFFSET(HDF5Branch, taken), H5::PredType::NATIVE_HBOOL);
-            branch_type.insertMember("cond", HOFFSET(HDF5Branch, cond), H5::PredType::NATIVE_HBOOL);
-            branch_type.insertMember("call", HOFFSET(HDF5Branch, call), H5::PredType::NATIVE_HBOOL);
-            branch_type.insertMember("ret", HOFFSET(HDF5Branch, ret), H5::PredType::NATIVE_HBOOL);
-            branch_type.insertMember("indirect", HOFFSET(HDF5Branch, indirect), H5::PredType::NATIVE_HBOOL);
+            static const auto& BoolType = use_unsigned_bool ? H5::PredType::NATIVE_HBOOL : H5::PredType::NATIVE_INT8;
+
+            H5::CompType branch_type(sizeof(BranchType));
+
+            branch_type.insertMember("index", HOFFSET(BranchType, index), H5::PredType::NATIVE_UINT64);
+            branch_type.insertMember("pc", HOFFSET(BranchType, pc), H5::PredType::NATIVE_UINT64);
+            branch_type.insertMember("target", HOFFSET(BranchType, target), H5::PredType::NATIVE_UINT64);
+            branch_type.insertMember("opcode", HOFFSET(BranchType, opcode), H5::PredType::NATIVE_UINT32);
+            branch_type.insertMember("target_opcode", HOFFSET(BranchType, target_opcode), H5::PredType::NATIVE_UINT32);
+            branch_type.insertMember("taken", HOFFSET(BranchType, taken), H5::PredType::NATIVE_HBOOL);
+            branch_type.insertMember("cond", HOFFSET(BranchType, cond), BoolType);
+            branch_type.insertMember("call", HOFFSET(BranchType, call), BoolType);
+            branch_type.insertMember("ret", HOFFSET(BranchType, ret), BoolType);
+            branch_type.insertMember("indirect", HOFFSET(BranchType, indirect), BoolType);
+            branch_type.insertMember("compare_eq", HOFFSET(BranchType, compare_eq), BoolType);
+            branch_type.insertMember("compare_not_eq", HOFFSET(BranchType, compare_not_eq), BoolType);
+            branch_type.insertMember("compare_greater_than_or_equal", HOFFSET(BranchType, compare_greater_than_or_equal), BoolType);
+            branch_type.insertMember("compare_less_than", HOFFSET(BranchType, compare_less_than), BoolType);
+            branch_type.insertMember("compare_unsigned", HOFFSET(BranchType, compare_unsigned), BoolType);
 
             return branch_type;
         }
@@ -126,7 +177,7 @@ class HDF5BranchWriter {
         }
 
         inline void append(const stf::STFBranch& branch) {
-            *(it_++) = HDF5Branch(branch);
+            *(it_++) = BranchType(branch);
             if(it_ == branch_buffer_.end()) {
                 writeChunk_();
                 it_ = branch_buffer_.begin();
@@ -134,26 +185,79 @@ class HDF5BranchWriter {
         }
 };
 
+template<bool use_unsigned_bool>
+void processTrace(const std::string& trace,
+                  const std::string& output,
+                  const bool skip_non_user,
+                  const std::set<uint64_t>& top_branches) {
+    static constexpr size_t CHUNK_SIZE = 1000;
+
+    stf::STFBranchReader reader(trace, skip_non_user);
+    HDF5BranchWriter<CHUNK_SIZE, use_unsigned_bool> writer(output);
+
+    if(top_branches.empty()) {
+        for(const auto& branch: reader) {
+            writer.append(branch);
+        }
+    }
+    else {
+        for(const auto& branch: reader) {
+            if(top_branches.count(branch.getPC())) {
+                writer.append(branch);
+            }
+        }
+    }
+}
+
+std::set<uint64_t> getTopBranches(const std::string& trace, const bool skip_non_user, const size_t limit_top_branches) {
+    std::set<uint64_t> top_branches;
+
+    if(limit_top_branches) {
+        std::unordered_map<uint64_t, uint64_t> branch_counts;
+        stf::STFBranchReader reader(trace, skip_non_user);
+        for(const auto& branch: reader) {
+            ++branch_counts[branch.getPC()];
+        }
+
+        std::multimap<uint64_t, uint64_t> sorted_branches;
+        for(const auto& p: branch_counts) {
+            sorted_branches.emplace(p.second, p.first);
+        }
+
+        for(auto it = sorted_branches.rbegin(); it != sorted_branches.rend(); ++it) {
+            top_branches.emplace(it->second);
+
+            if(top_branches.size() == limit_top_branches) {
+                break;
+            }
+        }
+    }
+
+    return top_branches;
+}
+
 int main(int argc, char** argv) {
     std::string trace;
     std::string output;
     bool skip_non_user = false;
+    bool use_unsigned_bool = false;
+    size_t limit_top_branches = 0;
 
     try {
-        processCommandLine(argc, argv, trace, output, skip_non_user);
+        processCommandLine(argc, argv, trace, output, skip_non_user, use_unsigned_bool, limit_top_branches);
     }
     catch(const trace_tools::CommandLineParser::EarlyExitException& e) {
         std::cerr << e.what() << std::endl;
         return e.getCode();
     }
 
-    static constexpr size_t CHUNK_SIZE = 1000;
+    std::set<uint64_t> top_branches = getTopBranches(trace, skip_non_user, limit_top_branches);
 
-    stf::STFBranchReader reader(trace, skip_non_user);
-    HDF5BranchWriter<CHUNK_SIZE> writer(output);
-
-    for(const auto& branch: reader) {
-        writer.append(branch);
+    if(use_unsigned_bool) {
+        processTrace<true>(trace, output, skip_non_user, top_branches);
+    }
+    else {
+        processTrace<false>(trace, output, skip_non_user, top_branches);
     }
 
     return 0;
