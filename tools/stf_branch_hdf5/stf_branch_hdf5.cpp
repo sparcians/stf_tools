@@ -41,11 +41,19 @@ struct HDF5Branch {
         return val ? True : False;
     }
 
+    static inline int16_t encodeRegNum(const stf::Registers::STF_REG reg) {
+        return reg == stf::Registers::STF_REG::STF_REG_INVALID ? -1 : static_cast<int16_t>(stf::Registers::Codec::packRegNum(reg));
+    }
+
     uint64_t index = 0;
     uint64_t pc = 0;
     uint64_t target = 0;
     uint32_t opcode = 0;
     uint32_t target_opcode = 0;
+    int16_t rs1 = -1;
+    int16_t rs2 = -1;
+    uint64_t rs1_value = 0;
+    uint64_t rs2_value = 0;
     bool taken = false;
     BoolType cond = False;
     BoolType call = False;
@@ -65,6 +73,10 @@ struct HDF5Branch {
         target(branch.getTargetPC()),
         opcode(branch.getOpcode()),
         target_opcode(branch.getTargetOpcode()),
+        rs1(encodeRegNum(branch.getRS1())),
+        rs2(encodeRegNum(branch.getRS2())),
+        rs1_value(branch.getRS1Value()),
+        rs2_value(branch.getRS2Value()),
         taken(branch.isTaken()),
         cond(encodeBool(branch.isConditional())),
         call(encodeBool(branch.isCall())),
@@ -136,6 +148,10 @@ class HDF5BranchWriter {
             branch_type.insertMember("target", HOFFSET(BranchType, target), H5::PredType::NATIVE_UINT64);
             branch_type.insertMember("opcode", HOFFSET(BranchType, opcode), H5::PredType::NATIVE_UINT32);
             branch_type.insertMember("target_opcode", HOFFSET(BranchType, target_opcode), H5::PredType::NATIVE_UINT32);
+            branch_type.insertMember("rs1", HOFFSET(BranchType, rs1), H5::PredType::NATIVE_INT16);
+            branch_type.insertMember("rs2", HOFFSET(BranchType, rs2), H5::PredType::NATIVE_INT16);
+            branch_type.insertMember("rs1_value", HOFFSET(BranchType, rs1_value), H5::PredType::NATIVE_UINT64);
+            branch_type.insertMember("rs2_value", HOFFSET(BranchType, rs2_value), H5::PredType::NATIVE_UINT64);
             branch_type.insertMember("taken", HOFFSET(BranchType, taken), H5::PredType::NATIVE_HBOOL);
             branch_type.insertMember("cond", HOFFSET(BranchType, cond), BoolType);
             branch_type.insertMember("call", HOFFSET(BranchType, call), BoolType);
