@@ -93,11 +93,12 @@ class BasicBlockTracker {
         BasicBlockMap bbv_;
 
     public:
-        explicit BasicBlockTracker(const uint64_t interval, const uint64_t min_user_insts, const std::string& output_filename, const std::string& user_mode_filename) :
+        explicit BasicBlockTracker(const uint64_t interval, const uint64_t min_user_insts, const std::string& output_filename, const std::string& user_mode_filename, const uint64_t start_inst) :
             interval_(interval),
             min_user_insts_(min_user_insts),
             os_(output_filename),
-            interval_file_(output_filename != "-" ? output_filename + ".interval" : "-")
+            interval_file_(output_filename != "-" ? output_filename + ".interval" : "-"),
+            last_interval_idx_(start_inst)
         {
             if(!user_mode_filename.empty()) {
                 user_mode_file_.open(user_mode_filename, std::ofstream::trunc);
@@ -202,7 +203,7 @@ int main(int argc, char **argv) {
     BasicBlockTracker::BasicBlockRange cur_bbr(0,0);
     uint64_t interval_count = 0;
 
-    BasicBlockTracker tracker(interval, min_user_insts, output_filename, user_mode_filename);
+    BasicBlockTracker tracker(interval, min_user_insts, output_filename, user_mode_filename, start_inst);
     bool has_non_user_code = false;
 
     for(const auto& inst: stf_reader) {
