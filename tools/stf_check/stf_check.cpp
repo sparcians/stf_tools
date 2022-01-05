@@ -137,6 +137,7 @@ int main (int argc, char **argv) {
 
         const auto& trace_features = stf_reader.getTraceFeatures();
         const bool has_rv64_inst = stf_reader.getInitialIEM() == stf::INST_IEM::STF_INST_IEM_RV64;
+        bool ignore_rv64_error = false;
 
         for(const auto& info: stf_reader.getTraceInfo()) {
             if (info->getGenerator() != stf::STF_GEN::STF_GEN_RESERVED) {      // Check for a valid header.
@@ -151,6 +152,9 @@ int main (int argc, char **argv) {
                 std::cout << "Comment: " << info->getComment() << std::endl;
                 std::cout << "Features: ";
                 stf::print_utils::printHex(trace_features->getFeatures());
+                if(info->getGenerator() == stf::STF_GEN::STF_GEN_SPIKE) {
+                    ignore_rv64_error = true;
+                }
                 std::cout << std::endl;
             }
             else {
@@ -460,14 +464,16 @@ msg     << "STF_CONTAIN_PHYSICAL_ADDRESS not set, but is required as part of the
         }
 
         // Check to see if the STF_CONTAIN_RV64 feature is set correctly.
-        if (has_rv64_inst && !trace_features->hasFeature(stf::TRACE_FEATURES::STF_CONTAIN_RV64)) {
-            ecount.countError(ErrorCode::RV64_INSTS);
-            auto& msg = ecount.reportError(ErrorCode::RV64_INSTS);
-            msg << "STF_CONTAIN_RV64 not set, but RV64 instructions are present" << std::endl;
-        }
-        else if (!has_rv64_inst && trace_features->hasFeature(stf::TRACE_FEATURES::STF_CONTAIN_RV64)) {
-            ecount.countError(ErrorCode::RV64_INSTS);
-            ecount.reportError(ErrorCode::RV64_INSTS) << "STF_CONTAIN_RV64 set, but no RV64 instructions are present" << std::endl;
+        if(!ignore_rv64_error) {
+            if (has_rv64_inst && !trace_features->hasFeature(stf::TRACE_FEATURES::STF_CONTAIN_RV64)) {
+                ecount.countError(ErrorCode::RV64_INSTS);
+                auto& msg = ecount.reportError(ErrorCode::RV64_INSTS);
+                msg << "STF_CONTAIN_RV64 not set, but RV64 instructions are present" << std::endl;
+            }
+            else if (!has_rv64_inst && trace_features->hasFeature(stf::TRACE_FEATURES::STF_CONTAIN_RV64)) {
+                ecount.countError(ErrorCode::RV64_INSTS);
+                ecount.reportError(ErrorCode::RV64_INSTS) << "STF_CONTAIN_RV64 set, but no RV64 instructions are present" << std::endl;
+            }
         }
 
         // Print a summary of findings.
