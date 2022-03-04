@@ -28,7 +28,9 @@ enum class HDF5Field {
     COMPARE_NOT_EQ,
     COMPARE_GREATER_THAN_OR_EQUAL,
     COMPARE_LESS_THAN,
-    COMPARE_UNSIGNED
+    COMPARE_UNSIGNED,
+    LAST_TAKEN,
+    WKLD_ID
 };
 
 #define PARSER_ENTRY(x) { #x, HDF5Field::x }
@@ -53,7 +55,9 @@ HDF5Field parseHDF5Field(const std::string_view hdf5_field_str) {
         PARSER_ENTRY(COMPARE_NOT_EQ),
         PARSER_ENTRY(COMPARE_GREATER_THAN_OR_EQUAL),
         PARSER_ENTRY(COMPARE_LESS_THAN),
-        PARSER_ENTRY(COMPARE_UNSIGNED)
+        PARSER_ENTRY(COMPARE_UNSIGNED),
+        PARSER_ENTRY(LAST_TAKEN),
+        PARSER_ENTRY(WKLD_ID)
     };
 
     const auto it = string_map.find(hdf5_field_str);
@@ -72,13 +76,15 @@ void processCommandLine(int argc,
                         bool& always_fill_in_target_opcode,
                         bool& byte_chunks,
                         std::unordered_set<HDF5Field>& excluded_fields,
-                        size_t& limit_top_branches) {
+                        size_t& limit_top_branches,
+                        int32_t& wkld_id) {
     trace_tools::CommandLineParser parser("stf_branch_hdf5");
     parser.addFlag('u', "skip non user-mode instructions");
     parser.addFlag('l', "N", "limit output to the top N most frequent branches");
     parser.addFlag('U', "use unsigned ({0,1}) encoding for boolean values. The default behavior encodes boolean values to {-1,1}. The taken field is *always* encoded to {0,1}.");
     parser.addFlag('O', "fill in target opcodes for not-taken branches. If the opcode is unknown, it will be set to a random value.");
     parser.addFlag('1', "break up opcodes, register values, and addresses into 1-byte chunks");
+    parser.addFlag('w', "wkld_id", "Add a wkld_id field with the specified value");
     parser.addMultiFlag('x', "exclude_field", "exclude specified field. Can be specified multiple times.");
     parser.addPositionalArgument("trace", "trace in STF format");
     parser.addPositionalArgument("output", "output HDF5");
@@ -88,8 +94,14 @@ void processCommandLine(int argc,
     always_fill_in_target_opcode = parser.hasArgument('O');
     parser.getArgumentValue('l', limit_top_branches);
     byte_chunks = parser.hasArgument('1');
+    wkld_id = -1;
+    parser.getArgumentValue('w', wkld_id);
     for(const auto& field: parser.getMultipleValueArgument('x')) {
         excluded_fields.insert(parseHDF5Field(field));
+    }
+
+    if(wkld_id == -1) {
+        excluded_fields.insert(HDF5Field::WKLD_ID);
     }
 
     parser.getPositionalArgument(0, trace);
@@ -185,10 +197,12 @@ struct HDF5Branch : public HDF5BranchBase<use_unsigned_bool> {
     BoolType compare_greater_than_or_equal = False;
     BoolType compare_less_than = False;
     BoolType compare_unsigned = False;
+    BoolType last_taken = 0;
+    int32_t wkld_id = -1;
 
     HDF5Branch() = default;
 
-    explicit HDF5Branch(const stf::STFBranch& branch, const OpcodeMap& opcode_map) :
+    explicit HDF5Branch(const stf::STFBranch& branch, const OpcodeMap& opcode_map, const int32_t cur_wkld_id) :
         index(branch.index()),
         pc(branch.getPC()),
         target(branch.getTargetPC()),
@@ -207,7 +221,8 @@ struct HDF5Branch : public HDF5BranchBase<use_unsigned_bool> {
         compare_not_eq(encodeBool(branch.isCompareNotEqual())),
         compare_greater_than_or_equal(encodeBool(branch.isCompareGreaterThanOrEqual())),
         compare_less_than(encodeBool(branch.isCompareLessThan())),
-        compare_unsigned(encodeBool(branch.isCompareUnsigned()))
+        compare_unsigned(encodeBool(branch.isCompareUnsigned())),
+        wkld_id(cur_wkld_id)
     {
     }
 
@@ -273,6 +288,12 @@ struct HDF5Branch : public HDF5BranchBase<use_unsigned_bool> {
         if(!excluded_fields.count(HDF5Field::COMPARE_UNSIGNED)) {
             branch_type.insertMember("compare_unsigned", HOFFSET(HDF5Branch, compare_unsigned), BoolType);
         }
+        if(!excluded_fields.count(HDF5Field::LAST_TAKEN)) {
+            branch_type.insertMember("last_taken", HOFFSET(HDF5Branch, last_taken), BoolType);
+        }
+        if(!excluded_fields.count(HDF5Field::WKLD_ID)) {
+            branch_type.insertMember("wkld_id", HOFFSET(HDF5Branch, wkld_id), H5::PredType::NATIVE_INT32);
+        }
 
         return branch_type;
     }
@@ -306,6 +327,8 @@ struct HDF5BranchByteChunked : public HDF5BranchBase<use_unsigned_bool> {
     BoolType compare_greater_than_or_equal = False;
     BoolType compare_less_than = False;
     BoolType compare_unsigned = False;
+    BoolType last_taken = 0;
+    int32_t wkld_id = -1;
 
     HDF5BranchByteChunked() = default;
 
@@ -318,7 +341,7 @@ struct HDF5BranchByteChunked : public HDF5BranchBase<use_unsigned_bool> {
         }
     }
 
-    explicit HDF5BranchByteChunked(const stf::STFBranch& branch, const OpcodeMap& opcode_map) :
+    explicit HDF5BranchByteChunked(const stf::STFBranch& branch, const OpcodeMap& opcode_map, const int32_t cur_wkld_id) :
         index(branch.index()),
         rs1(encodeRegNum(branch.getRS1())),
         rs2(encodeRegNum(branch.getRS2())),
@@ -331,7 +354,8 @@ struct HDF5BranchByteChunked : public HDF5BranchBase<use_unsigned_bool> {
         compare_not_eq(encodeBool(branch.isCompareNotEqual())),
         compare_greater_than_or_equal(encodeBool(branch.isCompareGreaterThanOrEqual())),
         compare_less_than(encodeBool(branch.isCompareLessThan())),
-        compare_unsigned(encodeBool(branch.isCompareUnsigned()))
+        compare_unsigned(encodeBool(branch.isCompareUnsigned())),
+        wkld_id(cur_wkld_id)
     {
         initValueArray<8>(branch.getPC(), pc);
         initValueArray<8>(branch.getTargetPC(), target);
@@ -437,6 +461,12 @@ struct HDF5BranchByteChunked : public HDF5BranchBase<use_unsigned_bool> {
         if(!excluded_fields.count(HDF5Field::COMPARE_UNSIGNED)) {
             branch_type.insertMember("compare_unsigned", HOFFSET(HDF5BranchByteChunked, compare_unsigned), BoolType);
         }
+        if(!excluded_fields.count(HDF5Field::LAST_TAKEN)) {
+            branch_type.insertMember("last_taken", HOFFSET(HDF5BranchByteChunked, last_taken), BoolType);
+        }
+        if(!excluded_fields.count(HDF5Field::WKLD_ID)) {
+            branch_type.insertMember("wkld_id", HOFFSET(HDF5BranchByteChunked, wkld_id), H5::PredType::NATIVE_INT32);
+        }
 
         return branch_type;
     }
@@ -474,6 +504,8 @@ class HDF5BranchWriter {
 
         hsize_t cur_slab_dim_[1] = {0};
         OpcodeMap opcode_map_;
+        const int32_t wkld_id_ = -1;
+        typename BranchType::BoolType last_taken_ = 0;
 
         inline void writeChunk_(const size_t num_items, const hsize_t chunk_dim[], const H5::DataSpace& mspace) {
             const hsize_t hyperslab_offset = cur_slab_dim_[0];
@@ -497,12 +529,13 @@ class HDF5BranchWriter {
         }
 
     public:
-        explicit HDF5BranchWriter(const std::string& filename, const bool return_random_for_unknown_target_opcode, const std::unordered_set<HDF5Field>& excluded_fields) :
+        explicit HDF5BranchWriter(const std::string& filename, const bool return_random_for_unknown_target_opcode, const std::unordered_set<HDF5Field>& excluded_fields, const int32_t wkld_id) :
             hdf5_file_(filename.c_str(), H5F_ACC_TRUNC),
             chunk_mspace_(RANK_, CHUNK_DIM_, MAX_DIMS_),
             branch_type_(BranchType::initBranchType(excluded_fields)),
             dataset_(hdf5_file_.createDataSet(DATASET_NAME_, branch_type_, chunk_mspace_, getDataSetProps_())),
-            opcode_map_(return_random_for_unknown_target_opcode)
+            opcode_map_(return_random_for_unknown_target_opcode),
+            wkld_id_(wkld_id)
         {
         }
 
@@ -517,7 +550,10 @@ class HDF5BranchWriter {
 
         inline void append(const stf::STFBranch& branch) {
             opcode_map_.updateOpcode(branch.getTargetPC(), branch.getTargetOpcode());
-            *(it_++) = BranchType(branch, opcode_map_);
+            *it_ = BranchType(branch, opcode_map_, wkld_id_);
+            it_->last_taken = last_taken_;
+            last_taken_ = it_->taken;
+            ++it_;
             if(it_ == branch_buffer_.end()) {
                 writeChunk_();
                 it_ = branch_buffer_.begin();
@@ -544,11 +580,12 @@ void processTrace(const std::string& trace,
                   const bool skip_non_user,
                   const bool always_fill_in_target_opcode,
                   const std::set<uint64_t>& top_branches,
-                  const std::unordered_set<HDF5Field>& excluded_fields) {
+                  const std::unordered_set<HDF5Field>& excluded_fields,
+                  const int32_t wkld_id) {
     static constexpr size_t CHUNK_SIZE = 1000;
 
     stf::STFBranchReader reader(trace, skip_non_user);
-    HDF5BranchWriter<CHUNK_SIZE, typename BranchTypeChooser<byte_chunks, use_unsigned_bool>::type> writer(output, always_fill_in_target_opcode, excluded_fields);
+    HDF5BranchWriter<CHUNK_SIZE, typename BranchTypeChooser<byte_chunks, use_unsigned_bool>::type> writer(output, always_fill_in_target_opcode, excluded_fields, wkld_id);
 
     if(top_branches.empty()) {
         for(const auto& branch: reader) {
@@ -600,6 +637,7 @@ int main(int argc, char** argv) {
     bool byte_chunks = false;
     std::unordered_set<HDF5Field> excluded_fields;
     size_t limit_top_branches = 0;
+    int32_t wkld_id = -1;
 
     try {
         processCommandLine(argc,
@@ -611,7 +649,8 @@ int main(int argc, char** argv) {
                            always_fill_in_target_opcode,
                            byte_chunks,
                            excluded_fields,
-                           limit_top_branches);
+                           limit_top_branches,
+                           wkld_id);
     }
     catch(const trace_tools::CommandLineParser::EarlyExitException& e) {
         std::cerr << e.what() << std::endl;
@@ -622,18 +661,18 @@ int main(int argc, char** argv) {
 
     if(use_unsigned_bool) {
         if(byte_chunks) {
-            processTrace<true, true>(trace, output, skip_non_user, always_fill_in_target_opcode, top_branches, excluded_fields);
+            processTrace<true, true>(trace, output, skip_non_user, always_fill_in_target_opcode, top_branches, excluded_fields, wkld_id);
         }
         else {
-            processTrace<true, false>(trace, output, skip_non_user, always_fill_in_target_opcode, top_branches, excluded_fields);
+            processTrace<true, false>(trace, output, skip_non_user, always_fill_in_target_opcode, top_branches, excluded_fields, wkld_id);
         }
     }
     else {
         if(byte_chunks) {
-            processTrace<false, true>(trace, output, skip_non_user, always_fill_in_target_opcode, top_branches, excluded_fields);
+            processTrace<false, true>(trace, output, skip_non_user, always_fill_in_target_opcode, top_branches, excluded_fields, wkld_id);
         }
         else {
-            processTrace<false, false>(trace, output, skip_non_user, always_fill_in_target_opcode, top_branches, excluded_fields);
+            processTrace<false, false>(trace, output, skip_non_user, always_fill_in_target_opcode, top_branches, excluded_fields, wkld_id);
         }
     }
 
