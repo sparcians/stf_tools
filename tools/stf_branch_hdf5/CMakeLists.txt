@@ -1,6 +1,7 @@
 project(stf_branch_hdf5)
 
 include(${STF_TOOLS_CMAKE_DIR}/hdf5.cmake)
+include(${STF_TOOLS_CMAKE_DIR}/stf_decoder.cmake)
 
 add_executable(stf_branch_hdf5 stf_branch_hdf5.cpp)
 
