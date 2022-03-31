@@ -14,10 +14,11 @@
 
 namespace stf {
     /**
-     * \class STFDecoder
+     * \class STFDecoderBase
      * \brief Class used by STF tools to decode instructions
      */
-    class STFDecoder {
+    template<typename MavisType>
+    class STFDecoderBase {
         public:
             /**
              * \class InvalidInstException
@@ -48,11 +49,11 @@ namespace stf {
                     }
             };
 
-        private:
+        protected:
             inline static const std::string UNIMP_ = "c.unimp";
 
-            mutable mavis_helpers::Mavis mavis_; /**< Mavis decoder */
-            mutable mavis_helpers::Mavis::DecodeInfoType decode_info_; /**< Cached decode info */
+            mutable MavisType mavis_; /**< Mavis decoder */
+            mutable typename MavisType::DecodeInfoType decode_info_; /**< Cached decode info */
             mutable bool has_pending_decode_info_ = false; /**< Cached decode info */
             stf::ValidValue<uint32_t> opcode_;
             bool is_compressed_ = false; /**< Set to true if the decoded instruction was compressed */
@@ -60,7 +61,7 @@ namespace stf {
             mutable std::string disasm_;
             mutable bool unknown_disasm_ = false;
 
-            const mavis_helpers::Mavis::DecodeInfoType& getDecodeInfo_() const {
+            const typename MavisType::DecodeInfoType& getDecodeInfo_() const {
                 if(STF_EXPECT_FALSE(has_pending_decode_info_)) {
                     try {
                         decode_info_ = mavis_.getInfo(opcode_.get());
@@ -159,34 +160,39 @@ namespace stf {
                 static constexpr size_t size = N;
             };
 
+            STFDecoderBase(std::vector<std::string>&& isa_jsons, std::vector<std::string>&& anno_jsons) :
+                mavis_(std::move(isa_jsons), std::move(anno_jsons))
+            {
+            }
+
         public:
             /**
-             * Constructs an STFDecoder
+             * Constructs an STFDecoderBase
              * \param iem Instruction encoding
              */
-            explicit STFDecoder(const stf::INST_IEM iem) :
-                STFDecoder(iem, getDefaultPath_())
+            explicit STFDecoderBase(const stf::INST_IEM iem) :
+                STFDecoderBase(iem, getDefaultPath_())
             {
             }
 
             /**
-             * Constructs an STFDecoder
+             * Constructs an STFDecoderBase
              * \param iem Instruction encoding
              * \param mavis_path Path to Mavis checkout
              */
-            STFDecoder(const stf::INST_IEM iem, const std::string& mavis_path) :
-                mavis_(mavis_helpers::getMavisJSONs(mavis_path, iem), {})
+            STFDecoderBase(const stf::INST_IEM iem, const std::string& mavis_path) :
+                STFDecoderBase(mavis_helpers::getMavisJSONs(mavis_path, iem), {})
             {
             }
 
-            STFDecoder(STFDecoder&&) = default;
-            STFDecoder& operator=(STFDecoder&&) = default;
+            STFDecoderBase(STFDecoderBase&&) = default;
+            STFDecoderBase& operator=(STFDecoderBase&&) = default;
 
             /**
              * Decodes an instruction from an STFRecord
              * \param rec Record to decode
              */
-            inline STFDecoder& decode(const STFRecord& rec) {
+            inline STFDecoderBase& decode(const STFRecord& rec) {
                 if(rec.getDescriptor() == stf::descriptors::internal::Descriptor::STF_INST_OPCODE16) {
                     return decode(rec.as<InstOpcode16Record>());
                 }
@@ -202,7 +208,7 @@ namespace stf {
              * Decodes an instruction from an InstOpcode16Record
              * \param rec Record to decode
              */
-            inline STFDecoder& decode(const InstOpcode16Record& rec) {
+            inline STFDecoderBase& decode(const InstOpcode16Record& rec) {
                 return decode(rec.getOpcode());
             }
 
@@ -210,7 +216,7 @@ namespace stf {
              * Decodes an instruction from an InstOpcode32Record
              * \param rec Record to decode
              */
-            inline STFDecoder& decode(const InstOpcode32Record& rec) {
+            inline STFDecoderBase& decode(const InstOpcode32Record& rec) {
                 return decode(rec.getOpcode());
             }
 
@@ -218,7 +224,7 @@ namespace stf {
              * Decodes an instruction from a raw opcode
              * \param opcode Opcode to decode
              */
-            inline STFDecoder& decode(uint32_t opcode) {
+            inline STFDecoderBase& decode(uint32_t opcode) {
                 is_compressed_ = isCompressed(opcode);
                 if(!opcode_.valid() || opcode_.get() != opcode) {
                     opcode_ = opcode;
@@ -641,5 +647,31 @@ namespace stf {
                     return mavis_helpers::MavisISAExtensionTypeArray::int_t(0);
                 }
             }
+
+            const auto& getAnnotation() const {
+                return getDecodeInfo_()->uinfo;
+            }
     };
+
+    using STFDecoder = STFDecoderBase<mavis_helpers::Mavis>;
+
+    class STFDecoderFull : public STFDecoderBase<mavis_helpers::FullMavis> {
+        public:
+            explicit STFDecoderFull(const stf::INST_IEM iem) :
+                STFDecoderFull(iem, getDefaultPath_())
+            {
+            }
+
+            /**
+             * Constructs an STFDecoderBase
+             * \param iem Instruction encoding
+             * \param mavis_path Path to Mavis checkout
+             */
+            STFDecoderFull(const stf::INST_IEM iem, const std::string& mavis_path) :
+                STFDecoderBase(mavis_helpers::getMavisJSONs(mavis_path, iem), mavis_helpers::getMavisJSONs(mavis_path, iem))
+            {
+            }
+
+    };
+
 } // end namespace stf
