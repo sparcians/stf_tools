@@ -14,7 +14,6 @@
 
 #include "command_line_parser.hpp"
 #include "stf_count.hpp"
-#include "stf_writer.hpp"
 #include "tools_util.hpp"
 
 /**
