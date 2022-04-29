@@ -609,7 +609,7 @@ class IMemMapVec {
                         sorted_filename = config.output_filename.substr(0, ext_idx) + ".s_imem";
                     }
                     else {
-                        sorted_filename = config.output_filename + imem_ext.data();
+                        sorted_filename = config.output_filename + ".s_imem";
                     }
                 }
 
