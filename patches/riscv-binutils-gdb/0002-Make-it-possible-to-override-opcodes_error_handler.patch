@@ -1,0 +1,25 @@
+From 42b3fd1243474f0b67e1578c612007fab8d96959 Mon Sep 17 00:00:00 2001
+From: Brett Dutro <brett.dutro@sifive.com>
+Date: Mon, 16 May 2022 12:15:21 -0700
+Subject: [PATCH 2/2] Make it possible to override opcodes_error_handler
+
+---
+ opcodes/sysdep.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/opcodes/sysdep.h b/opcodes/sysdep.h
+index 3751563a11..e7b1f124eb 100644
+--- a/opcodes/sysdep.h
++++ b/opcodes/sysdep.h
+@@ -40,7 +40,7 @@
+ extern char *stpcpy (char *__dest, const char *__src);
+ #endif
+ 
+-#define opcodes_error_handler _bfd_error_handler
++extern void opcodes_error_handler(const char* fmt, ...);
+ 
+ /* Use sigsetjmp/siglongjmp without saving the signal mask if possible.
+    It is faster than setjmp/longjmp on systems where the signal mask is
+-- 
+2.30.2
+

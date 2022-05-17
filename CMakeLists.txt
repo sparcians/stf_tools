@@ -11,6 +11,7 @@ include_directories (SYSTEM ${Boost_INCLUDE_DIRS})
 set (STF_TOOLS_BASE ${CMAKE_CURRENT_SOURCE_DIR})
 include_directories(${STF_TOOLS_BASE}/include)
 set(STF_TOOLS_CMAKE_DIR ${STF_TOOLS_BASE}/cmake)
+set(STF_TOOLS_PATCHES_DIR ${STF_TOOLS_BASE}/patches)
 set(STF_LIB_CMAKE_DIR ${STF_TOOLS_BASE}/stf_lib/cmake)
 
 set(CMAKE_MODULE_PATH ${STF_TOOLS_CMAKE_DIR} ${STF_LIB_CMAKE_DIR} ${CMAKE_MODULE_PATH})
@@ -25,6 +26,8 @@ include(std_filesystem)
 
 include(stf_linker_setup)
 
+include(binutils)
+
 set(FULL_LTO true)
 
 setup_stf_linker(true)
@@ -38,5 +41,7 @@ add_subdirectory(stf_lib)
 include_directories(${STF_BASE}/stf-inc)
 
 add_subdirectory(generators)
+
+add_subdirectory(lib)
 
 add_subdirectory(tools)

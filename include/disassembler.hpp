@@ -19,6 +19,8 @@
     #endif
 #endif
 
+#define DEFAULT_DISASM_BACKEND "MAVIS"
+
 #include "disassemblers/mavis_disassembler.hpp"
 
 namespace stf {
@@ -53,13 +55,13 @@ namespace stf {
             Disassembler(const ISA inst_set, const INST_IEM iem, const bool use_aliases) :
                 BaseDisassembler(inst_set, iem, use_aliases)
             {
-                STFEnvVar disasm_var("STF_DISASM",
-                                     {"MAVIS",
+                STFValidatedEnvVar disasm_var("STF_DISASM",
+                                              {"MAVIS",
 #ifdef ENABLE_BINUTILS_DISASM
-                                     "BINUTILS",
+                                               "BINUTILS",
 #endif
-                                     },
-                                     "MAVIS");
+                                              },
+                                              DEFAULT_DISASM_BACKEND);
                 if(const auto& disasm = disasm_var.get(); disasm == "MAVIS") {
                     dis_ = std::make_unique<disassemblers::MavisDisassembler>(inst_set,
                                                                               iem,
