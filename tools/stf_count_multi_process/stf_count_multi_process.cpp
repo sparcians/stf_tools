@@ -101,9 +101,9 @@ int main(int argc, char* argv[]) {
         auto& d_alloc = d.GetAllocator();
         rapidjson::Value object(rapidjson::kObjectType);
 
-        object.AddMember("num_traces", traces.size(), d_alloc);
-        object.AddMember("num_processes", process_instruction_counts.size() - 1, d_alloc);
-        object.AddMember("num_insts", num_insts, d_alloc);
+        object.AddMember("num_traces", (uint32_t)traces.size(), d_alloc);
+        object.AddMember("num_processes", (uint32_t)process_instruction_counts.size() - 1, d_alloc);
+        object.AddMember("num_insts", (uint64_t)num_insts, d_alloc);
 
         rapidjson::Value processes_json(rapidjson::kObjectType);
         for(const auto& p: process_instruction_counts) {
