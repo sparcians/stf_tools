@@ -144,7 +144,7 @@ static int fprintf_wrapper(void * stream, const char * format, ... ) {
     *dis_str << formatted_str;
 
     return retval;
-};
+}
 
 static inline disassembler_ftype initDisasmFunc(const std::string& riscv_isa_str) {
     return riscv_get_disassembler_arch(nullptr, riscv_isa_str.c_str());
@@ -273,4 +273,3 @@ namespace stf {
 
     }
 }
-
