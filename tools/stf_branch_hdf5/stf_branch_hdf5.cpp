@@ -285,7 +285,7 @@ class OpcodeMap {
                 rd = getReg_(*anno, "rd", opcode);
             }
             else {
-                for(size_t i = 0; i < stf::enums::to_int(OpcodeField::__NUM_FIELDS); ++i) {
+                for(auto i = 0; i < stf::enums::to_int(OpcodeField::__NUM_FIELDS); ++i) {
                     decoded_fields[i] = decoded_distribution_(rng_);
                 }
 
@@ -323,6 +323,15 @@ struct HDF5BranchBase {
         return opcode;
     }
 };
+
+#define ARRAY_HOFFSET(cls, arr, idx) (HOFFSET(cls, arr) + idx*sizeof(std::remove_all_extents_t<decltype(cls::arr)>))
+
+#define INSERT_ARRAY(btype, cls, arr, n, elem_type) \
+do {\
+    for(size_t i = 0; i < n; ++i) { \
+        btype.insertMember(#arr + std::to_string(i), ARRAY_HOFFSET(cls, arr, i), elem_type); \
+    } \
+} while(0)
 
 template<bool use_unsigned_bool>
 struct HDF5Branch : public HDF5BranchBase<use_unsigned_bool> {
@@ -474,14 +483,27 @@ struct HDF5BranchByteChunked : public HDF5BranchBase<use_unsigned_bool> {
     using HDF5BranchBase<use_unsigned_bool>::getTargetOpcode;
 
     uint64_t index = 0;
-    uint8_t pc[8]{0,0,0,0,0,0,0,0};
-    uint8_t target[8]{0,0,0,0,0,0,0,0};
-    uint8_t opcode[4]{0,0,0,0};
-    uint8_t target_opcode[4]{0,0,0,0};
+
+    inline static constexpr auto PC_SIZE = sizeof(uint64_t);
+    uint8_t pc[PC_SIZE]{0,0,0,0,0,0,0,0};
+
+    inline static constexpr auto TARGET_SIZE = sizeof(uint64_t);
+    uint8_t target[TARGET_SIZE]{0,0,0,0,0,0,0,0};
+
+    inline static constexpr auto OPCODE_SIZE = sizeof(uint32_t);
+    uint8_t opcode[OPCODE_SIZE]{0,0,0,0};
+
+    inline static constexpr auto TARGET_OPCODE_SIZE = sizeof(uint32_t);
+    uint8_t target_opcode[TARGET_OPCODE_SIZE]{0,0,0,0};
     int16_t rs1 = -1;
     int16_t rs2 = -1;
+
+    inline static constexpr auto RS1_VALUE_SIZE = sizeof(uint64_t);
     uint8_t rs1_value[8]{0,0,0,0,0,0,0,0};
+
+    inline static constexpr auto RS2_VALUE_SIZE = sizeof(uint64_t);
     uint8_t rs2_value[8]{0,0,0,0,0,0,0,0};
+
     bool taken = false;
     BoolType cond = False;
     BoolType call = False;
@@ -562,36 +584,16 @@ struct HDF5BranchByteChunked : public HDF5BranchBase<use_unsigned_bool> {
             branch_type.insertMember("index", HOFFSET(HDF5BranchByteChunked, index), H5::PredType::NATIVE_UINT64);
         }
         if(!excluded_fields.count(HDF5Field::PC)) {
-            branch_type.insertMember("pc0", HOFFSET(HDF5BranchByteChunked, pc[0]), H5::PredType::NATIVE_UINT8);
-            branch_type.insertMember("pc1", HOFFSET(HDF5BranchByteChunked, pc[1]), H5::PredType::NATIVE_UINT8);
-            branch_type.insertMember("pc2", HOFFSET(HDF5BranchByteChunked, pc[2]), H5::PredType::NATIVE_UINT8);
-            branch_type.insertMember("pc3", HOFFSET(HDF5BranchByteChunked, pc[3]), H5::PredType::NATIVE_UINT8);
-            branch_type.insertMember("pc4", HOFFSET(HDF5BranchByteChunked, pc[4]), H5::PredType::NATIVE_UINT8);
-            branch_type.insertMember("pc5", HOFFSET(HDF5BranchByteChunked, pc[5]), H5::PredType::NATIVE_UINT8);
-            branch_type.insertMember("pc6", HOFFSET(HDF5BranchByteChunked, pc[6]), H5::PredType::NATIVE_UINT8);
-            branch_type.insertMember("pc7", HOFFSET(HDF5BranchByteChunked, pc[7]), H5::PredType::NATIVE_UINT8);
+            INSERT_ARRAY(branch_type, HDF5BranchByteChunked, pc, PC_SIZE, H5::PredType::NATIVE_UINT8);
         }
         if(!excluded_fields.count(HDF5Field::TARGET)) {
-            branch_type.insertMember("target0", HOFFSET(HDF5BranchByteChunked, target[0]), H5::PredType::NATIVE_UINT8);
-            branch_type.insertMember("target1", HOFFSET(HDF5BranchByteChunked, target[1]), H5::PredType::NATIVE_UINT8);
-            branch_type.insertMember("target2", HOFFSET(HDF5BranchByteChunked, target[2]), H5::PredType::NATIVE_UINT8);
-            branch_type.insertMember("target3", HOFFSET(HDF5BranchByteChunked, target[3]), H5::PredType::NATIVE_UINT8);
-            branch_type.insertMember("target4", HOFFSET(HDF5BranchByteChunked, target[4]), H5::PredType::NATIVE_UINT8);
-            branch_type.insertMember("target5", HOFFSET(HDF5BranchByteChunked, target[5]), H5::PredType::NATIVE_UINT8);
-            branch_type.insertMember("target6", HOFFSET(HDF5BranchByteChunked, target[6]), H5::PredType::NATIVE_UINT8);
-            branch_type.insertMember("target7", HOFFSET(HDF5BranchByteChunked, target[7]), H5::PredType::NATIVE_UINT8);
+            INSERT_ARRAY(branch_type, HDF5BranchByteChunked, target, TARGET_SIZE, H5::PredType::NATIVE_UINT8);
         }
         if(!excluded_fields.count(HDF5Field::OPCODE)) {
-            branch_type.insertMember("opcode0", HOFFSET(HDF5BranchByteChunked, opcode[0]), H5::PredType::NATIVE_UINT8);
-            branch_type.insertMember("opcode1", HOFFSET(HDF5BranchByteChunked, opcode[1]), H5::PredType::NATIVE_UINT8);
-            branch_type.insertMember("opcode2", HOFFSET(HDF5BranchByteChunked, opcode[2]), H5::PredType::NATIVE_UINT8);
-            branch_type.insertMember("opcode3", HOFFSET(HDF5BranchByteChunked, opcode[3]), H5::PredType::NATIVE_UINT8);
+            INSERT_ARRAY(branch_type, HDF5BranchByteChunked, opcode, OPCODE_SIZE, H5::PredType::NATIVE_UINT8);
         }
         if(!decode_target_opcodes && !excluded_fields.count(HDF5Field::TARGET_OPCODE)) {
-            branch_type.insertMember("target_opcode0", HOFFSET(HDF5BranchByteChunked, target_opcode[0]), H5::PredType::NATIVE_UINT8);
-            branch_type.insertMember("target_opcode1", HOFFSET(HDF5BranchByteChunked, target_opcode[1]), H5::PredType::NATIVE_UINT8);
-            branch_type.insertMember("target_opcode2", HOFFSET(HDF5BranchByteChunked, target_opcode[2]), H5::PredType::NATIVE_UINT8);
-            branch_type.insertMember("target_opcode3", HOFFSET(HDF5BranchByteChunked, target_opcode[3]), H5::PredType::NATIVE_UINT8);
+            INSERT_ARRAY(branch_type, HDF5BranchByteChunked, target_opcode, TARGET_OPCODE_SIZE, H5::PredType::NATIVE_UINT8);
         }
         else if(decode_target_opcodes) {
             if(!excluded_fields.count(HDF5Field::TARGET_OPCODE)) {
@@ -650,24 +652,10 @@ struct HDF5BranchByteChunked : public HDF5BranchBase<use_unsigned_bool> {
             branch_type.insertMember("rs2", HOFFSET(HDF5BranchByteChunked, rs2), H5::PredType::NATIVE_INT16);
         }
         if(!excluded_fields.count(HDF5Field::RS1_VALUE)) {
-            branch_type.insertMember("rs1_value0", HOFFSET(HDF5BranchByteChunked, rs1_value[0]), H5::PredType::NATIVE_UINT8);
-            branch_type.insertMember("rs1_value1", HOFFSET(HDF5BranchByteChunked, rs1_value[1]), H5::PredType::NATIVE_UINT8);
-            branch_type.insertMember("rs1_value2", HOFFSET(HDF5BranchByteChunked, rs1_value[2]), H5::PredType::NATIVE_UINT8);
-            branch_type.insertMember("rs1_value3", HOFFSET(HDF5BranchByteChunked, rs1_value[3]), H5::PredType::NATIVE_UINT8);
-            branch_type.insertMember("rs1_value4", HOFFSET(HDF5BranchByteChunked, rs1_value[4]), H5::PredType::NATIVE_UINT8);
-            branch_type.insertMember("rs1_value5", HOFFSET(HDF5BranchByteChunked, rs1_value[5]), H5::PredType::NATIVE_UINT8);
-            branch_type.insertMember("rs1_value6", HOFFSET(HDF5BranchByteChunked, rs1_value[6]), H5::PredType::NATIVE_UINT8);
-            branch_type.insertMember("rs1_value7", HOFFSET(HDF5BranchByteChunked, rs1_value[7]), H5::PredType::NATIVE_UINT8);
+            INSERT_ARRAY(branch_type, HDF5BranchByteChunked, rs1_value, RS1_VALUE_SIZE, H5::PredType::NATIVE_UINT8);
         }
         if(!excluded_fields.count(HDF5Field::RS2_VALUE)) {
-            branch_type.insertMember("rs2_value0", HOFFSET(HDF5BranchByteChunked, rs2_value[0]), H5::PredType::NATIVE_UINT8);
-            branch_type.insertMember("rs2_value1", HOFFSET(HDF5BranchByteChunked, rs2_value[1]), H5::PredType::NATIVE_UINT8);
-            branch_type.insertMember("rs2_value2", HOFFSET(HDF5BranchByteChunked, rs2_value[2]), H5::PredType::NATIVE_UINT8);
-            branch_type.insertMember("rs2_value3", HOFFSET(HDF5BranchByteChunked, rs2_value[3]), H5::PredType::NATIVE_UINT8);
-            branch_type.insertMember("rs2_value4", HOFFSET(HDF5BranchByteChunked, rs2_value[4]), H5::PredType::NATIVE_UINT8);
-            branch_type.insertMember("rs2_value5", HOFFSET(HDF5BranchByteChunked, rs2_value[5]), H5::PredType::NATIVE_UINT8);
-            branch_type.insertMember("rs2_value6", HOFFSET(HDF5BranchByteChunked, rs2_value[6]), H5::PredType::NATIVE_UINT8);
-            branch_type.insertMember("rs2_value7", HOFFSET(HDF5BranchByteChunked, rs2_value[7]), H5::PredType::NATIVE_UINT8);
+            INSERT_ARRAY(branch_type, HDF5BranchByteChunked, rs2_value, RS2_VALUE_SIZE, H5::PredType::NATIVE_UINT8);
         }
         if(!excluded_fields.count(HDF5Field::TAKEN)) {
             branch_type.insertMember("taken", HOFFSET(HDF5BranchByteChunked, taken), H5::PredType::NATIVE_HBOOL);
@@ -706,10 +694,7 @@ struct HDF5BranchByteChunked : public HDF5BranchBase<use_unsigned_bool> {
             branch_type.insertMember("wkld_id", HOFFSET(HDF5BranchByteChunked, wkld_id), H5::PredType::NATIVE_INT32);
         }
         if(!excluded_fields.count(HDF5Field::LOCAL_HISTORY)) {
-            for(size_t i = 0; i < local_history_length; ++i) {
-                std::string field_name = "local_history" + std::to_string(i);
-                branch_type.insertMember(field_name, HOFFSET(HDF5BranchByteChunked, local_history[i]), BoolType);
-            }
+            INSERT_ARRAY(branch_type, HDF5BranchByteChunked, local_history, local_history_length, BoolType);
         }
 
         return branch_type;
