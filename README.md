@@ -24,10 +24,17 @@ cmake .. -DCMAKE_BUILD_TYPE=Debug
 make
 ```
 
-## RISC-V Binutils Disassembly Support
+OS X users may need to add the following to their `cmake` invocation if Python was installed via Homebrew:
+```
+-DPYTHON_LIBRARY=$(python3-config --prefix)/lib/libpython3.8.dylib -DPYTHON_INCLUDE_DIR=$(python3-config --prefix)/include/python3.8
+```
 
-[Mavis](https://github.com/sparcians/mavis) is the default disassembly backend. You can optionally use the [RISC-V binutils backend](https://github.com/riscv-collab/riscv-binutils-gdb) instead.
+## RISC-V Disassembly Support
 
-The binutils disassembly backend can be selected by setting the environment variable `STF_DISASM=BINUTILS`.
+[RISC-V binutils](https://github.com/riscv-collab/riscv-binutils-gdb) is the default disassembly backend. You can optionally use the [Mavis](https://github.com/sparcians/mavis) backend instead.
 
-Building binutils can optionally be disabled by running `cmake` with `-DDISABLE_BINUTILS=1`.
+Different RISC-V ISA extensions can be activated by setting the `STF_DISASM_ISA` environment variable. It defaults to `rv64gcv_zba_zbb`.
+
+The Mavis disassembly backend can be selected by setting the environment variable `STF_DISASM=MAVIS`.
+
+Building binutils can optionally be disabled by running `cmake` with `-DDISABLE_BINUTILS=1`. In this case the tools will automatically default to using Mavis.

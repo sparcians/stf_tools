@@ -261,7 +261,7 @@ namespace stf {
 
         BinutilsDisassembler::~BinutilsDisassembler() {
             if(unknown_disasm_) {
-                std::cerr << "One or more unknown instructions were encountered. Try running again with STF_DISASM=MAVIS" << std::endl;
+                std::cerr << "One or more unknown instructions were encountered. Try running again with a different ISA string specified in STF_DISASM_ISA. Alternatively, you can try STF_DISASM=MAVIS" << std::endl;
             }
         }
 

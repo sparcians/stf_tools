@@ -17,9 +17,11 @@
     #ifndef MULTIPLE_DISASSEMBLERS_ENABLED
         #define MULTIPLE_DISASSEMBLERS_ENABLED
     #endif
-#endif
 
-#define DEFAULT_DISASM_BACKEND "MAVIS"
+    #define DEFAULT_DISASM_BACKEND "BINUTILS"
+#else
+    #define DEFAULT_DISASM_BACKEND "MAVIS"
+#endif
 
 #include "disassemblers/mavis_disassembler.hpp"
 
