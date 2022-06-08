@@ -46,6 +46,7 @@ class OutputFileStream {
             }
             else {
                 of_.open(output_filename.data());
+                stf_assert(!of_.fail(), "Failed to open " << output_filename << " for writing: " << strerror(errno));
                 buf = of_.rdbuf();
                 is_stdout_ = false;
             }
