@@ -151,6 +151,7 @@ void processCommandLine(int argc,
                         bool& always_fill_in_target_opcode,
                         bool& decode_target_opcodes,
                         bool& byte_chunks,
+                        bool& exclude_loop_branches,
                         size_t& local_history_length,
                         std::unordered_set<HDF5Field>& excluded_fields,
                         size_t& limit_top_branches,
@@ -164,6 +165,7 @@ void processCommandLine(int argc,
     parser.addFlag('1', "break up opcodes, register values, and addresses into 1-byte chunks");
     parser.addFlag('w', "wkld_id", "Add a wkld_id field with the specified value");
     parser.addFlag('L', "L", "Keep a local history of length L (maximum length is 64). If -1 is specified, this field is broken up into single bit fields.");
+    parser.addFlag('X', "exclude loop branches");
     parser.addMultiFlag('x', "exclude_field", "exclude specified field. Can be specified multiple times.");
     parser.addPositionalArgument("trace", "trace in STF format");
     parser.addPositionalArgument("output", "output HDF5");
@@ -172,6 +174,7 @@ void processCommandLine(int argc,
     use_unsigned_bool = parser.hasArgument('U');
     always_fill_in_target_opcode = parser.hasArgument('O');
     decode_target_opcodes = parser.hasArgument('D');
+    exclude_loop_branches = parser.hasArgument('X');
 
     if(!decode_target_opcodes) {
         excluded_fields.insert(HDF5Field::TARGET_FUNC1);
@@ -820,6 +823,10 @@ struct BranchTypeChooser<true, use_unsigned_bool> {
 };
 
 template<bool use_unsigned_bool, bool byte_chunks>
+inline bool isLoopBranch(const stf::STFBranch& branch) {
+    return branch.isConditional() && (branch.getTargetPC() <= branch.getPC());
+}
+
 void processTrace(const std::string& trace,
                   const std::string& output,
                   const bool skip_non_user,
@@ -828,7 +835,8 @@ void processTrace(const std::string& trace,
                   const std::unordered_set<HDF5Field>& excluded_fields,
                   const int32_t wkld_id,
                   const size_t local_history_length,
-                  const bool decode_target_opcodes) {
+                  const bool decode_target_opcodes,
+                  const bool exclude_loop_branches) {
     static constexpr size_t CHUNK_SIZE = 1000;
 
     stf::STFBranchReader reader(trace, skip_non_user);
@@ -836,12 +844,14 @@ void processTrace(const std::string& trace,
 
     if(top_branches.empty()) {
         for(const auto& branch: reader) {
-            writer.append(branch);
+            if(!exclude_loop_branches || !isLoopBranch(branch)) {
+                writer.append(branch);
+            }
         }
     }
     else {
         for(const auto& branch: reader) {
-            if(top_branches.count(branch.getPC())) {
+            if(top_branches.count(branch.getPC()) && (!exclude_loop_branches || !isLoopBranch(branch))) {
                 writer.append(branch);
             }
         }
@@ -883,6 +893,7 @@ int main(int argc, char** argv) {
     bool always_fill_in_target_opcode = false;
     bool decode_target_opcodes = false;
     bool byte_chunks = false;
+    bool exclude_loop_branches = false;
     std::unordered_set<HDF5Field> excluded_fields;
     size_t limit_top_branches = 0;
     int32_t wkld_id = -1;
@@ -898,6 +909,7 @@ int main(int argc, char** argv) {
                            always_fill_in_target_opcode,
                            decode_target_opcodes,
                            byte_chunks,
+                           exclude_loop_branches,
                            local_history_length,
                            excluded_fields,
                            limit_top_branches,
