@@ -35,7 +35,7 @@ namespace stf {
                     }
 
                     const char* what() const noexcept final {
-                        static std::string opcode_hex;
+                        static thread_local std::string opcode_hex;
                         if(opcode_hex.empty()) {
                             std::stringstream ss;
                             ss << std::hex << opcode_;
@@ -273,6 +273,13 @@ namespace stf {
             }
 
             /**
+             * Returns whether the decoded instruction is atomic
+             */
+            inline bool isAtomic() const {
+                return isInstType(mavis::InstMetaData::InstructionTypes::ATOMIC);
+            }
+
+            /**
              * Returns the stf::INST_MEM_ACCESS type associated with the instruction
              */
             inline stf::INST_MEM_ACCESS getMemAccessType() const {
@@ -312,6 +319,13 @@ namespace stf {
             inline bool isIndirect() const {
                 return isInstType(mavis::InstMetaData::InstructionTypes::JAL) ||
                        isInstType(mavis::InstMetaData::InstructionTypes::JALR);
+            }
+
+            /**
+             * Returns whether the decoded instruction is a JALR instruction
+             */
+            inline bool isJal() const {
+                return isInstType(mavis::InstMetaData::InstructionTypes::JAL);
             }
 
             /**
