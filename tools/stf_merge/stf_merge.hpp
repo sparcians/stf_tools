@@ -49,7 +49,7 @@ class STFMergeExtractor {
                            stf::STF_PTE& page_table,
                            const uint64_t inst_count) {
             // keep track of initial values of PC and INST_IEM
-            switch (rec->getDescriptor()) {
+            switch (rec->getId()) {
                 case stf::descriptors::internal::Descriptor::STF_PROCESS_ID_EXT:
                     {
                         const auto& pid_rec = rec->as<stf::ProcessIDExtRecord>();
@@ -61,7 +61,7 @@ class STFMergeExtractor {
 
                 case stf::descriptors::internal::Descriptor::STF_PAGE_TABLE_WALK:
                     {
-                        const auto result = record_map_.emplace(stf::pointer_utils::grabOwnership<stf::STFRecord, stf::PageTableWalkRecord>(rec));
+                        const auto result = record_map_.emplace(stf::STFRecord::grabOwnership<stf::PageTableWalkRecord>(rec));
                         const auto& pte_rec = result->as<stf::PageTableWalkRecord>();
                         const_cast<stf::PageTableWalkRecord&>(pte_rec).setIndex(inst_count + 1);
                         page_table.UpdatePTE(inst_asid_, &pte_rec);
@@ -84,7 +84,7 @@ class STFMergeExtractor {
                 case stf::descriptors::internal::Descriptor::STF_EVENT:
                 case stf::descriptors::internal::Descriptor::STF_EVENT_PC_TARGET:
                 case stf::descriptors::internal::Descriptor::STF_INST_MICROOP:
-                case stf::descriptors::internal::Descriptor::STF_RESERVED_END:
+                case stf::descriptors::internal::Descriptor::RESERVED_END:
                 case stf::descriptors::internal::Descriptor::STF_TRACE_INFO:
                 case stf::descriptors::internal::Descriptor::STF_COMMENT:
                 case stf::descriptors::internal::Descriptor::STF_FORCE_PC:
@@ -92,6 +92,7 @@ class STFMergeExtractor {
                 case stf::descriptors::internal::Descriptor::STF_INST_OPCODE16:
                 case stf::descriptors::internal::Descriptor::STF_INST_OPCODE32:
                 case stf::descriptors::internal::Descriptor::STF_INST_IEM:
+                case stf::descriptors::internal::Descriptor::STF_TRANSACTION:
                     break;
             }
         }

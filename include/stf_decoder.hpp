@@ -193,14 +193,14 @@ namespace stf {
              * \param rec Record to decode
              */
             inline STFDecoderBase& decode(const STFRecord& rec) {
-                if(rec.getDescriptor() == stf::descriptors::internal::Descriptor::STF_INST_OPCODE16) {
+                if(rec.getId() == stf::descriptors::internal::Descriptor::STF_INST_OPCODE16) {
                     return decode(rec.as<InstOpcode16Record>());
                 }
-                else if(rec.getDescriptor() == stf::descriptors::internal::Descriptor::STF_INST_OPCODE32) {
+                else if(rec.getId() == stf::descriptors::internal::Descriptor::STF_INST_OPCODE32) {
                     return decode(rec.as<InstOpcode32Record>());
                 }
                 else {
-                    stf_throw("Attempted to decode a non-instruction: " << rec.getDescriptor());
+                    stf_throw("Attempted to decode a non-instruction: " << rec.getId());
                 }
             }
 

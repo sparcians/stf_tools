@@ -27,6 +27,16 @@ class LineIteratorData {
 
 using LineIterator = std::istream_iterator<LineIteratorData>;
 
+inline void appendJSONs(std::vector<std::string>& final_jsons, const std::vector<std::string>& json_files) {
+    std::transform(std::begin(json_files),
+                   std::end(json_files),
+                   std::back_inserter(final_jsons),
+                   [](const auto& f) {
+                        return fs::path(f).filename().string();
+                   }
+    );
+}
+
 std::vector<std::string> getJSONs(const char* arch_size) {
     std::vector<std::string> json_files;
     std::vector<std::string> jsons_with_expands;
@@ -81,13 +91,8 @@ std::vector<std::string> getJSONs(const char* arch_size) {
 
     std::vector<std::string> final_jsons;
 
-    for(const auto& f: json_files) {
-        final_jsons.emplace_back(fs::path(f).filename().string());
-    }
-
-    for(const auto& f: jsons_with_expands) {
-        final_jsons.emplace_back(fs::path(f).filename().string());
-    }
+    appendJSONs(final_jsons, json_files);
+    appendJSONs(final_jsons, jsons_with_expands);
 
     return final_jsons;
 }

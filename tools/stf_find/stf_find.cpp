@@ -128,7 +128,7 @@ int main (int argc, char **argv)
         }
 
         if (config.per_iter) {
-            for (amit = config.amap.begin(); amit != config.amap.end(); amit++) {
+            for (amit = config.amap.begin(); amit != config.amap.end(); ++amit) {
                 stf_assert(amit->second.count >= 2,
                            "ERROR:  " << argv[0]
                                       << ":  Only found less than one full iteration, using address 0x"

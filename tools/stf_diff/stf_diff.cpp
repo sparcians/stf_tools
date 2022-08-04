@@ -102,15 +102,14 @@ inline bool isSC(stf::STFDecoder& decoder, const stf::STFInst& inst) {
 
 inline bool isFailedSC(stf::STFDecoder& decoder, const stf::STFInst& inst) {
     if(STF_EXPECT_FALSE(isSC(decoder, inst))) {
-        bool inst_is_failed_sc = true;
-        for(const auto& m: inst.getMemoryAccesses()) {
-            if(m.getType() == stf::INST_MEM_ACCESS::WRITE) {
-                inst_is_failed_sc = false;
-                break;
+        const auto& mem_accesses = inst.getMemoryAccesses();
+        return std::none_of(
+            std::begin(mem_accesses),
+            std::end(mem_accesses),
+            [](const auto& m) {
+                return m.getType() == stf::INST_MEM_ACCESS::WRITE;
             }
-        }
-
-        return inst_is_failed_sc;
+        );
     }
 
     return false;

@@ -194,7 +194,7 @@ namespace binutils_wrapper {
             mutable std::array<uint8_t, 4> opcode_mem_;
 
             //! The PC of the opcode held in the 4 byte opcode memory
-            mutable uint64_t opcode_pc_;
+            mutable uint64_t opcode_pc_ = 0;
 
             /**
              * Static wrapper for readMemory_ so that it can be used as a callback in binutils

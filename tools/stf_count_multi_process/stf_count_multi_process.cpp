@@ -65,7 +65,7 @@ int main(int argc, char* argv[]) {
             uint64_t cur_satp = 0;
 
             while(reader >> rec) {
-                if(STF_EXPECT_FALSE(rec->getDescriptor() == stf::descriptors::internal::Descriptor::STF_INST_REG)) {
+                if(STF_EXPECT_FALSE(rec->getId() == stf::descriptors::internal::Descriptor::STF_INST_REG)) {
                     const auto& reg_rec = rec->as<stf::InstRegRecord>();
                     if(STF_EXPECT_FALSE((reg_rec.getOperandType() == stf::Registers::STF_REG_OPERAND_TYPE::REG_DEST) &&
                                         (reg_rec.getReg() == stf::Registers::STF_REG::STF_REG_CSR_SATP))) {
@@ -75,7 +75,7 @@ int main(int argc, char* argv[]) {
                         cur_satp = new_satp_value;
                     }
                 }
-                else if(STF_EXPECT_FALSE(rec->getDescriptor() == stf::descriptors::internal::Descriptor::STF_EVENT)) {
+                else if(STF_EXPECT_FALSE(rec->getId() == stf::descriptors::internal::Descriptor::STF_EVENT)) {
                     const auto& event_rec = rec->as<stf::EventRecord>();
                     if(event_rec.isModeChange()) {
                         const auto new_mode = static_cast<stf::EXECUTION_MODE>(event_rec.getData().front());

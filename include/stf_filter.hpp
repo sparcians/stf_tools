@@ -169,7 +169,7 @@ namespace stf {
 
                 /*for (auto it = inst.origRecordsBegin(); it != inst.origRecordsEnd(); ++it) {
                     for(const auto& rec: it->second) {
-                        switch (rec->getDescriptor()) {
+                        switch (rec->getId()) {
                             case stf::descriptors::internal::Descriptor::STF_INST_REG:
                                 {
                                     const auto& reg_rec = rec->as<InstRegRecord>();

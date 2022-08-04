@@ -15,7 +15,7 @@
     #define INCLUDE_STD_FILESYSTEM_EXPERIMENTAL 1
 
 // Check if the header "<filesystem>" exists
-#elif __has_include(<filesystem>)
+#elif __has_include(<filesystem>) // cppcheck-suppress preprocessorErrorDirective
 
     // If we're compiling on Visual Studio and are not compiling with C++17, we need to use experimental
     #ifdef _MSC_VER

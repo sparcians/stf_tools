@@ -126,11 +126,11 @@ int main(int argc, char** argv) {
             stf::STFRecord::UniqueHandle rec;
             while(reader >> rec) {
                 if(STF_EXPECT_FALSE(!only_instruction_pc &&
-                                    rec->getDescriptor() == stf::descriptors::internal::Descriptor::STF_INST_MEM_ACCESS)) {
+                                    rec->getId() == stf::descriptors::internal::Descriptor::STF_INST_MEM_ACCESS)) {
                     countAddress(address_map, rec->as<stf::InstMemAccessRecord>(), address_mask);
                 }
                 else if(include_instruction_pc) {
-                    const auto desc = rec->getDescriptor();
+                    const auto desc = rec->getId();
                     if(STF_EXPECT_FALSE(desc == stf::descriptors::internal::Descriptor::STF_INST_OPCODE16)) {
                         countPC(address_map, rec->as<stf::InstOpcode16Record>().getPC(), address_mask);
                     }

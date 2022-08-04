@@ -29,5 +29,5 @@ static const auto STF_DESCRIPTOR_NAME_MAP = std::unordered_map<std::string, stf:
     {"STF_VLEN_CONFIG", stf::descriptors::internal::Descriptor::STF_VLEN_CONFIG},
     {"STF_END_HEADER", stf::descriptors::internal::Descriptor::STF_END_HEADER},
     {"STF_RESERVED", stf::descriptors::internal::Descriptor::STF_RESERVED},
-    {"STF_RESERVED_END", stf::descriptors::internal::Descriptor::STF_RESERVED_END}
+    {"RESERVED_END", stf::descriptors::internal::Descriptor::RESERVED_END}
 });

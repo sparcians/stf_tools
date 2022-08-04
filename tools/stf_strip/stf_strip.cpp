@@ -85,7 +85,7 @@ int main(int argc, char** argv) {
         stf::STFRecord::UniqueHandle r;
         while(reader) {
             reader >> r;
-            if(STF_EXPECT_FALSE(stripped_records.count(r->getDescriptor()) != 0)) {
+            if(STF_EXPECT_FALSE(stripped_records.count(r->getId()) != 0)) {
                 continue;
             }
 

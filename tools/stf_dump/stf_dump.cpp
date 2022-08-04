@@ -139,9 +139,6 @@ int main (int argc, char **argv)
             }
         }
 
-        uint32_t tid = 0;
-        uint32_t pid = 0;
-        uint32_t asid = 0;
         uint32_t tid_prev = std::numeric_limits<uint32_t>::max();
         uint32_t pid_prev = std::numeric_limits<uint32_t>::max();
         uint32_t asid_prev = std::numeric_limits<uint32_t>::max();
@@ -155,9 +152,9 @@ int main (int argc, char **argv)
                 std::cerr << "ERROR: " << inst.index() << " invalid instruction " << std::hex << inst.opcode() << " PC " << inst.pc() << std::endl;
             }
 
-            tid = inst.tid();
-            pid = inst.tgid();
-            asid = inst.asid();
+            const uint32_t tid = inst.tid();
+            const uint32_t pid = inst.tgid();
+            const uint32_t asid = inst.asid();
             if (STF_EXPECT_FALSE(!config.concise_mode && (tid != tid_prev || pid != pid_prev || asid != asid_prev))) {
                 stf::print_utils::printLabel("PID");
                 stf::print_utils::printTID(pid);
