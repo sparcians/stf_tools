@@ -74,6 +74,7 @@ class STFMergeExtractor {
                 case stf::descriptors::internal::Descriptor::STF_ISA:
                 case stf::descriptors::internal::Descriptor::STF_TRACE_INFO_FEATURE:
                 case stf::descriptors::internal::Descriptor::STF_VLEN_CONFIG:
+                case stf::descriptors::internal::Descriptor::STF_PROTOCOL_ID:
                 case stf::descriptors::internal::Descriptor::STF_END_HEADER:
                 case stf::descriptors::internal::Descriptor::STF_INST_REG:
                 case stf::descriptors::internal::Descriptor::STF_INST_READY_REG:
@@ -93,6 +94,7 @@ class STFMergeExtractor {
                 case stf::descriptors::internal::Descriptor::STF_INST_OPCODE32:
                 case stf::descriptors::internal::Descriptor::STF_INST_IEM:
                 case stf::descriptors::internal::Descriptor::STF_TRANSACTION:
+                case stf::descriptors::internal::Descriptor::STF_TRANSACTION_DEPENDENCY:
                     break;
             }
         }
