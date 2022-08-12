@@ -45,3 +45,5 @@ add_subdirectory(generators)
 add_subdirectory(lib)
 
 add_subdirectory(tools)
+
+add_subdirectory(examples)
