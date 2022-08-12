@@ -35,6 +35,7 @@ class STFMorpher {
                             opcode_(opcode),
                             operands_(std::move(operands)),
                             ls_address_(ls_address),
+                            ls_size_(ls_size),
                             ls_access_type_(ls_access_type),
                             op_size_(op_size)
                         {
@@ -44,7 +45,7 @@ class STFMorpher {
                 };
 
             private:
-                size_t total_size_;
+                size_t total_size_ = 0;
                 std::vector<Op> opcodes_;
 
             public:
