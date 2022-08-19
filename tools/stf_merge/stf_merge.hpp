@@ -85,7 +85,7 @@ class STFMergeExtractor {
                 case stf::descriptors::internal::Descriptor::STF_EVENT:
                 case stf::descriptors::internal::Descriptor::STF_EVENT_PC_TARGET:
                 case stf::descriptors::internal::Descriptor::STF_INST_MICROOP:
-                case stf::descriptors::internal::Descriptor::RESERVED_END:
+                case stf::descriptors::internal::Descriptor::__RESERVED_END:
                 case stf::descriptors::internal::Descriptor::STF_TRACE_INFO:
                 case stf::descriptors::internal::Descriptor::STF_COMMENT:
                 case stf::descriptors::internal::Descriptor::STF_FORCE_PC:
