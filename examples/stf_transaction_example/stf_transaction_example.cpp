@@ -9,6 +9,7 @@ int main(int argc, char** argv) {
     writer.addTraceInfo(stf::TraceInfoRecord(stf::STF_GEN::STF_TRANSACTION_EXAMPLE, 1, 0, 0, "STF transaction example"));
     writer.setTraceFeature(stf::TRACE_FEATURES::STF_CONTAIN_TRANSACTIONS);
     writer.setProtocolId(stf::protocols::ProtocolId::TILELINK);
+    writer.addClock(1, "system_clock");
     writer.finalizeHeader();
 
     writer << stf::protocols::TileLink::makeTransaction<stf::protocols::tilelink::ChannelA>(1, 2, 3, 4, 5);
