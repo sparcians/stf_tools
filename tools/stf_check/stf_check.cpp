@@ -318,11 +318,9 @@ msg     << "STF_CONTAIN_PHYSICAL_ADDRESS not set, but is required as part of the
                 }
             }
 
-            size_t mem_access_size = 0;
             const auto& mem_accesses = inst.getMemoryAccesses();
             // Check for physcial address issues in memory access records.
             for(const auto& mem_access: mem_accesses) {
-                mem_access_size += mem_access.getSize();
                 // Check if accesses address zero
                 if (STF_EXPECT_FALSE(mem_access.getAddress() == 0)) {
                     ecount.countError(ErrorCode::MEM_POINT_TO_ZERO);
