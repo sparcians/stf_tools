@@ -73,31 +73,14 @@ static STFCheckConfig parse_command_line (int argc, char **argv) {
 
 inline bool isVectorMemAccessMasked(const stf::STFInst& inst) {
     if(inst.isVector()) {
-        const auto& operands = inst.getSourceOperands();
-        const auto end_it = operands.end();
-        auto vl = end_it;
-        auto v0 = end_it;
+        const auto vl = inst.getSourceOperand(stf::Registers::STF_REG::STF_REG_CSR_VL);
+        const auto v0 = inst.getSourceOperand(stf::Registers::STF_REG::STF_REG_V0);
 
-        for(auto it = operands.begin(); it != operands.end(); ++it) {
-            const auto reg_num = it->getReg();
-
-            if(STF_EXPECT_FALSE(reg_num == stf::Registers::STF_REG::STF_REG_CSR_VL)) {
-                vl = it;
-            }
-            else if(STF_EXPECT_FALSE(reg_num == stf::Registers::STF_REG::STF_REG_V0)) {
-                v0 = it;
-            }
-            if(STF_EXPECT_FALSE((vl != end_it) && (v0 != end_it))) {
-                break;
-            }
-        }
-
-        // If there is no VL specified, there can't be any mask
-        if(vl == end_it) {
+        if(!vl.second) {
             return false;
         }
         else {
-            auto vlen = vl->getScalarValue();
+            auto vlen = vl.first->getScalarValue();
 
             // If VL == 0, all accesses are masked
             if(vlen == 0) {
@@ -105,12 +88,12 @@ inline bool isVectorMemAccessMasked(const stf::STFInst& inst) {
             }
             // If V0 is specified, bits [VL-1:0] define the mask
             // If all of the mask bits are 0, then all load/store accesses are masked
-            else if(v0 != end_it) {
+            else if(v0.second) {
                 // Calculate how many vector elements are needed to hold the mask
                 const auto num_mask_elements = stf::InstRegRecord::calcVectorLen(vlen);
                 stf_assert(num_mask_elements != 0, "There should be at least 1 mask element if vlen != 0");
 
-                const auto& v0_data = v0->getVectorValue();
+                const auto& v0_data = v0.first->getVectorValue();
                 using ElementType = std::remove_reference_t<decltype(v0_data)>::value_type;
 
                 // This loop handles the first n-1 mask elements - each one is a full vector element,

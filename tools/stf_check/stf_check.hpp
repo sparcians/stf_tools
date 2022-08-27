@@ -5,6 +5,8 @@
 #include <map>
 #include <unordered_map>
 #include <unordered_set>
+
+#include "boost_wrappers/setup.hpp"
 #include <boost/container_hash/hash.hpp>
 
 #include "print_utils.hpp"
@@ -48,7 +50,7 @@ enum class ErrorCode : uint8_t {
  * \param os std::ostream to send output to
  * \param code ErrorCode to format
  */
-std::ostream& operator<<(std::ostream& os, const ErrorCode code) {
+inline std::ostream& operator<<(std::ostream& os, const ErrorCode code) {
     switch(code) {
         case ErrorCode::RESERVED_NO_ERROR:
             os << "NO_ERROR";
@@ -124,7 +126,7 @@ std::ostream& operator<<(std::ostream& os, const ErrorCode code) {
 
 #define PARSER_ENTRY(x) { #x, ErrorCode::x }
 
-ErrorCode parseErrorCode(const std::string_view err_code_str) {
+inline ErrorCode parseErrorCode(const std::string_view err_code_str) {
     static const std::unordered_map<std::string_view, ErrorCode> string_map {
         PARSER_ENTRY(INVALID_PC_32),
         PARSER_ENTRY(INVALID_PC_16),
@@ -381,7 +383,7 @@ class ErrorTracker {
         }
 
     public:
-        ErrorTracker(const std::unordered_set<ErrorCode> ignored_errors) :
+        explicit ErrorTracker(const std::unordered_set<ErrorCode>& ignored_errors) :
             ignored_errors_(ignored_errors),
             err_(std::cerr)
         {
@@ -467,7 +469,7 @@ class ErrorTracker {
         }
 };
 
-const std::map<ErrorCode, const char*> ErrorTracker::error_code_msgs_ = {
+inline const std::map<ErrorCode, const char*> ErrorTracker::error_code_msgs_ = {
     {ErrorCode::RESERVED_NO_ERROR, "no error"},
     {ErrorCode::INVALID_PC_32, "invalid pc value found in mode"},
     {ErrorCode::INVALID_PC_16, "invalid pc value found in mode"},
