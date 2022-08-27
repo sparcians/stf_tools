@@ -7,7 +7,7 @@
 #include <set>
 #include <unordered_map>
 #include <vector>
-#include <boost/container/small_vector.hpp>
+#include "boost_wrappers/small_vector.hpp"
 
 #include "stf_inst.hpp"
 
@@ -241,8 +241,8 @@ class StLdDependencyTracker : public DependencyTracker<StLdDependencyTracker, ui
             return false;
         }
 
-        StLdDependencyTracker(const uint64_t max_distance,
-                              const uint64_t address_mask = std::numeric_limits<uint64_t>::max()) :
+        explicit StLdDependencyTracker(const uint64_t max_distance,
+                                       const uint64_t address_mask = std::numeric_limits<uint64_t>::max()) :
             DependencyTracker(max_distance),
             address_mask_(address_mask)
         {
