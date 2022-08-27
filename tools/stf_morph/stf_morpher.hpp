@@ -176,32 +176,17 @@ class STFMorpher {
 
         void updateInitialRegState_() {
             for(const auto& op: it_->getRegisterStates()) {
-                if(STF_EXPECT_FALSE(op.isVector())) {
-                    reg_state_.regStateVectorUpdate(op.getReg(), op.getVectorValue());
-                }
-                else {
-                    reg_state_.regStateScalarUpdate(op.getReg(), op.getScalarValue());
-                }
+                reg_state_.regStateUpdate(op.getRecord());
             }
 
             for(const auto& op: it_->getSourceOperands()) {
-                if(STF_EXPECT_FALSE(op.isVector())) {
-                    reg_state_.regStateVectorUpdate(op.getReg(), op.getVectorValue());
-                }
-                else {
-                    reg_state_.regStateScalarUpdate(op.getReg(), op.getScalarValue());
-                }
+                reg_state_.regStateUpdate(op.getRecord());
             }
         }
 
         void updateFinalRegState_() {
             for(const auto& op: it_->getDestOperands()) {
-                if(STF_EXPECT_FALSE(op.isVector())) {
-                    reg_state_.regStateVectorUpdate(op.getReg(), op.getVectorValue());
-                }
-                else {
-                    reg_state_.regStateScalarUpdate(op.getReg(), op.getScalarValue());
-                }
+                reg_state_.regStateUpdate(op.getRecord());
             }
         }
 
