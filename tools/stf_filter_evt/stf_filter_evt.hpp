@@ -193,11 +193,8 @@ class STFEventFilter {
                     prev_inst_.overrideRegState(reg_state);
                 }
 
-                for(const auto& op: inst.getOperands()) {
-                    const auto& rec = op.getRecord();
-                    if (rec.getOperandType() == stf::Registers::STF_REG_OPERAND_TYPE::REG_DEST) {
-                        reg_state.regStateUpdate(rec);
-                    }
+                for(const auto& op: inst.getDestOperands()) {
+                    reg_state.regStateUpdate(op.getRecord());
                 }
 
                 // write previous instruction

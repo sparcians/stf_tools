@@ -108,11 +108,8 @@ int main (int argc, char **argv)
             }
 
             if (inst.index() < config.startInst) {
-                for(const auto& op: inst.getOperands()) {
-                    const auto& rec = op.getRecord();
-                    if (rec.getOperandType() == stf::Registers::STF_REG_OPERAND_TYPE::REG_DEST) {
-                        regState.regStateUpdate(rec);
-                    }
+                for(const auto& op: inst.getDestOperands()) {
+                    regState.regStateUpdate(op.getRecord());
                 }
                 filter.appendFilteredPTE(inst);
                 continue;
@@ -213,11 +210,8 @@ int main (int argc, char **argv)
 
             if (instFiltered) {
                 // the instruction is filtered; update register state;
-                for(const auto& op: inst.getOperands()) {
-                    const auto& rec = op.getRecord();
-                    if (rec.getOperandType() == stf::Registers::STF_REG_OPERAND_TYPE::REG_DEST) {
-                        regState.regStateUpdate(rec);
-                    }
+                for(const auto& op: inst.getDestOperands()) {
+                    regState.regStateUpdate(op.getRecord());
                 }
                 // the instruction is filtered; PTE;
                 filter.appendFilteredPTE(inst);
