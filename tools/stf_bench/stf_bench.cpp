@@ -47,9 +47,9 @@ inline std::chrono::duration<double> readAllRecords(stf::STFReader& reader) {
     return end - start;
 }
 
-template<typename Reader>
-void readerBench(const std::string& filename) {
-    Reader reader(filename);
+template<typename Reader, typename ... Args>
+void readerBench(const std::string& filename, Args&&... args) {
+    Reader reader(filename, args...);
 
     auto time = readAllRecords<Reader>(reader);
 
@@ -74,26 +74,28 @@ int main(int argc, char* argv[]) {
 
         trace_tools::CommandLineParser parser("stf_bench");
         parser.addFlag('r', "reader", "Reader to test (0 = all, 1 = STFReader, 2 = STFInstReader, 3 = STFBranchReader)");
+        parser.addFlag('u', "Skip non-user instructions (will not apply to STFReader)");
         parser.addPositionalArgument("trace", "STF to test with");
         parser.parseArguments(argc, argv);
 
+        const bool skip_non_user = parser.hasArgument('u');
         parser.getArgumentValue('r', reader);
         const auto trace = parser.getPositionalArgument<std::string>(0);
 
         switch(reader) {
             case 0:
                 readerBench<stf::STFReader>(trace);
-                readerBench<stf::STFInstReader>(trace);
-                readerBench<stf::STFBranchReader>(trace);
+                readerBench<stf::STFInstReader>(trace, skip_non_user);
+                readerBench<stf::STFBranchReader>(trace, skip_non_user);
                 break;
             case 1:
                 readerBench<stf::STFReader>(trace);
                 break;
             case 2:
-                readerBench<stf::STFInstReader>(trace);
+                readerBench<stf::STFInstReader>(trace, skip_non_user);
                 break;
             case 3:
-                readerBench<stf::STFBranchReader>(trace);
+                readerBench<stf::STFBranchReader>(trace, skip_non_user);
                 break;
         };
     }
