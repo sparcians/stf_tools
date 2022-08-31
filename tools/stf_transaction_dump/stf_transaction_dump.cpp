@@ -1,6 +1,7 @@
 #include <iostream>
 
 #include "command_line_parser.hpp"
+#include "print_utils.hpp"
 #include "stf_transaction_reader.hpp"
 #include "protocols/tilelink.hpp"
 
@@ -42,6 +43,9 @@ int main(int argc, char** argv) {
             }
         }
 
+        stf::print_utils::printLabel("PROTOCOL");
+        std::cout << reader.getProtocolId() << std::endl;
+
         const auto start_transaction_idx = start_transaction ? start_transaction - 1 : 0;
 
         for (auto it = reader.begin(start_transaction_idx); it != reader.end(); ++it) {
@@ -55,6 +59,5 @@ int main(int argc, char** argv) {
         std::cerr << e.what() << std::endl;
         return e.getCode();
     }
-    //delete annoSt;
     return 0;
 }
