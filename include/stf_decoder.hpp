@@ -224,7 +224,7 @@ namespace stf {
              * Decodes an instruction from a raw opcode
              * \param opcode Opcode to decode
              */
-            inline STFDecoderBase& decode(uint32_t opcode) {
+            inline STFDecoderBase& decode(const uint32_t opcode) {
                 is_compressed_ = isCompressed(opcode);
                 if(!opcode_.valid() || opcode_.get() != opcode) {
                     opcode_ = opcode;
