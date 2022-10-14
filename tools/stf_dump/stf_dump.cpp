@@ -188,9 +188,18 @@ int main (int argc, char **argv)
                 if (stf::format_utils::showPhys()) {
                     std::cout << ':';
                     //stf::print_utils::printPA(inst.physBranchTarget());
+                    stf::print_utils::printSpaces(stf::format_utils::PA_WIDTH);
                 }
                 stf::print_utils::printSpaces(1);
-            } else {
+            }
+            else if(STF_EXPECT_FALSE(config.concise_mode && (inst.isFault() || inst.isInterrupt()))) {
+                const std::string_view fault_msg = inst.isFault() ? "FAULT" : "INTERRUPT";
+                stf::print_utils::printLeft(fault_msg, stf::format_utils::VA_WIDTH + 4);
+                if (stf::format_utils::showPhys()) {
+                    stf::print_utils::printSpaces(stf::format_utils::PA_WIDTH + 1);
+                }
+            }
+            else {
                 stf::print_utils::printSpaces(stf::format_utils::VA_WIDTH + 4);
                 if (stf::format_utils::showPhys()) {
                     stf::print_utils::printSpaces(stf::format_utils::PA_WIDTH + 1);
@@ -199,7 +208,6 @@ int main (int argc, char **argv)
 
             stf::print_utils::printSpaces(9); // Additional padding so that opcode lines up with operand values
             printOpcodeWithDisassembly(dis, inst.opcode(), inst.pc());
-
 
             if(!config.concise_mode) {
                 for(const auto& m: inst.getMemoryAccesses()) {
