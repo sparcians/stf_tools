@@ -27,7 +27,6 @@ static STFFilterConfig parse_command_line (int argc, char **argv) {
     parser.addFlag('s', "N", "start trace event filtering at N-th instruction");
     parser.addFlag('e', "M", "end trace event filtering at M-th instruction");
     parser.addMultiFlag('E', "evt", "Event to filter, i.e. -E 0x5 -E 0x2");
-    parser.addFlag('F', "filter all faults");
     parser.addFlag('K', "filter all kernel activities, not including syscalls");
     parser.addFlag('S', "filter all syscalls, keeping the call instructions");
     parser.addFlag('o', "trace", "output filename. stdout is default");
