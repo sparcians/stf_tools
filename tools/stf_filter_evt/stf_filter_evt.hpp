@@ -26,6 +26,11 @@ class FilteredSTFInst : public stf::STFInst {
         }
 
     public:
+        FilteredSTFInst(const stf::STFInstReader& reader) :
+            reg_state_(reader.getISA(), reader.getInitialIEM())
+        {
+        }
+
         /**
          * \brief Write all records in this instruction to STFWriter
          */
@@ -137,8 +142,9 @@ class STFEventFilter {
         stf::STFDecoder decoder_;
 
     public:
-        STFEventFilter(const stf::INST_IEM iem) :
-            decoder_(iem)
+        STFEventFilter(const stf::STFInstReader& reader) :
+            prev_inst_(reader),
+            decoder_(reader.getInitialIEM())
         {
         }
 
@@ -198,7 +204,6 @@ class STFEventFilter {
                 }
 
                 // write previous instruction
-                prev_inst_.keepEvents(keep_event);
                 prev_inst_.write(stf_writer);
 
                 if (!bBranch) {
@@ -222,6 +227,7 @@ class STFEventFilter {
             // don't write opcode yet, in case IRQ on branch instr.
             // wait for next instruction ready, to check branch target before writing opcode;
             prev_inst_ = inst;
+            prev_inst_.keepEvents(keep_event);
             return true;
         }
 

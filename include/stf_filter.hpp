@@ -48,6 +48,7 @@ namespace stf {
                 user_mode_only_(user_mode_only),
                 stf_inst_reader_(stf_inst_reader),
                 stf_writer_(std::move(stf_writer)),
+                reg_state_(stf_inst_reader.getISA(), stf_inst_reader.getInitialIEM()),
                 page_table_(nullptr, nullptr, true),
                 in_user_code_(user_mode_only)
             {}
