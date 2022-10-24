@@ -12,7 +12,7 @@ int main(int argc, char** argv) {
     writer.addClock(1, "system_clock");
     writer.finalizeHeader();
 
-    stf::TransactionRecord::IdManager id_manager;
+    stf::RecordIdManager id_manager;
     writer << stf::protocols::TileLink::makeTransaction<stf::protocols::tilelink::ChannelA>(id_manager, 1, 2, 3, 4, 5);
     writer << stf::protocols::TileLink::makeTransactionWithDelta<stf::protocols::tilelink::ChannelB>(id_manager, 10, 6, 7, 8, 9, 10, std::vector<uint8_t>({0x1, 0x2, 0x3, 0x4}), std::vector<uint8_t>({1, 0, 1, 0}));
     writer << stf::protocols::TileLink::makeTransactionWithDelta<stf::protocols::tilelink::ChannelC>(id_manager, 20, 11, 12, 13, 14, 15, std::vector<uint8_t>({0x4, 0x3, 0x2, 0x1}));
