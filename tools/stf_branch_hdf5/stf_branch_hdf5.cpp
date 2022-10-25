@@ -823,11 +823,11 @@ struct BranchTypeChooser<true, use_unsigned_bool> {
     using type = HDF5BranchByteChunked<use_unsigned_bool>;
 };
 
-template<bool use_unsigned_bool, bool byte_chunks>
 inline bool isLoopBranch(const stf::STFBranch& branch) {
     return branch.isConditional() && (branch.getTargetPC() <= branch.getPC());
 }
 
+template<bool use_unsigned_bool, bool byte_chunks>
 void processTrace(const std::string& trace,
                   const std::string& output,
                   const bool skip_non_user,
@@ -925,18 +925,18 @@ int main(int argc, char** argv) {
 
     if(use_unsigned_bool) {
         if(byte_chunks) {
-            processTrace<true, true>(trace, output, skip_non_user, always_fill_in_target_opcode, top_branches, excluded_fields, wkld_id, local_history_length, decode_target_opcodes);
+            processTrace<true, true>(trace, output, skip_non_user, always_fill_in_target_opcode, top_branches, excluded_fields, wkld_id, local_history_length, decode_target_opcodes, exclude_loop_branches);
         }
         else {
-            processTrace<true, false>(trace, output, skip_non_user, always_fill_in_target_opcode, top_branches, excluded_fields, wkld_id, local_history_length, decode_target_opcodes);
+            processTrace<true, false>(trace, output, skip_non_user, always_fill_in_target_opcode, top_branches, excluded_fields, wkld_id, local_history_length, decode_target_opcodes, exclude_loop_branches);
         }
     }
     else {
         if(byte_chunks) {
-            processTrace<false, true>(trace, output, skip_non_user, always_fill_in_target_opcode, top_branches, excluded_fields, wkld_id, local_history_length, decode_target_opcodes);
+            processTrace<false, true>(trace, output, skip_non_user, always_fill_in_target_opcode, top_branches, excluded_fields, wkld_id, local_history_length, decode_target_opcodes, exclude_loop_branches);
         }
         else {
-            processTrace<false, false>(trace, output, skip_non_user, always_fill_in_target_opcode, top_branches, excluded_fields, wkld_id, local_history_length, decode_target_opcodes);
+            processTrace<false, false>(trace, output, skip_non_user, always_fill_in_target_opcode, top_branches, excluded_fields, wkld_id, local_history_length, decode_target_opcodes, exclude_loop_branches);
         }
     }
 
