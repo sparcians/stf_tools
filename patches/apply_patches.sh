@@ -2,18 +2,20 @@
 
 count_patches() { echo $#; }
 
-if [ $# -lt 1 ]; then
-    echo "Usage: apply_patches.sh [<patch>...]"
+if [ $# -lt 2 ]; then
+    echo "Usage: apply_patches.sh <tag|branch> [<patch>...]"
     exit 1
 fi
 
+CUR_TAG=$1
+shift
 PATCHES=$@
 NUM_PATCHES=$(count_patches $PATCHES)
-NUM_REPO_PATCHES=$(git rev-list --count HEAD ^origin/HEAD)
+NUM_REPO_PATCHES=$(git rev-list --count HEAD ^$CUR_TAG)
 
 # If the checkout has more patches applied than we expect, start from scratch
 if [ $NUM_PATCHES -lt $NUM_REPO_PATCHES ]; then
-    git reset --hard origin/HEAD
+    git reset --hard $CUR_TAG
 fi
 
 # Check each patch in order and apply it if needed

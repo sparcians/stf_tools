@@ -13,31 +13,32 @@ diff --git a/opcodes/disassemble.h b/opcodes/disassemble.h
 index 7fc2c6e716..fbb0a14482 100644
 --- a/opcodes/disassemble.h
 +++ b/opcodes/disassemble.h
-@@ -105,6 +105,7 @@ extern int print_insn_loongarch		(bfd_vma, disassemble_info *);
+@@ -102,7 +102,8 @@ extern int print_insn_loongarch		(bfd_vma, disassemble_info *);
+
  extern disassembler_ftype csky_get_disassembler (bfd *);
  extern disassembler_ftype rl78_get_disassembler (bfd *);
  extern disassembler_ftype riscv_get_disassembler (bfd *);
 +extern disassembler_ftype riscv_get_disassembler_arch (bfd *, const char*);
- 
+
  extern void ATTRIBUTE_NORETURN opcodes_assert (const char *, int);
- 
+
 diff --git a/opcodes/riscv-dis.c b/opcodes/riscv-dis.c
 index 34724d4aec..ff616e11ea 100644
 --- a/opcodes/riscv-dis.c
 +++ b/opcodes/riscv-dis.c
-@@ -948,7 +948,12 @@ disassembler_ftype
+@@ -1000,7 +1000,12 @@ disassembler_ftype
  riscv_get_disassembler (bfd *abfd)
  {
    const char *default_arch = "rv64gc";
 +  return riscv_get_disassembler_arch(abfd, default_arch);
 +}
- 
+
 +disassembler_ftype
 +riscv_get_disassembler_arch (bfd *abfd, const char* default_arch)
 +{
-   if (abfd)
+   if (abfd && bfd_get_flavour (abfd) == bfd_target_elf_flavour)
      {
-       const struct elf_backend_data *ebd = get_elf_backend_data (abfd);
--- 
+       const char *sec_name = get_elf_backend_data (abfd)->obj_attrs_section;
+--
 2.30.2
 
