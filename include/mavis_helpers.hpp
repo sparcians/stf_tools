@@ -9,7 +9,7 @@
 
 namespace mavis_helpers {
     namespace __mavis_array {
-        static constexpr size_t NUM_INSTRUCTION_TYPES_ = 31;
+        static constexpr size_t NUM_INSTRUCTION_TYPES_ = 33;
 
         using IType = mavis::InstMetaData::InstructionTypes;
         using InstructionTypeArray = std::array<IType, NUM_INSTRUCTION_TYPES_>;
@@ -47,6 +47,8 @@ namespace mavis_helpers {
                 IType::FAULTFIRST,
                 IType::WHOLE,
                 IType::MASK,
+                IType::WIDENING,
+                IType::HYPERVISOR,
                 IType::CACHE,
                 IType::ATOMIC,
                 IType::FENCE,
@@ -88,6 +90,8 @@ namespace mavis_helpers {
                     case IType::FENCE:
                     case IType::SYSTEM:
                     case IType::CSR:
+                    case IType::WIDENING:
+                    case IType::HYPERVISOR:
                         break;
                 };
             }
@@ -220,6 +224,10 @@ namespace mavis_helpers {
                         return "whole";
                     case enum_t::MASK:
                         return "mask";
+                    case enum_t::WIDENING:
+                        return "widening";
+                    case enum_t::HYPERVISOR:
+                        return "hypervisor";
                     case enum_t::CACHE:
                         return "cache";
                     case enum_t::ATOMIC:
