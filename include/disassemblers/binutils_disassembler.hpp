@@ -31,7 +31,7 @@ namespace stf {
                                        const uint64_t pc,
                                        const uint32_t opcode) const final;
 
-                inline static const char* DEFAULT_DISASM_ISA_ = "rv64gcv_zba_zbb_zbs";
+                inline static const char* DEFAULT_DISASM_ISA_ = "rv64imafdcvh_zicsr_zifencei_zfh_zba_zbb_zbs";
 
             public:
                 /**
