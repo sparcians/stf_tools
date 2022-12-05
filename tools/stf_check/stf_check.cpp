@@ -45,6 +45,7 @@ static STFCheckConfig parse_command_line (int argc, char **argv) {
     STFCheckConfig config;
 
     trace_tools::CommandLineParser parser("stf_check");
+    parser.addFlag('u', "skip non-user code");
     parser.addFlag('c', "continue on error");
     parser.addFlag('d', "print out memory point to zero errors");
     parser.addFlag('p', "print trace info");
@@ -56,6 +57,7 @@ static STFCheckConfig parse_command_line (int argc, char **argv) {
     parser.addPositionalArgument("trace", "trace in STF format");
 
     parser.parseArguments(argc, argv);
+    config.skip_non_user = parser.hasArgument('u');
     config.continue_on_error = parser.hasArgument('c');
     config.print_memory_zero_warnings = parser.hasArgument('d');
     config.print_info = parser.hasArgument('p');
@@ -143,7 +145,7 @@ int main (int argc, char **argv) {
         ThreadMapKey thread_id;
 
         // Open stf trace reader
-        stf::STFInstReader stf_reader(config.trace_filename);
+        stf::STFInstReader stf_reader(config.trace_filename, config.skip_non_user);
         stf::STFDecoder decoder(stf_reader.getInitialIEM());
         /* FIXME Because we have not kept up with STF versioning, this is currently broken and must be loosened.
         if (!stf_reader.checkVersion()) {
@@ -318,6 +320,34 @@ msg     << "STF_CONTAIN_PHYSICAL_ADDRESS not set, but is required as part of the
                 }
             }
 
+            if(STF_EXPECT_FALSE(inst_count > 1 && inst.pc() != (inst_prev.pc() + inst_prev.opcodeSize()))) {
+                bool valid_jump = false;
+                if(STF_EXPECT_FALSE(inst_prev.isTakenBranch() && inst_prev.branchTarget() == inst.pc())) {
+                    valid_jump = true;
+                }
+                else {
+                    valid_jump = !prev_events.empty() && !std::any_of(prev_events.begin(),
+                                                                      prev_events.end(),
+                                                                      [&](const auto& event) {
+                                                                          return event.targetValid() && (event.getTarget() != inst.pc());
+                                                                      });
+                }
+
+                if(STF_EXPECT_FALSE(!valid_jump)) {
+                    ecount.countError(ErrorCode::PC_DISCONTINUITY);
+                    auto& msg = ecount.reportError(ErrorCode::PC_DISCONTINUITY);
+                    msg << "PC discontinuity found between instruction #";
+                    stf::format_utils::formatDec(msg, inst_prev.index());
+                    msg << " and ";
+                    stf::format_utils::formatDec(msg, inst.index());
+                    msg << " first pc value: ";
+                    stf::format_utils::formatVA(msg, inst_prev.pc());
+                    msg << " second pc value: ";
+                    stf::format_utils::formatVA(msg, inst.pc());
+                    msg << std::endl;
+                }
+            }
+
             const auto& mem_accesses = inst.getMemoryAccesses();
             // Check for physcial address issues in memory access records.
             for(const auto& mem_access: mem_accesses) {
@@ -444,7 +474,7 @@ msg     << "STF_CONTAIN_PHYSICAL_ADDRESS not set, but is required as part of the
             thread_pc_prev[thread_id] = inst;
         }
 
-        // Check to see if the STF_CONTAINS_PHYSCICAL_ADDRESS flag is set properly.
+        // Check to see if the STF_CONTAINS_PHYSICAL_ADDRESS flag is set properly.
         if (trace_features->hasFeature(stf::TRACE_FEATURES::STF_CONTAIN_PHYSICAL_ADDRESS)) {
             if (pa_count == 0) {
                 ecount.countError(ErrorCode::PHYS_ADDR);
