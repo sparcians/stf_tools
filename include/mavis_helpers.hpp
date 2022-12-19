@@ -162,6 +162,8 @@ namespace mavis_helpers {
             using enum_t = __mavis_array::IType;
             using int_t = stf::enums::int_t<enum_t>;
 
+            static constexpr enum_t UNDEFINED = static_cast<enum_t>(0);
+
             static constexpr auto begin() {
                 return instruction_type_array_.begin();
             }
@@ -172,6 +174,8 @@ namespace mavis_helpers {
 
             static const char* getTypeString(const enum_t type) {
                 switch(type) {
+                    case UNDEFINED:
+                        return "undef";
                     case enum_t::INT:
                         return "int";
                     case enum_t::FLOAT:

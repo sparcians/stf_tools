@@ -313,7 +313,13 @@ int main(int argc, char** argv) {
             countMavisEnums(decoder.getISAExtensions(), isa_extension_counts, p.second);
         }
         else {
-            countMavisEnums(decoder.getInstTypes(), category_counts, p.second);
+            const auto inst_types = decoder.getInstTypes();
+            if(STF_EXPECT_FALSE(inst_types == stf::enums::to_int(mavis_helpers::MavisInstTypeArray::UNDEFINED))) {
+                category_counts[mavis_helpers::MavisInstTypeArray::UNDEFINED] += p.second;
+            }
+            else {
+                countMavisEnums(inst_types, category_counts, p.second);
+            }
         }
     }
 
