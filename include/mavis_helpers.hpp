@@ -173,9 +173,11 @@ namespace mavis_helpers {
             }
 
             static const char* getTypeString(const enum_t type) {
+                if(STF_EXPECT_FALSE(type == UNDEFINED)) {
+                    return "undef";
+                }
+
                 switch(type) {
-                    case UNDEFINED:
-                        return "undef";
                     case enum_t::INT:
                         return "int";
                     case enum_t::FLOAT:
