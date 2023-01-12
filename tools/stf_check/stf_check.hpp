@@ -42,6 +42,7 @@ enum class ErrorCode : uint8_t {
     SWITCH_USR          = 18,   // switch to user mode wihtout sret/mret instr
     MEM_POINT_TO_ZERO   = 19,   // store write to vaddr zero
     DECODER_FAILURE     = 20,   // decoder failed to recognize an instruction
+    PC_DISCONTINUITY    = 21,   // pc jumps to the wrong address
     RESERVED_NUM_ERRORS
 };
 
@@ -115,6 +116,9 @@ inline std::ostream& operator<<(std::ostream& os, const ErrorCode code) {
         case ErrorCode::DECODER_FAILURE:
             os << "DECODER_FAILURE";
             return os;
+        case ErrorCode::PC_DISCONTINUITY:
+            os << "PC_DISCONTINUITY";
+            return os;
         case ErrorCode::RESERVED_NUM_ERRORS:
             break;
     };
@@ -148,6 +152,7 @@ inline ErrorCode parseErrorCode(const std::string_view err_code_str) {
         PARSER_ENTRY(SWITCH_USR),
         PARSER_ENTRY(MEM_POINT_TO_ZERO),
         PARSER_ENTRY(DECODER_FAILURE),
+        PARSER_ENTRY(PC_DISCONTINUITY)
     };
 
     const auto it = string_map.find(err_code_str);
@@ -489,7 +494,8 @@ inline const std::map<ErrorCode, const char*> ErrorTracker::error_code_msgs_ = {
     {ErrorCode::MISS_MEM_STR, "missing memory access record for store"},
     {ErrorCode::UNCOND_BR, "unconditional branch instr does not have PC target"},
     {ErrorCode::SWITCH_USR, "switch to user mode wihtout sret/mret instr"},
-    {ErrorCode::MEM_POINT_TO_ZERO, "Memory records point ot virtual address zero"}
+    {ErrorCode::MEM_POINT_TO_ZERO, "Memory records point to virtual address zero"},
+    {ErrorCode::PC_DISCONTINUITY, "PC jumps to the wrong address"}
 };
 
 /**
@@ -498,6 +504,7 @@ inline const std::map<ErrorCode, const char*> ErrorTracker::error_code_msgs_ = {
  */
 struct STFCheckConfig {
     std::string trace_filename; /**< Filename of trace to check */
+    bool skip_non_user = false; /**< If true, skip non-user mode instructions when checking the trace */
     bool print_memory_zero_warnings = false; /**< Whether we should print warnings if a memory record accesses address 0x0 */
     bool print_info = false; /**< Whether we should print trace info */
     bool check_phys_addr = true; /**< Whether we should check physical addresses */

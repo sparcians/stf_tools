@@ -19,11 +19,14 @@ else()
                          ${STF_TOOLS_PATCHES_DIR}/riscv-binutils-gdb/0002-Make-it-possible-to-override-opcodes_error_handler.patch
     )
 
+    # Set tag
+    set(BINUTILS_TAG binutils-2_39)
+
     ExternalProject_Add(
         binutils
-        GIT_REPOSITORY https://github.com/riscv-collab/riscv-binutils-gdb.git
-        GIT_TAG riscv-binutils-2.38
-        PATCH_COMMAND ${STF_TOOLS_PATCHES_DIR}/apply_patches.sh ${BINUTILS_PATCHES}
+        GIT_REPOSITORY git://sourceware.org/git/binutils-gdb.git
+        GIT_TAG ${BINUTILS_TAG}
+        PATCH_COMMAND ${STF_TOOLS_PATCHES_DIR}/apply_patches.sh ${BINUTILS_TAG} ${BINUTILS_PATCHES}
         CONFIGURE_COMMAND <SOURCE_DIR>/configure --prefix=<INSTALL_DIR> --disable-gas --disable-etc --disable-libbacktrace --disable-libdecnumber --disable-gnulib --disable-readline --disable-sim --disable-gdbserver --disable-gdbsupport --disable-gprof --disable-gdb --disable-libctf --disable-ld --disable-binutils --target=riscv64-unknown-linux-gnu
                           "CFLAGS=${BINUTILS_CFLAGS}"
                           "CPPFLAGS=${BINUTILS_CPPFLAGS}"

@@ -127,21 +127,43 @@ void opcodes_error_handler(const char* fmt, ...) {
 }
 
 /**
- * When disassembling to a string, the function that binutils will call.
+ * fprintf handler that takes a va_list of arguments
  */
-static int fprintf_wrapper(void * stream, const char * format, ... ) {
+static int vfprintf_wrapper(void * stream, const char * format, va_list args) {
     auto dis_str = static_cast<UnTabStream*>(stream);
     stf_assert(dis_str, "Disassembly failed.");
 
     dis_str->checkUnknownDisasm(format);
 
     const char* formatted_str = nullptr;
-    va_list args;
-    va_start(args, format);
     const auto retval = varListFormatter(&formatted_str, format, args);
-    va_end(args);
 
     *dis_str << formatted_str;
+
+    return retval;
+}
+
+/**
+ * When disassembling to a string, the function that binutils will call.
+ */
+static int fprintf_wrapper(void * stream, const char * format, ...) {
+    va_list args;
+    va_start(args, format);
+    const auto retval = vfprintf_wrapper(stream, format, args);
+    va_end(args);
+
+    return retval;
+}
+
+/**
+ * Binutils 2.39 added a styled fprintf option for syntax highlighting.
+ * Right now this is a stub that will call the existing (unformatted) fprintf handler.
+ */
+static int fprintf_styled_wrapper(void * stream, enum disassembler_style, const char * format, ...) {
+    va_list args;
+    va_start(args, format);
+    const auto retval = vfprintf_wrapper(stream, format, args);
+    va_end(args);
 
     return retval;
 }
@@ -226,7 +248,10 @@ namespace binutils_wrapper {
             DisassemblerInternals(const std::string& riscv_isa_str, const bool use_aliases) :
                 disasm_func_(initDisasmFunc(riscv_isa_str))
             {
-                init_disassemble_info (&dis_info_, 0, static_cast<fprintf_ftype>(fprintf_wrapper));
+                init_disassemble_info (&dis_info_,
+                                       0,
+                                       static_cast<fprintf_ftype>(fprintf_wrapper),
+                                       static_cast<fprintf_styled_ftype>(fprintf_styled_wrapper));
                 dis_info_.read_memory_func = readMemoryWrapper_;
                 dis_info_.application_data = static_cast<void*>(this);
                 dis_info_.mach = bfd_mach_riscv64;

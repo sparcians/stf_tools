@@ -9,7 +9,7 @@
 
 namespace mavis_helpers {
     namespace __mavis_array {
-        static constexpr size_t NUM_INSTRUCTION_TYPES_ = 31;
+        static constexpr size_t NUM_INSTRUCTION_TYPES_ = 33;
 
         using IType = mavis::InstMetaData::InstructionTypes;
         using InstructionTypeArray = std::array<IType, NUM_INSTRUCTION_TYPES_>;
@@ -47,6 +47,8 @@ namespace mavis_helpers {
                 IType::FAULTFIRST,
                 IType::WHOLE,
                 IType::MASK,
+                IType::WIDENING,
+                IType::HYPERVISOR,
                 IType::CACHE,
                 IType::ATOMIC,
                 IType::FENCE,
@@ -88,6 +90,8 @@ namespace mavis_helpers {
                     case IType::FENCE:
                     case IType::SYSTEM:
                     case IType::CSR:
+                    case IType::WIDENING:
+                    case IType::HYPERVISOR:
                         break;
                 };
             }
@@ -158,6 +162,8 @@ namespace mavis_helpers {
             using enum_t = __mavis_array::IType;
             using int_t = stf::enums::int_t<enum_t>;
 
+            static constexpr enum_t UNDEFINED = static_cast<enum_t>(0);
+
             static constexpr auto begin() {
                 return instruction_type_array_.begin();
             }
@@ -168,6 +174,8 @@ namespace mavis_helpers {
 
             static const char* getTypeString(const enum_t type) {
                 switch(type) {
+                    case UNDEFINED:
+                        return "undef";
                     case enum_t::INT:
                         return "int";
                     case enum_t::FLOAT:
@@ -220,6 +228,10 @@ namespace mavis_helpers {
                         return "whole";
                     case enum_t::MASK:
                         return "mask";
+                    case enum_t::WIDENING:
+                        return "widening";
+                    case enum_t::HYPERVISOR:
+                        return "hypervisor";
                     case enum_t::CACHE:
                         return "cache";
                     case enum_t::ATOMIC:
