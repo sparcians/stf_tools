@@ -20,7 +20,7 @@ else()
     )
 
     # Set tag
-    set(BINUTILS_TAG binutils-2_39)
+    set(BINUTILS_TAG binutils-2_40)
 
     ExternalProject_Add(
         binutils
