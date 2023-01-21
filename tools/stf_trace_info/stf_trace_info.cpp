@@ -101,20 +101,28 @@ static void parseCommandLine(int argc,
         parser.assertCondition(trace_info.isVersionSet(), "Need to specify trace info versions and features");
 
         // check features;
-        uint64_t supported = stf::enums::to_int(stf::TRACE_FEATURES::STF_CONTAIN_PHYSICAL_ADDRESS)      |
-                             stf::enums::to_int(stf::TRACE_FEATURES::STF_CONTAIN_DATA_ATTRIBUTE)        |
-                             stf::enums::to_int(stf::TRACE_FEATURES::STF_CONTAIN_OPERAND_VALUE)         |
-                             stf::enums::to_int(stf::TRACE_FEATURES::STF_CONTAIN_EVENT)                 |
-                             stf::enums::to_int(stf::TRACE_FEATURES::STF_CONTAIN_SYSTEMCALL_VALUE)      |
-                             stf::enums::to_int(stf::TRACE_FEATURES::STF_CONTAIN_RV64)                  |
-                             stf::enums::to_int(stf::TRACE_FEATURES::STF_CONTAIN_INT_DIV_OPERAND_VALUE) |
-                             stf::enums::to_int(stf::TRACE_FEATURES::STF_CONTAIN_SAMPLING)              |
-                             stf::enums::to_int(stf::TRACE_FEATURES::STF_CONTAIN_PTE)                   |
-                             stf::enums::to_int(stf::TRACE_FEATURES::STF_CONTAIN_SIMPOINT)              |
-                             stf::enums::to_int(stf::TRACE_FEATURES::STF_CONTAIN_PROCESS_ID)            |
-                             stf::enums::to_int(stf::TRACE_FEATURES::STF_CONTAIN_PTE_ONLY)              |
-                             stf::enums::to_int(stf::TRACE_FEATURES::STF_NEED_POST_PROCESS)             |
-                             stf::enums::to_int(stf::TRACE_FEATURES::STF_CONTAIN_REG_STATE);
+        const uint64_t supported = stf::enums::to_int(stf::TRACE_FEATURES::STF_CONTAIN_PHYSICAL_ADDRESS)      |
+                                   stf::enums::to_int(stf::TRACE_FEATURES::STF_CONTAIN_DATA_ATTRIBUTE)        |
+                                   stf::enums::to_int(stf::TRACE_FEATURES::STF_CONTAIN_OPERAND_VALUE)         |
+                                   stf::enums::to_int(stf::TRACE_FEATURES::STF_CONTAIN_EVENT)                 |
+                                   stf::enums::to_int(stf::TRACE_FEATURES::STF_CONTAIN_SYSTEMCALL_VALUE)      |
+                                   stf::enums::to_int(stf::TRACE_FEATURES::STF_CONTAIN_RV64)                  |
+                                   stf::enums::to_int(stf::TRACE_FEATURES::STF_CONTAIN_INT_DIV_OPERAND_VALUE) |
+                                   stf::enums::to_int(stf::TRACE_FEATURES::STF_CONTAIN_SAMPLING)              |
+                                   stf::enums::to_int(stf::TRACE_FEATURES::STF_CONTAIN_PTE)                   |
+                                   stf::enums::to_int(stf::TRACE_FEATURES::STF_CONTAIN_SIMPOINT)              |
+                                   stf::enums::to_int(stf::TRACE_FEATURES::STF_CONTAIN_PROCESS_ID)            |
+                                   stf::enums::to_int(stf::TRACE_FEATURES::STF_CONTAIN_PTE_ONLY)              |
+                                   stf::enums::to_int(stf::TRACE_FEATURES::STF_NEED_POST_PROCESS)             |
+                                   stf::enums::to_int(stf::TRACE_FEATURES::STF_CONTAIN_REG_STATE)             |
+                                   // not supported yet
+                                   //stf::enums::to_int(stf::TRACE_FEATURES::STF_CONTAIN_MICROOP)               |
+                                   //stf::enums::to_int(stf::TRACE_FEATURES::STF_CONTAIN_MULTI_THREAD)          |
+                                   //stf::enums::to_int(stf::TRACE_FEATURES::STF_CONTAIN_MULTI_CORE)            |
+                                   //stf::enums::to_int(stf::TRACE_FEATURES::STF_CONTAIN_PTE_HW_AD)             |
+                                   stf::enums::to_int(stf::TRACE_FEATURES::STF_CONTAIN_VEC)                   |
+                                   stf::enums::to_int(stf::TRACE_FEATURES::STF_CONTAIN_EVENT64)               |
+                                   stf::enums::to_int(stf::TRACE_FEATURES::STF_CONTAIN_TRANSACTIONS);
         if (trace_features.getFeatures() & ~supported) {
             std::cerr << "Warning: Some bits of features are not supported. Ignored!" << std::endl;
         }
