@@ -184,6 +184,9 @@ int main (int argc, char **argv) {
         for(const auto& i: reader.getTraceInfo()) {
             std::cerr << *i << std::endl;
         }
+        if(const auto& features = reader.getTraceFeatures()) {
+            std::cerr << *features << std::endl;
+        }
     }
 
     if(writer) {
