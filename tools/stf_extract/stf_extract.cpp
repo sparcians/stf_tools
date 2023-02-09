@@ -38,8 +38,8 @@ static STFExtractConfig parse_command_line (int argc, char **argv)
     //parser.appendHelpText("    -b <n> -e <m> -o <output> <input> -- write instructions [<n>, <m>) from <input> to <output>");
     parser.appendHelpText("    -s <n> -k <m> -o <output> <input> -- skip the first <n> instructions and write the next <m> to <output>");
     parser.appendHelpText("    -s <n> -o <output> <input> -- skip the first <n> instructions and write the rest to <output>");
-    parser.appendHelpText("    -s <n> -t <m> <output> <input> -- skip the first <n> instructions and write every <m> instructions to <output.xxxxx.inst.stf.xz>");
-    parser.appendHelpText("    -t <m> -o <output> <input> -- write every <m> instructions to <output.xxxxx.inst.stf.xz>");
+    parser.appendHelpText("    -s <n> -t <m> <output> <input> -- skip the first <n> instructions and write every <m> instructions to <output.xxxxx.zstf>");
+    parser.appendHelpText("    -t <m> -o <output> <input> -- write every <m> instructions to <output.xxxxx.zstf>");
 
     parser.setMutuallyExclusive('k', 't');
 
