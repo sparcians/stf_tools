@@ -75,24 +75,26 @@ int main(int argc, char* argv[]) {
         trace_tools::CommandLineParser parser("stf_bench");
         parser.addFlag('r', "reader", "Reader to test (0 = all, 1 = STFReader, 2 = STFInstReader, 3 = STFBranchReader)");
         parser.addFlag('u', "Skip non-user instructions (will not apply to STFReader)");
+        parser.addFlag('p', "Enable page table tracking");
         parser.addPositionalArgument("trace", "STF to test with");
         parser.parseArguments(argc, argv);
 
         const bool skip_non_user = parser.hasArgument('u');
+        const bool track_page_table_entries = parser.hasArgument('p');
         parser.getArgumentValue('r', reader);
         const auto trace = parser.getPositionalArgument<std::string>(0);
 
         switch(reader) {
             case 0:
                 readerBench<stf::STFReader>(trace);
-                readerBench<stf::STFInstReader>(trace, skip_non_user);
+                readerBench<stf::STFInstReader>(trace, skip_non_user, track_page_table_entries);
                 readerBench<stf::STFBranchReader>(trace, skip_non_user);
                 break;
             case 1:
                 readerBench<stf::STFReader>(trace);
                 break;
             case 2:
-                readerBench<stf::STFInstReader>(trace, skip_non_user);
+                readerBench<stf::STFInstReader>(trace, skip_non_user, track_page_table_entries);
                 break;
             case 3:
                 readerBench<stf::STFBranchReader>(trace, skip_non_user);
