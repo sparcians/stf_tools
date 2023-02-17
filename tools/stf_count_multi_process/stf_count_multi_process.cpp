@@ -61,7 +61,9 @@ int main(int argc, char* argv[]) {
 
         try {
             stf::STFRecord::UniqueHandle rec;
+#ifdef COUNT_CONTEXT_SWITCHES
             uint64_t num_context_switches = 0;
+#endif
             uint64_t cur_satp = 0;
 
             while(reader >> rec) {
@@ -75,6 +77,7 @@ int main(int argc, char* argv[]) {
                         cur_satp = new_satp_value;
                     }
                 }
+#ifdef COUNT_CONTEXT_SWITCHES
                 else if(STF_EXPECT_FALSE(rec->getId() == stf::descriptors::internal::Descriptor::STF_EVENT)) {
                     const auto& event_rec = rec->as<stf::EventRecord>();
                     if(event_rec.isModeChange()) {
@@ -84,6 +87,7 @@ int main(int argc, char* argv[]) {
                         }
                     }
                 }
+#endif
                 else if(STF_EXPECT_FALSE(rec->isInstructionRecord())) {
                     ++process_instruction_counts[cur_satp][trace_id];
                     ++num_insts;
