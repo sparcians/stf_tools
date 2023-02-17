@@ -18,6 +18,7 @@
 #include "print_utils.hpp"
 #include "stf_dump.hpp"
 #include "stf_inst_reader.hpp"
+#include "stf_page_table.hpp"
 #include "tools_util.hpp"
 //#include "STFSymTab.hpp"
 
@@ -178,18 +179,13 @@ int main (int argc, char **argv)
             if (stf::format_utils::showPhys()) {
                 // Make sure we zero-fill as needed, so that the address remains "virt:phys" and not "virt:  phys"
                 std::cout << ':';
-                //stf::print_utils::printPA(inst.physPc());
+                stf::print_utils::printPA(inst.getPA(inst.pc()));
             }
             stf::print_utils::printSpaces(1);
 
             if (STF_EXPECT_FALSE(inst.isTakenBranch())) {
                 std::cout << "PC ";
                 stf::print_utils::printVA(inst.branchTarget());
-                if (stf::format_utils::showPhys()) {
-                    std::cout << ':';
-                    //stf::print_utils::printPA(inst.physBranchTarget());
-                    stf::print_utils::printSpaces(stf::format_utils::PA_WIDTH);
-                }
                 stf::print_utils::printSpaces(1);
             }
             else if(STF_EXPECT_FALSE(config.concise_mode && (inst.isFault() || inst.isInterrupt()))) {
