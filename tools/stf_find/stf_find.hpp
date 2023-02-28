@@ -51,6 +51,8 @@ class STFFindConfig {
         uint64_t addr_mask = std::numeric_limits<uint64_t>::max();
         uint64_t start_inst = 0;
         uint64_t end_inst = 0;
+        uint64_t max_matches = std::numeric_limits<uint64_t>::max();
+        bool skip_non_user = false;
         bool summary = false;
         bool per_iter = false;
         bool print_extra = false;
@@ -69,6 +71,7 @@ class STFFindConfig {
         STFFindConfig(int argc, char **argv) {
             // Parse options
             trace_tools::CommandLineParser parser("stf_find");
+            parser.addFlag('u', "skip non-user instructions");
             parser.addMultiFlag('a', "addr", "find instructions at the specified address");
             parser.addMultiFlag('m', "addr", "find memory accesses at this address");
             parser.addMultiFlag('p', "addr", "find memory accesses at this physical address");
@@ -78,6 +81,7 @@ class STFFindConfig {
             parser.addFlag('S', "inst", "skip to instruction # <inst>");
             parser.addFlag('E', "inst", "stop after instruction # <inst>");
             parser.addFlag('I', "per-Iter:  show instructions between these markers, per iter, concisely.");
+            parser.addFlag('c', "count", "stop after <count> matches");
             parser.addPositionalArgument("trace", "trace in STF format");
             parser.parseArguments(argc, argv);
 
@@ -102,7 +106,9 @@ class STFFindConfig {
             parser.getArgumentValue<uint64_t, 16>('M', addr_mask);
             parser.getArgumentValue('S', start_inst);
             parser.getArgumentValue('E', end_inst);
+            parser.getArgumentValue('c', max_matches);
             print_extra = parser.hasArgument('e');
+            skip_non_user = parser.hasArgument('u');
             summary = parser.hasArgument('s');
             per_iter = parser.hasArgument('I');
 

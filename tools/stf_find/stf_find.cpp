@@ -19,13 +19,15 @@ int main (int argc, char **argv)
     try {
         STFFindConfig config(argc, argv);
 
-        stf::STFInstReader stf_reader(config.trace_filename);
+        stf::STFInstReader stf_reader(config.trace_filename, config.skip_non_user);
 
         AddrMap::iterator amit;
 
         const auto start_inst = config.start_inst ? (config.start_inst - 1) : 0;
 
+        uint64_t num_matches = 0;
         for (auto it = stf_reader.begin(start_inst); it != stf_reader.end(); ++it) {
+            bool found_match = false;
             const auto& inst = *it;
 
             if (!inst.valid()) {
@@ -55,6 +57,8 @@ int main (int argc, char **argv)
 
                 amit->second.last_index = index;
                 amit->second.count++;
+
+                found_match = true;
 
                 if (!config.summary && !config.per_iter) {
                     std::cout << "0x";
@@ -108,6 +112,8 @@ int main (int argc, char **argv)
                     pmit->second.count++;
                 }*/
 
+                found_match |= mem_found;
+
                 if (mem_found && !config.summary && !config.per_iter) {
                     stf::print_utils::printVA(mem_access.getAddress());
                     // FIXME: print PA
@@ -118,7 +124,9 @@ int main (int argc, char **argv)
                 }
             }
 
-            if (index == config.end_inst) {
+            num_matches += found_match;
+
+            if (index == config.end_inst || num_matches == config.max_matches) {
                 break;
             }
         }
