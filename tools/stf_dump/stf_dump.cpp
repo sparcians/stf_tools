@@ -133,13 +133,6 @@ int main (int argc, char **argv)
             }
         }
 
-        if (config.show_pte) {
-            for (auto it = stf_reader.pteBegin(); it != stf_reader.pteEnd(); ++it) {
-                const auto& pte = *it;
-                std::cout << pte;
-            }
-        }
-
         uint32_t tid_prev = std::numeric_limits<uint32_t>::max();
         uint32_t pid_prev = std::numeric_limits<uint32_t>::max();
         uint32_t asid_prev = std::numeric_limits<uint32_t>::max();
