@@ -38,6 +38,7 @@
 #include "command_line_parser.hpp"
 #include "stf_check.hpp"
 #include "stf_decoder.hpp"
+#include "stf_enums.hpp"
 #include "stf_inst_reader.hpp"
 #include "tools_util.hpp"
 
@@ -50,7 +51,7 @@ static STFCheckConfig parse_command_line (int argc, char **argv) {
     parser.addFlag('d', "print out memory point to zero errors");
     parser.addFlag('p', "print trace info");
     parser.addFlag('P', "check prefetch memory address");
-    parser.addFlag('n', "skip checking for phsyical address");
+    parser.addFlag('n', "skip checking for physical address");
     parser.addFlag('v', "always print error counts at the end");
     parser.addFlag('e', "M", "end checking at M-th instruction");
     parser.addMultiFlag('i', "err", "ignore the specified error type");
@@ -145,19 +146,13 @@ int main (int argc, char **argv) {
         ThreadMapKey thread_id;
 
         // Open stf trace reader
-        stf::STFInstReader stf_reader(config.trace_filename, config.skip_non_user);
+        stf::STFInstReader stf_reader(config.trace_filename, config.skip_non_user, config.check_phys_addr);
         stf::STFDecoder decoder(stf_reader.getInitialIEM());
         /* FIXME Because we have not kept up with STF versioning, this is currently broken and must be loosened.
         if (!stf_reader.checkVersion()) {
             exit(1);
         }
         */
-
-        // Count the pte entries in the header.
-        /* This check for pte entries in the header is incorrect; Current assumption is that ptes in the header doesn't matter
-        for (stf::STFInstReader::pte_iterator it = stf_reader.pteBegin(); it != stf_reader.pteEnd(); it ++) {
-            hdr_pte_count++;
-        }*/
 
         const auto it = stf_reader.begin();
         // Get initial trace thread info
@@ -223,12 +218,12 @@ int main (int argc, char **argv) {
             decoder.decode(inst_prev.opcode());
 
             //check if trace has physical address translations
-            /*if (check_phys_addr && ((trace_features & STF_CONTAIN_PHYSICAL_ADDRESS) == 0)) {
-                stringstream msg;
-msg     << "STF_CONTAIN_PHYSICAL_ADDRESS not set, but is required as part of the default tracing configuration";
-                ecount.phys_addr_9++;
-                reportError(msg.str().c_str(), 9);
-            }*/
+            if (config.check_phys_addr && !trace_features->hasFeature(stf::TRACE_FEATURES::STF_CONTAIN_PHYSICAL_ADDRESS)) {
+                ecount.countError(ErrorCode::PHYS_ADDR);
+                auto& msg = ecount.reportError(ErrorCode::PHYS_ADDR);
+                stf::format_utils::formatDecLeft(msg, inst.index(), MAX_COUNT_LENGTH);
+                msg << "STF_CONTAIN_PHYSICAL_ADDRESS not set, but is required as part of the default tracing configuration" << std::endl;
+            }
 
             const auto& prev_events = inst_prev.getEvents();
 
@@ -369,73 +364,71 @@ msg     << "STF_CONTAIN_PHYSICAL_ADDRESS not set, but is required as part of the
                     msg << "The Instruction accesses memory. But there is no memory access attribute record at instruction index " << inst.index() << std::endl;
                 }
 
-                // Commenting this out for now until we get translation figured out
-#if 0
                 // Check to see if paddr is valid.
 
-                if (mem_access.isPhysAddrValid()) {
+                if (mem_access.addressTranslationEnabled()) {
                     pa_count++;
+                    const uint64_t phys_addr = mem_access.getPhysAddress();
 
-                    // Verify paddr is not 0.
-                    if (mem_access.paddr == 0) {
-                        // check if the instruction is PLD instr;
-                        bool isPLDInstr = false;
-                        // Commenting this out for now since RISC-V doesn't have software prefetches
-                        /*
-                        OpcodeList::iterator oit = pldOpcodes.begin();
-                        for (;oit != pldOpcodes.end(); oit++) {
-                            if (oit->decodeOpcode(inst.opcode())) {
-                                isPLDInstr = true;
+                    if(phys_addr == 0) {
+                        bool is_ls_fault = false;
+                        for(const auto& event: inst.getEvents()) {
+                            switch(event.getEvent()) {
+                                case stf::EventRecord::TYPE::LOAD_ACCESS_FAULT:
+                                case stf::EventRecord::TYPE::STORE_ACCESS_FAULT:
+                                case stf::EventRecord::TYPE::LOAD_PAGE_FAULT:
+                                case stf::EventRecord::TYPE::STORE_PAGE_FAULT:
+                                    is_ls_fault = true;
+                                    break;
+                                default:
+                                    break;
+                            }
+                            if(STF_EXPECT_FALSE(is_ls_fault)) {
                                 break;
                             }
                         }
-                        */
-                        if (!isPLDInstr) {
-                            std::stringstream msg;
-                            msg << "PA == 0 at instruction index " << std::dec << inst.index();
-                            std::cerr << "stf_check: WARNING " << std::dec << 6 << ": " << msg.str().c_str() << std::endl;   // Send message to stderr.
-                            return_code = 6;
-                            ecount.pa_eq_0_6++;
-                            //print out error but don't exit or send exit code
-                            //reportError(msg.str().c_str(), 6);
+                        if(!is_ls_fault) {
+                            ecount.countError(ErrorCode::PA_EQ_0);
+                            auto& msg = ecount.reportError(ErrorCode::PA_EQ_0);
+                            msg << "PA == 0 at instruction index " << std::dec << inst.index() << std::endl;
                         }
-                    } else if ((mem_access.paddr & 0xfff) != (mem_access.addr & 0xfff)) {
-                        std::stringstream msg;
-                        msg << "PA & 0xfff != VA & 0xfff at instruction index " << std::dec << inst.index();
-                        ecount.pa_ne_va_7++;
-                        reportError(msg.str().c_str(), 7);
+                    }
+                    else if ((phys_addr & 0xfff) != (mem_access.getAddress() & 0xfff)) {
+                        ecount.countError(ErrorCode::PA_NE_VA);
+                        auto& msg = ecount.reportError(ErrorCode::PA_NE_VA);
+                        msg << "PA & 0xfff != VA & 0xfff at instruction index " << std::dec << inst.index() << std::endl;
                     }
                 }
-#endif
             }
 
-            // Commenting this out until we get translation figured out
-            /*
-            // Check for invalid inst_phys_pc value.
-            if (inst.physPc() == 0xffffffff) {
-                // Scan all event entries to check if this instruction was aborted due to a code page fault.
-                bool bPrefetchAbort = false;
-
-                if (inst.numEvents() > 0) {
-                    for (stf::STFInst::event_const_iterator eit = inst.eventBegin(); eit != inst.eventEnd(); eit++) {
-                        if ((*eit).event == STF_EVENT_PREFETCH_ABORT) {
-                            bPrefetchAbort = true;
+            if(inst.addressTranslationEnabled()) {
+                // Check for invalid inst_phys_pc value.
+                if (inst.physPc() == 0) {
+                    // Scan all event entries to check if this instruction was aborted due to a code page fault.
+                    bool is_inst_fault = false;
+                    for(const auto& event: inst.getEvents()) {
+                        switch(event.getEvent()) {
+                            case stf::EventRecord::TYPE::INST_ADDR_FAULT:
+                            case stf::EventRecord::TYPE::INST_PAGE_FAULT:
+                                is_inst_fault = true;
+                                break;
+                            default:
+                                break;
                         }
-
+                        if(STF_EXPECT_FALSE(is_inst_fault)) {
+                            break;
+                        }
+                    }
+                    if(!is_inst_fault) {
+                        ecount.countError(ErrorCode::INVALID_PHYS);
+                        auto& msg = ecount.reportError(ErrorCode::INVALID_PHYS);
+                        msg << "Invalid phys PC value at index " << std::dec << inst.index() << std::endl;
                     }
                 }
-
-                // If this was a code page fault, then ignore any PC errors.
-                if (!bPrefetchAbort) {
-                    std::stringstream msg;
-                    msg << "Invalid phys PC value at index " << std::dec << inst.index();
-                    ecount.invalid_phys_8++;
-                    reportError(msg.str().c_str(), 8);
+                else {
+                    phys_pc_count++;
                 }
-            } else if (inst.physPc() != 0xffffffffffffffff) {
-                phys_pc_count++;
             }
-            */
 
             // Check for embedded PTEs
             embed_pte_count += inst.getEmbeddedPTEs().size();
