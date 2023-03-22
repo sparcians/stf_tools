@@ -21,8 +21,6 @@ int main (int argc, char **argv)
 
         stf::STFInstReader stf_reader(config.trace_filename, config.skip_non_user);
 
-        AddrMap::iterator amit;
-
         const auto start_inst = config.start_inst ? (config.start_inst - 1) : 0;
 
         uint64_t num_matches = 0;
@@ -42,21 +40,19 @@ int main (int argc, char **argv)
 
             uint64_t index = inst.index();
 
-            // masking off the low bits -- fix me
-            uint64_t key = (inst.pc() & ~0x1ULL) & config.addr_mask;
-
-            // Search for instruction matches
-            amit = config.amap.find(key);
-
             const auto& mem_accesses = inst.getMemoryAccesses();
 
-            if (amit != config.amap.end()) {
-                if (!amit->second.first_index) {
-                    amit->second.first_index = index;
+            // Search for instruction matches
+            // masking off the low bits -- fix me
+            const uint64_t key = inst.pc() & ~0x1ULL;
+
+            if (const auto it = config.findAddress(config.amap, inst.pc()); it != config.amap.end()) {
+                if (!it->second.first_index) {
+                    it->second.first_index = index;
                 }
 
-                amit->second.last_index = index;
-                amit->second.count++;
+                it->second.last_index = index;
+                it->second.count++;
 
                 found_match = true;
 
@@ -83,34 +79,29 @@ int main (int argc, char **argv)
             }
 
             for (const auto& mem_access: mem_accesses) {
-                key = mem_access.getAddress() & config.addr_mask;
-
-                amit = config.mmap.find(key);
-                // TODO: implement translation
-                //const auto pmit = config.pmap.find(mit->paddr & config.addr_mask);
-
                 bool mem_found = false;
 
-                if (amit != config.mmap.end()) {
+                // Search for VA
+                if (const auto it = config.findAddress(config.mmap, mem_access.getAddress()); it != config.mmap.end()) {
                     mem_found = true;
 
-                    if (!amit->second.first_index)
-                        amit->second.first_index = index;
+                    if (!it->second.first_index)
+                        it->second.first_index = index;
 
-                    amit->second.last_index = index;
-                    amit->second.count++;
+                    it->second.last_index = index;
+                    it->second.count++;
 
                 }
-                // TODO: implement tranlsation
-                /*else if (pmit != config.pmap.end()) {
+                // Search for PA
+                else if (const auto it = config.findAddress(config.pmap, mem_access.getPhysAddress()); it != config.pmap.end()) {
                     mem_found = true;
 
-                    if (!pmit->second.first_index)
-                        pmit->second.first_index = index;
+                    if (!it->second.first_index)
+                        it->second.first_index = index;
 
-                    pmit->second.last_index = index;
-                    pmit->second.count++;
-                }*/
+                    it->second.last_index = index;
+                    it->second.count++;
+                }
 
                 found_match |= mem_found;
 
@@ -136,15 +127,15 @@ int main (int argc, char **argv)
         }
 
         if (config.per_iter) {
-            for (amit = config.amap.begin(); amit != config.amap.end(); ++amit) {
-                stf_assert(amit->second.count >= 2,
+            for (auto it = config.amap.begin(); it != config.amap.end(); ++it) {
+                stf_assert(it->second.count >= 2,
                            "ERROR:  " << argv[0]
                                       << ":  Only found less than one full iteration, using address 0x"
-                                      << std::hex << std::setw(16) << amit->first);
-                uint64_t delta_insts = amit->second.last_index - amit->second.first_index;
-                stf::print_utils::printFloat(static_cast<float>(delta_insts) / static_cast<float>(amit->second.count - 1), 6, 2);
+                                      << std::hex << std::setw(16) << it->first);
+                uint64_t delta_insts = it->second.last_index - it->second.first_index;
+                stf::print_utils::printFloat(static_cast<float>(delta_insts) / static_cast<float>(it->second.count - 1), 6, 2);
                 std::cout << " instructions/iter using 0x";
-                stf::print_utils::printVA(amit->first);
+                stf::print_utils::printVA(it->first);
                 std::cout << std::endl;
             }
         }

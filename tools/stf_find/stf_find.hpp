@@ -128,4 +128,8 @@ class STFFindConfig {
                 validateAddr_(elem.first, addr_mask);
             }
         }
+
+        inline AddrMap::iterator findAddress(AddrMap& map, const uint64_t addr) const {
+            return map.find(addr & addr_mask);
+        }
 };
