@@ -101,7 +101,7 @@ int main (int argc, char **argv)
         const STFDumpConfig config = parseCommandLine (argc, argv);
 
         // Open stf trace reader
-        stf::STFInstReader stf_reader(config.trace_filename, config.user_mode_only);
+        stf::STFInstReader stf_reader(config.trace_filename, config.user_mode_only, stf::format_utils::showPhys());
         stf_reader.checkVersion();
 
         // Create disassembler
@@ -172,13 +172,17 @@ int main (int argc, char **argv)
             if (stf::format_utils::showPhys()) {
                 // Make sure we zero-fill as needed, so that the address remains "virt:phys" and not "virt:  phys"
                 std::cout << ':';
-                stf::print_utils::printPA(inst.getPA(inst.pc()));
+                stf::print_utils::printPA(inst.physPc());
             }
             stf::print_utils::printSpaces(1);
 
             if (STF_EXPECT_FALSE(inst.isTakenBranch())) {
                 std::cout << "PC ";
                 stf::print_utils::printVA(inst.branchTarget());
+                if (stf::format_utils::showPhys()) {
+                    std::cout << ':';
+                    stf::print_utils::printPA(inst.physBranchTarget());
+                }
                 stf::print_utils::printSpaces(1);
             }
             else if(STF_EXPECT_FALSE(config.concise_mode && (inst.isFault() || inst.isInterrupt()))) {
