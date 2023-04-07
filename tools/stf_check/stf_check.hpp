@@ -6,7 +6,6 @@
 #include <unordered_map>
 #include <unordered_set>
 
-#include "boost_wrappers/setup.hpp"
 #include <boost/container_hash/hash.hpp>
 
 #include "print_utils.hpp"
