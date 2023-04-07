@@ -5,7 +5,6 @@
 #include <string_view>
 #include <unordered_map>
 
-#include "boost_wrappers/setup.hpp"
 #include <boost/dynamic_bitset.hpp>
 #include "boost_wrappers/flat_map.hpp"
 #include <H5Cpp.h>
