@@ -10,9 +10,9 @@ else()
     set(BINUTILS_CXXFLAGS ${CMAKE_CXX_FLAGS})
 
     if (CMAKE_BUILD_TYPE MATCHES "^[Dd]ebug")
-        set(BINUTILS_CFLAGS "${BINUTILS_CFLAGS} -O0 -g")
-        set(BINUTILS_CPPFLAGS "${BINUTILS_CPPFLAGS} -O0 -g")
-        set(BINUTILS_CXXFLAGS "${BINUTILS_CXXFLAGS} -O0 -g")
+        set(BINUTILS_CFLAGS ${BINUTILS_CFLAGS} -O0 -g)
+        set(BINUTILS_CPPFLAGS ${BINUTILS_CPPFLAGS} -O0 -g)
+        set(BINUTILS_CXXFLAGS ${BINUTILS_CXXFLAGS} -O0 -g)
     endif()
 
     set(BINUTILS_PATCHES ${STF_TOOLS_PATCHES_DIR}/riscv-binutils-gdb/0001-Add-riscv_get_disassembler_arch-function.patch

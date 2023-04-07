@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.17)
-project (stf_tools CXX)
+project (stf_tools C CXX)
 
 set (CMAKE_CXX_STANDARD 17)
 set (CMAKE_CXX_STANDARD_REQUIRED ON)
