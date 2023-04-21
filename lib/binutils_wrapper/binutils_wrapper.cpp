@@ -21,6 +21,8 @@
 extern "C" {
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wconversion"
+#pragma GCC diagnostic ignored "-Wpragmas"
+#pragma GCC diagnostic ignored "-Wpedantic"
 #include "disassemble.h"
 #pragma GCC diagnostic pop
 }
