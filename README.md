@@ -23,10 +23,17 @@ cd debug
 cmake .. -DCMAKE_BUILD_TYPE=Debug
 make
 ```
-
+Ensure you have cython installed on your machine, can be done easily using
+```
+pip3 install cython
+```
 OS X users may need to add the following to their `cmake` invocation if Python was installed via Homebrew:
 ```
 -DPYTHON_LIBRARY=$(python3-config --prefix)/lib/libpython3.8.dylib -DPYTHON_INCLUDE_DIR=$(python3-config --prefix)/include/python3.8
+```
+Ubuntu users may need to install the following dependency for binutils
+```
+sudo apt-get install libmpc-dev
 ```
 
 ## RISC-V Disassembly Support
