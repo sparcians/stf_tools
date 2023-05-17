@@ -19,6 +19,12 @@ int main(int argc, char** argv) {
     writer << stf::protocols::TileLink::makeTransactionWithDelta<stf::protocols::tilelink::ChannelD>(id_manager, 30, 16, 17, 18, 19, 20, std::vector<uint8_t>({0xab, 0xcd}));
     writer << stf::protocols::TileLink::makeTransactionWithDelta<stf::protocols::tilelink::ChannelE>(id_manager, 40, 21);
 
+    auto transaction_with_metadata = stf::protocols::TileLink::makeTransaction<stf::protocols::tilelink::ChannelA>(id_manager, 1, 2, 3, 4, 5);
+
+    transaction_with_metadata.getMetadata().append(0xffffeeeeddddcccc);
+
+    writer << transaction_with_metadata;
+
     writer.close();
 
     stf::STFTransactionReader reader("test.zstf", stf::protocols::ProtocolId::TILELINK);
