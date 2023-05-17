@@ -65,7 +65,7 @@ class STFTransactionExtractor {
         /**
          * \brief extract max_transaction_count transactions; and update TLB page table;
          */
-        uint64_t extractInstr_(const uint64_t max_transaction_count, const bool modify_header) {
+        uint64_t extractTxn_(const uint64_t max_transaction_count, const bool modify_header) {
             uint64_t count = 0;
 
             // Indicate the input file had been read in the past;
@@ -127,7 +127,7 @@ class STFTransactionExtractor {
                     stf_writer_.open(cur_output_file);
                     stf_assert(stf_writer_, "Error: Failed to open output " << cur_output_file);
 
-                    transaction_written = extractInstr_(split_count, modify_header);
+                    transaction_written = extractTxn_(split_count, modify_header);
                     modify_header = true;
                     stf_writer_.close();
 
@@ -143,7 +143,7 @@ class STFTransactionExtractor {
 
                 stf_writer_.open(output_filename);
                 stf_assert(stf_writer_, "Error: Failed to open output " << output_filename);
-                extractInstr_(head_count, overall_transaction_count);
+                extractTxn_(head_count, overall_transaction_count);
                 stf_writer_.close();
             }
         }
