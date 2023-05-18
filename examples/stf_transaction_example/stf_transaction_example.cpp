@@ -22,17 +22,24 @@ int main(int argc, char** argv) {
     {
         auto transaction_with_metadata = stf::protocols::TileLink::makeTransaction<stf::protocols::tilelink::ChannelA>(id_manager, 1, 2, 3, 4, 5);
 
-        transaction_with_metadata.getMetadata().append(0xffffeeeeddddcccc);
+        transaction_with_metadata.getMetadata().append<uint8_t>(0xcc);
+        transaction_with_metadata.getMetadata().append<uint8_t>(0xcc);
+        transaction_with_metadata.getMetadata().append<uint8_t>(0xdd);
+        transaction_with_metadata.getMetadata().append<uint8_t>(0xdd);
+        transaction_with_metadata.getMetadata().append<uint8_t>(0xee);
+        transaction_with_metadata.getMetadata().append<uint8_t>(0xee);
+        transaction_with_metadata.getMetadata().append<uint8_t>(0xff);
+        transaction_with_metadata.getMetadata().append<uint8_t>(0xff);
 
         writer << transaction_with_metadata;
     }
 
-    // Same as the last transaction, but change the metadata type to uint64_t
+    // Same as the last transaction, but change the metadata type to uint64_t and append a single uint8_t
     {
         auto transaction_with_metadata = stf::protocols::TileLink::makeTransaction<stf::protocols::tilelink::ChannelA>(id_manager, 1, 2, 3, 4, 5);
 
-        transaction_with_metadata.getMetadata().setType<uint64_t>();
-        transaction_with_metadata.getMetadata().append(0xffffeeeeddddcccc);
+        transaction_with_metadata.getMetadata().append<uint64_t>(0xffffeeeeddddcccc);
+        transaction_with_metadata.getMetadata().append<uint8_t>(0xaa);
 
         writer << transaction_with_metadata;
     }
