@@ -27,7 +27,7 @@ else()
         GIT_REPOSITORY git://sourceware.org/git/binutils-gdb.git
         GIT_TAG ${BINUTILS_TAG}
         PATCH_COMMAND ${STF_TOOLS_PATCHES_DIR}/apply_patches.sh ${BINUTILS_TAG} ${BINUTILS_PATCHES}
-        CONFIGURE_COMMAND ${CMAKE_COMMAND} -E env CFLAGS=${BINUTILS_CFLAGS} CPPFLAGS=${BINUTILS_CPPFLAGS} CXXFLAGS=${BINUTILS_CXXFLAGS} <SOURCE_DIR>/configure --prefix=<INSTALL_DIR> --disable-gas --disable-etc --disable-libbacktrace --disable-libdecnumber --disable-gnulib --disable-readline --disable-sim --disable-gdbserver --disable-gdbsupport --disable-gprof --disable-gdb --disable-libctf --disable-ld --disable-binutils --target=riscv64-unknown-linux-gnu
+        CONFIGURE_COMMAND ${CMAKE_COMMAND} -E env CC=${CMAKE_C_COMPILER} CXX=${CMAKE_CXX_COMPILER} CFLAGS=${BINUTILS_CFLAGS} CPPFLAGS=${BINUTILS_CPPFLAGS} CXXFLAGS=${BINUTILS_CXXFLAGS} <SOURCE_DIR>/configure --prefix=<INSTALL_DIR> --disable-gas --disable-etc --disable-libbacktrace --disable-libdecnumber --disable-gnulib --disable-readline --disable-sim --disable-gdbserver --disable-gdbsupport --disable-gprof --disable-gdb --disable-libctf --disable-ld --disable-binutils --target=riscv64-unknown-linux-gnu
         BUILD_COMMAND make all-bfd all-opcodes all-libiberty all-intl
         INSTALL_COMMAND make install-bfd install-opcodes install-libiberty
         UPDATE_DISCONNECTED true
