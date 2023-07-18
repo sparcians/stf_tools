@@ -3,24 +3,12 @@
 #include <memory>
 #include <string>
 #include <string_view>
-#include <cxxabi.h>
+
+#include <boost/core/demangle.hpp>
 
 #include "command_line_parser.hpp"
 #include "stf_branch_reader.hpp"
 #include "stf_inst_reader.hpp"
-
-std::string demangle(const char* name) {
-
-    int status = -4; // some arbitrary value to eliminate the compiler warning
-
-    // enable c++11 by passing the flag -std=c++11 to g++
-    std::unique_ptr<char, void(*)(void*)> res {
-        abi::__cxa_demangle(name, NULL, NULL, &status),
-        std::free
-    };
-
-    return (status==0) ? res.get() : name ;
-}
 
 template<typename Reader>
 inline std::chrono::duration<double> readAllRecords(Reader& reader) {
@@ -53,7 +41,7 @@ void readerBench(const std::string& filename, Args&&... args) {
 
     auto time = readAllRecords<Reader>(reader);
 
-    std::cout << demangle(typeid(Reader).name())
+    std::cout << boost::core::demangle(typeid(Reader).name())
               << std::endl
               << "Read "
               << reader.numRecordsRead()
