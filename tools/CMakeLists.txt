@@ -34,8 +34,9 @@ add_subdirectory(stf_branch_hdf5)
 add_subdirectory(stf_branch_dump)
 add_subdirectory(stf_transaction_dump)
 add_subdirectory(stf_transaction_extract)
+add_subdirectory(stf_function_histogram)
 
-set(STF_INSTALL_TARGETS stf_dump stf_check stf_extract stf_trace_info stf_count stf_find stf_verify_pc stf_merge stf_filter_evt stf_imem stf_imix stf_bench stf_recompress stf_count_multi_process stf_record_dump stf_strip stf_address_map stf_branch_classify stf_bbv stf_diff stf_morph stf_branch_hdf5 stf_branch_dump stf_transaction_dump stf_transaction_extract)
+set(STF_INSTALL_TARGETS stf_dump stf_check stf_extract stf_trace_info stf_count stf_find stf_verify_pc stf_merge stf_filter_evt stf_imem stf_imix stf_bench stf_recompress stf_count_multi_process stf_record_dump stf_strip stf_address_map stf_branch_classify stf_bbv stf_diff stf_morph stf_branch_hdf5 stf_branch_dump stf_transaction_dump stf_transaction_extract stf_function_histogram)
 
 include(stf_extra_tools.cmake OPTIONAL)
 
