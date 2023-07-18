@@ -81,7 +81,7 @@ int main(int argc, char** argv) {
     stf::STFBranchReader reader(trace, skip_non_user);
 
     for(const auto& branch: reader) {
-        if(STF_EXPECT_FALSE(branch.getInstIndex() >= end_insts)) {
+        if(STF_EXPECT_FALSE(branch.instIndex() >= end_insts)) {
             break;
         }
 
