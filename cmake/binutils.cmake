@@ -6,13 +6,13 @@ if(DISABLE_BINUTILS)
     message("-- Disabling binutils support")
 else()
     set(BINUTILS_CFLAGS ${CMAKE_C_FLAGS})
-    set(BINUTILS_CPPFLAGS ${CMAKE_CPP_FLAGS})
     set(BINUTILS_CXXFLAGS ${CMAKE_CXX_FLAGS})
+    set(BINUTILS_LDFLAGS ${CMAKE_EXE_LINKER_FLAGS})
 
     if (CMAKE_BUILD_TYPE MATCHES "^[Dd]ebug")
-        set(BINUTILS_CFLAGS ${BINUTILS_CFLAGS} -O0 -g)
-        set(BINUTILS_CPPFLAGS ${BINUTILS_CPPFLAGS} -O0 -g)
-        set(BINUTILS_CXXFLAGS ${BINUTILS_CXXFLAGS} -O0 -g)
+        set(BINUTILS_CFLAGS "${BINUTILS_CFLAGS} -O0 -g")
+        set(BINUTILS_CXXFLAGS "${BINUTILS_CXXFLAGS} -O0 -g")
+        set(BINUTILS_LDFLAGS "${BINUTILS_LDFLAGS} -Wl,-O0")
     endif()
 
     set(BINUTILS_PATCHES ${STF_TOOLS_PATCHES_DIR}/riscv-binutils-gdb/0001-Add-riscv_get_disassembler_arch-function.patch
@@ -27,7 +27,7 @@ else()
         GIT_REPOSITORY git://sourceware.org/git/binutils-gdb.git
         GIT_TAG ${BINUTILS_TAG}
         PATCH_COMMAND ${STF_TOOLS_PATCHES_DIR}/apply_patches.sh ${BINUTILS_TAG} ${BINUTILS_PATCHES}
-        CONFIGURE_COMMAND ${CMAKE_COMMAND} -E env CC=${CMAKE_C_COMPILER} CXX=${CMAKE_CXX_COMPILER} CFLAGS=${BINUTILS_CFLAGS} CPPFLAGS=${BINUTILS_CPPFLAGS} CXXFLAGS=${BINUTILS_CXXFLAGS} <SOURCE_DIR>/configure --prefix=<INSTALL_DIR> --disable-gas --disable-etc --disable-libbacktrace --disable-libdecnumber --disable-gnulib --disable-readline --disable-sim --disable-gdbserver --disable-gdbsupport --disable-gprof --disable-gdb --disable-libctf --disable-ld --disable-binutils --target=riscv64-unknown-linux-gnu
+        CONFIGURE_COMMAND ${CMAKE_COMMAND} -E env CC=${CMAKE_C_COMPILER} CXX=${CMAKE_CXX_COMPILER} CFLAGS=${BINUTILS_CFLAGS} CPPFLAGS=${BINUTILS_CFLAGS} CXXFLAGS=${BINUTILS_CXXFLAGS} LDFLAGS=${BINUTILS_LDFLAGS} <SOURCE_DIR>/configure --prefix=<INSTALL_DIR> --disable-gas --disable-etc --disable-libbacktrace --disable-libdecnumber --disable-gnulib --disable-readline --disable-sim --disable-gdbserver --disable-gdbsupport --disable-gprof --disable-gdb --disable-libctf --disable-ld --disable-binutils --target=riscv64-unknown-linux-gnu
         BUILD_COMMAND make all-bfd all-opcodes all-libiberty all-intl
         INSTALL_COMMAND make install-bfd install-opcodes install-libiberty
         UPDATE_DISCONNECTED true
