@@ -4,7 +4,6 @@
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
-#include <string_view>
 
 #include <unistd.h>
 #include <sys/types.h>
@@ -25,8 +24,9 @@ class STFBinary {
         void* file_ptr_ = nullptr;
         size_t file_size_ = 0;
         int fd_ = -1;
+        std::string filename_;
 
-        void validateAddress_(const uint64_t address) const {
+        inline void validateAddress_(const uint64_t address) const {
             stf_assert(address >= base_addr_ && address <= base_addr_ + file_size_, std::hex << "Address " <<
                                                                                     address <<
                                                                                     " is outside binary range: [" <<
@@ -41,6 +41,20 @@ class STFBinary {
             memcpy(reinterpret_cast<uint8_t*>(ptr),
                    reinterpret_cast<uint8_t*>(file_ptr_) + (address - base_addr_),
                    num_bytes);
+        }
+
+        virtual void open_() {
+            fd_ = ::open(filename_.c_str(), O_RDONLY);
+            stf_assert(fd_ >= 0, "Failed to open " << filename_ << ": " << strerror(errno));
+            file_size_ = static_cast<size_t>(lseek(fd_, 0, SEEK_END));
+            file_ptr_ = mmap(nullptr, file_size_, PROT_READ, MAP_FILE | MAP_PRIVATE, fd_, 0);
+            stf_assert(file_ptr_ && file_ptr_ != MAP_FAILED, "Failed to mmap file: " << strerror(errno));
+        }
+
+        explicit STFBinary(const std::string& filename, const uint64_t base_addr = 0) :
+            base_addr_(base_addr),
+            filename_(filename)
+        {
         }
 
     public:
@@ -62,18 +76,19 @@ class STFBinary {
             }
         }
 
-        virtual void open(const std::string_view filename) {
-            fd_ = ::open(filename.data(), O_RDONLY);
-            stf_assert(fd_ >= 0, "Failed to open " << filename << ": " << strerror(errno));
-            file_size_ = static_cast<size_t>(lseek(fd_, 0, SEEK_END));
-            file_ptr_ = mmap(nullptr, file_size_, PROT_READ, MAP_FILE | MAP_PRIVATE, fd_, 0);
-            stf_assert(file_ptr_ && file_ptr_ != MAP_FAILED, "Failed to mmap file: " << strerror(errno));
+        inline void open(const std::string& filename) {
+            filename_ = filename;
+            open_();
         }
 
         template<typename T>
-        T read(const uint64_t address) const {
+        inline T read(const uint64_t address) const {
             T value;
             read_(address, &value, sizeof(T));
             return value;
+        }
+
+        inline const auto& getFilename() const {
+            return filename_;
         }
 };

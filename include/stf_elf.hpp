@@ -4,7 +4,6 @@
 #include <cstdint>
 #include <map>
 
-#include "filesystem.hpp"
 #include "stf_address_range.hpp"
 #include "stf_bin.hpp"
 
@@ -14,7 +13,7 @@ class STFElf : public STFBinary {
     private:
         ELFIO::elfio reader_;
         std::map<STFAddressRange, const ELFIO::segment*> segments_;
-        fs::path filename_;
+        uint64_t min_address_ = std::numeric_limits<uint64_t>::max();
 
         auto findSection_(const uint64_t address, const size_t num_bytes = 0) const {
             validateAddress_(address);
@@ -37,7 +36,7 @@ class STFElf : public STFBinary {
             return it;
         }
 
-        void read_(const uint64_t address, void* const ptr, const size_t num_bytes) const override {
+        void read_(const uint64_t address, void* const ptr, const size_t num_bytes) const final {
             auto it = findSection_(address, num_bytes);
 
             stf_assert(it != segments_.end(),
@@ -48,22 +47,8 @@ class STFElf : public STFBinary {
                    num_bytes);
         }
 
-    public:
-        STFElf() :
-            STFBinary(0)
-        {
-        }
-
-        explicit STFElf(const std::string_view filename) :
-            STFElf()
-        {
-            open(filename);
-        }
-
-        void open(const std::string_view filename) final {
-            filename_ = filename;
-
-            stf_assert(reader_.load(filename.data()), "Failed to load ELF " << filename);
+        void open_() final {
+            stf_assert(reader_.load(filename_), "Failed to load ELF " << filename_);
             for(unsigned int i = 0; i < reader_.segments.size(); ++i) {
                 const auto* segment = reader_.segments[i];
                 if(segment->get_type() == ELFIO::PT_LOAD) {
@@ -73,16 +58,33 @@ class STFElf : public STFBinary {
                                       std::forward_as_tuple(start_addr, end_addr),
                                       std::forward_as_tuple(segment));
                     file_size_ = std::max(file_size_, static_cast<size_t>(end_addr));
+                    min_address_ = std::min(min_address_, start_addr);
                 }
             }
         }
 
-        inline const auto& getFilename() const {
-            return filename_;
+    public:
+        STFElf() :
+            STFBinary(0)
+        {
+        }
+
+        explicit STFElf(const std::string& filename) :
+            STFBinary(filename)
+        {
+            open_();
         }
 
         inline const auto& getReader() const {
             return reader_;
+        }
+
+        inline uint64_t getMinAddress() const {
+            return min_address_;
+        }
+
+        inline uint64_t getMaxAddress() const {
+            return file_size_;
         }
 };
 

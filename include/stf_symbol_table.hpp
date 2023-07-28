@@ -1,10 +1,12 @@
 #pragma once
 
+#include <map>
 #include <memory>
 #include <string>
-#include <tuple>
 #include <unordered_map>
 #include <vector>
+
+#include <boost/core/demangle.hpp>
 
 #include "stf_dwarf.hpp"
 #include "stf_elf.hpp"
@@ -21,7 +23,7 @@ class STFSymbol {
         const std::string name_;
         const std::vector<STFAddressRange> ranges_;
 
-        static inline STFAddressRange initSingleRange_(const STFDwarf::Die& die) {
+        static inline STFAddressRange initSingleRange_(const dwarf_wrapper::Die& die) {
             const auto low_pc = die.getLowPC();
 
             if(!low_pc) {
@@ -32,16 +34,16 @@ class STFSymbol {
             return STFAddressRange(*low_pc, high_pc);
         }
 
-        static inline std::string getName_(const STFDwarf::Die& die) {
-            if(auto name_result = die.getName(); STF_EXPECT_TRUE(name_result)) {
-                return *name_result;
+        static inline std::string getDwarfDieName_(const dwarf_wrapper::Die& die) {
+            if(const auto name_result = die.getName(); STF_EXPECT_TRUE(name_result)) {
+                return boost::core::demangle(name_result);
             }
 
             throw InvalidSymbolException();
         }
 
-        static inline std::string getName_(const STFDwarf::Die& die,
-                                           const DwarfInlineMap& inline_map) {
+        static inline std::string getDwarfDieName_(const dwarf_wrapper::Die& die,
+                                                   const DwarfInlineMap& inline_map) {
             if(const auto inline_offset = die.getInlineOffset(); STF_EXPECT_TRUE(inline_offset)) {
                 return inline_map.at(*inline_offset);
             }
@@ -49,29 +51,30 @@ class STFSymbol {
             throw InvalidSymbolException();
         }
 
-        static inline std::tuple<std::string, STFAddressRange> initFromELF_(const ELFIO::symbol_section_accessor& symbols, const unsigned int index) {
+        static inline STFSymbol makeFromELF_(const ELFIO::symbol_section_accessor& symbols,
+                                             const unsigned int index) {
             ELFIO::Elf64_Addr value = 0;
             ELFIO::Elf_Xword size = 0;
             unsigned char bind = 0;
             unsigned char type = 0;
             ELFIO::Elf_Half section_index = 0;
             unsigned char other = 0;
-            std::string mangled_name;
+            std::string symbol_name;
 
             if(STF_EXPECT_FALSE(!symbols.get_symbol(index,
-                                                    mangled_name,
+                                                    symbol_name,
                                                     value,
                                                     size,
                                                     bind,
                                                     type,
                                                     section_index,
-                                                    other) || mangled_name.empty())) {
+                                                    other) || !value || symbol_name.empty())) {
                 throw InvalidSymbolException();
             }
 
             size = std::max(size, static_cast<decltype(size)>(1)); // If the symbol has 0 size, override to 1
-            return std::make_tuple(boost::core::demangle(mangled_name.c_str()),
-                                   STFAddressRange(value, value + size));
+            return STFSymbol(boost::core::demangle(symbol_name.c_str()),
+                             STFAddressRange(value, value + size));
         }
 
         STFSymbol(std::string&& name, std::vector<STFAddressRange>&& range, const bool inlined = false) :
@@ -93,15 +96,16 @@ class STFSymbol {
         {
         }
 
-        explicit STFSymbol(std::tuple<std::string, STFAddressRange>&& tuple_args) :
-            STFSymbol(std::forward<std::string>(std::get<0>(tuple_args)),
-                      std::forward<STFAddressRange>(std::get<1>(tuple_args)))
+        STFSymbol(const dwarf_wrapper::Die& die, std::string&& name) :
+            STFSymbol(std::forward<std::string>(name),
+                      initSingleRange_(die),
+                      die.isInlinedSubroutine())
         {
         }
 
-        STFSymbol(const STFDwarf::Die& die, std::string&& name) :
+        STFSymbol(const dwarf_wrapper::Die& die, std::string&& name, std::vector<STFAddressRange>&& ranges) :
             STFSymbol(std::forward<std::string>(name),
-                      initSingleRange_(die),
+                      std::forward<std::vector<STFAddressRange>>(ranges),
                       die.isInlinedSubroutine())
         {
         }
@@ -109,26 +113,34 @@ class STFSymbol {
     public:
         using Handle = std::shared_ptr<STFSymbol>;
 
-        STFSymbol(const STFDwarf::Die& die, const DwarfInlineMap& inline_map) :
-            STFSymbol(die, getName_(die, inline_map))
+        STFSymbol(const dwarf_wrapper::Die& die, const DwarfInlineMap& inline_map) :
+            STFSymbol(die, getDwarfDieName_(die, inline_map))
         {
         }
 
-        STFSymbol(const STFDwarf::Die& die,
+        STFSymbol(const dwarf_wrapper::Die& die,
+                  const DwarfInlineMap& inline_map,
                   std::vector<STFAddressRange>&& ranges) :
-            STFSymbol(getName_(die),
-                      std::forward<std::vector<STFAddressRange>>(ranges),
-                      die.isInlinedSubroutine())
+            STFSymbol(die,
+                      getDwarfDieName_(die, inline_map),
+                      std::forward<std::vector<STFAddressRange>>(ranges))
         {
         }
 
-        explicit STFSymbol(const STFDwarf::Die& die) :
-            STFSymbol(die, getName_(die))
+        STFSymbol(const dwarf_wrapper::Die& die, std::vector<STFAddressRange>&& ranges) :
+            STFSymbol(die,
+                      getDwarfDieName_(die),
+                      std::forward<std::vector<STFAddressRange>>(ranges))
+        {
+        }
+
+        explicit STFSymbol(const dwarf_wrapper::Die& die) :
+            STFSymbol(die, getDwarfDieName_(die))
         {
         }
 
         STFSymbol(const ELFIO::symbol_section_accessor& symbols, const unsigned int index) :
-            STFSymbol(initFromELF_(symbols, index))
+            STFSymbol(makeFromELF_(symbols, index))
         {
         }
 
@@ -141,14 +153,31 @@ class STFSymbol {
         }
 
         inline bool checkPC(const uint64_t pc) const {
-            auto it = std::lower_bound(
+            const STFAddressRange key(pc);
+            auto it = std::upper_bound(
                 ranges_.begin(),
                 ranges_.end(),
-                pc
+                STFAddressRange(pc)
             );
 
-            if(it == ranges_.end() || *it > pc) {
+            while(it != ranges_.begin() && (it == ranges_.end() || std::prev(it)->contains(pc))) {
                 --it;
+            }
+
+            if(!it->contains(key)) {
+                stf_assert(it->startsAfter(key));
+                bool found = false;
+                for(auto search_it = std::next(it); search_it != ranges_.end(); ++search_it) {
+                    if(search_it->contains(key)) {
+                        it = search_it;
+                        found = true;
+                        break;
+                    }
+                }
+
+                if(STF_EXPECT_FALSE(!found)) {
+                    return false;
+                }
             }
 
             return it->contains(pc);
@@ -162,50 +191,50 @@ class STFSymbol {
 class STFSymbolTable {
     private:
         std::multimap<STFAddressRange, STFSymbol::Handle> symbols_;
+        uint64_t elf_min_address_ = 0;
+        uint64_t elf_max_address_ = 0;
 
         template<typename... Args>
-        inline bool emplaceSymbol_(Args&&... args) {
-            try {
-                auto new_symbol = std::make_shared<STFSymbol>(std::forward<Args>(args)...);
-                stf_assert(new_symbol, "Failed to allocate new symbol");
+        inline void emplaceSymbol_(Args&&... args) {
+            auto new_symbol = std::make_shared<STFSymbol>(std::forward<Args>(args)...);
+            stf_assert(new_symbol, "Failed to allocate new symbol");
 
-                for(const auto& p: new_symbol->getRanges()) {
-                    symbols_.emplace(p, new_symbol);
-                }
+            for(const auto& p: new_symbol->getRanges()) {
+                symbols_.emplace(p, new_symbol);
             }
-            catch(const STFSymbol::InvalidSymbolException&) {
-                return false;
-            }
-            return true;
         }
 
         template<typename... Args>
-        inline void emplaceSymbolFromDwarf_(const STFDwarf::Die& die,
-                                            Args&&... args) {
-            if(!emplaceSymbol_(die, std::forward<Args>(args)...)) {
+        inline void emplaceSymbolFromDwarf_(const dwarf_wrapper::Die& die, Args&&... args) {
+            try {
+                emplaceSymbol_(die, std::forward<Args>(args)...);
+            }
+            catch(const STFSymbol::InvalidSymbolException&) {
                 auto ranges = die.getRanges();
                 if(!ranges.empty()) {
                     std::sort(ranges.begin(), ranges.end());
-                    emplaceSymbol_(die, std::move(ranges));
+                    emplaceSymbol_(die, std::forward<Args>(args)..., std::move(ranges));
                 }
             }
         }
 
-        inline void populateDwarf_(const std::string& filename) {
+    public:
+        explicit STFSymbolTable(const STFElf& elf) {
+            // Try to populate with DWARF info first
             try {
-                STFDwarf dwarf(filename);
+                STFDwarf dwarf(elf.getFilename());
 
                 STFSymbol::DwarfInlineMap inlined_cus;
                 std::vector<uint64_t> unresolved_inlines;
 
                 dwarf.iterateDies(
-                    [this, &inlined_cus, &unresolved_inlines](const STFDwarf::Die& die) {
+                    [this, &inlined_cus, &unresolved_inlines](const dwarf_wrapper::Die& die) {
                         if(die.isSubprogram()) {
                             if(die.isInlined()) {
                                 const auto die_name = die.getName();
                                 stf_assert(die_name, "Couldn't get name for inlined function");
 
-                                inlined_cus[die.getOffset()] = *die_name;
+                                inlined_cus[die.getOffset()] = boost::core::demangle(die_name);
                             }
                             else {
                                 emplaceSymbolFromDwarf_(die);
@@ -221,16 +250,12 @@ class STFSymbolTable {
                     emplaceSymbolFromDwarf_(dwarf.getDieFromOffset(inlined_die_offset), inlined_cus);
                 }
             }
-            catch(const STFDwarf::NoDwarfInfoException&) {
+            catch(const dwarf_wrapper::NoDwarfInfoException&) {
             }
-        }
-
-    public:
-        explicit STFSymbolTable(const STFElf& elf) {
-            // Try to populate with DWARF info first
-            populateDwarf_(elf.getFilename());
 
             const auto& elf_reader = elf.getReader();
+            elf_min_address_ = elf.getMinAddress();
+            elf_max_address_ = elf.getMaxAddress();
 
             for(unsigned int i = 0; i < elf_reader.sections.size(); ++i) {
                 auto* section = elf_reader.sections[i];
@@ -253,35 +278,45 @@ class STFSymbolTable {
         {
         }
 
+        inline bool validPC(const uint64_t pc) const {
+            return (elf_min_address_ <= pc) && (pc < elf_max_address_);
+        }
+
         /**
          * Finds the function containing the specified address
          */
-        inline STFSymbol::Handle findFunction(const uint64_t address) const {
-            const STFAddressRange key(address, address + 1);
-            auto it = symbols_.lower_bound(key);
+        inline std::pair<STFSymbol::Handle, bool> findFunction(const uint64_t address) const {
+            if(!validPC(address)) {
+                return std::make_pair(nullptr, false);
+            }
 
-            if(it == symbols_.end() || it->first.startsAfter(key)) {
-                if(it == symbols_.begin()) {
-                    return nullptr;
-                }
+            const STFAddressRange key(address);
+            auto it = symbols_.upper_bound(key);
+
+            while(it != symbols_.begin() && (it == symbols_.end() || std::prev(it)->first.contains(key))) {
                 --it;
             }
 
-            auto end_it = std::next(it);
+            if(!it->first.contains(key)) {
+                stf_assert(it->first.startsAfter(key));
+                bool found = false;
+                for(auto search_it = std::next(it); search_it != symbols_.end(); ++search_it) {
+                    if(search_it->first.contains(key)) {
+                        it = search_it;
+                        found = true;
+                        break;
+                    }
+                }
 
-            while(it != symbols_.begin() && std::prev(it)->first >= key) {
-                --it;
-            }
-
-            // The map is sorted from smallest to largest range, so we
-            // can just return the first one that contains the address
-            for(; it != end_it; ++it) {
-                const auto& symbol = it->second;
-                if(symbol->checkPC(address)) {
-                    return symbol;
+                if(STF_EXPECT_FALSE(!found)) {
+                    return std::make_pair(nullptr, false);
                 }
             }
 
-            return nullptr;
+            if(it->second->checkPC(address)) {
+                return std::make_pair(it->second, it->first.startAddress() == address);
+            }
+
+            return std::make_pair(nullptr, false);
         }
 };

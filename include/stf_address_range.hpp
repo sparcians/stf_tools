@@ -12,6 +12,11 @@ class STFAddressRange {
         uint64_t end_pc_;
 
     public:
+        STFAddressRange(const uint64_t pc) :
+            STFAddressRange(pc, pc + 1)
+        {
+        }
+
         STFAddressRange(const uint64_t start_pc, const uint64_t end_pc) :
             start_pc_(start_pc),
             end_pc_(end_pc)
@@ -31,8 +36,8 @@ class STFAddressRange {
             return end_pc_ - start_pc_;
         }
 
-        inline bool contains(const uint64_t pc) const {
-            return start_pc_ <= pc && pc < end_pc_;
+        inline bool contains(const STFAddressRange& rhs) const {
+            return start_pc_ <= rhs.start_pc_ && rhs.end_pc_ <= end_pc_;
         }
 
         inline bool startsBefore(const STFAddressRange& rhs) const {
@@ -44,19 +49,13 @@ class STFAddressRange {
         }
 
         inline bool operator<(const STFAddressRange& rhs) const {
-            return startsBefore(rhs) || ((start_pc_ == rhs.start_pc_) && (range() < rhs.range()));
-        }
-
-        inline bool operator<(const uint64_t pc) const {
-            return start_pc_ < pc;
+            //return startsBefore(rhs) || ((start_pc_ == rhs.start_pc_) && (range() < rhs.range()));
+            return rhs.contains(*this) || (!contains(rhs) && startsBefore(rhs));
         }
 
         inline bool operator>(const STFAddressRange& rhs) const {
-            return startsAfter(rhs) || ((start_pc_ == rhs.start_pc_) && (range() > rhs.range()));
-        }
-
-        inline bool operator>(const uint64_t pc) const {
-            return start_pc_ > pc;
+            //return startsAfter(rhs) || ((start_pc_ == rhs.start_pc_) && (range() > rhs.range()));
+            return contains(rhs) || (!rhs.contains(*this) && startsAfter(rhs));
         }
 
         inline bool operator==(const STFAddressRange& rhs) const {
