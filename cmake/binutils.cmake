@@ -5,8 +5,8 @@ include(ExternalProject)
 if(DISABLE_BINUTILS)
     message("-- Disabling binutils support")
 else()
-    set(BINUTILS_CFLAGS ${CMAKE_C_FLAGS})
-    set(BINUTILS_CXXFLAGS ${CMAKE_CXX_FLAGS})
+    set(BINUTILS_CFLAGS "${CMAKE_C_FLAGS} -Wno-unknown-warning-option")
+    set(BINUTILS_CXXFLAGS "${CMAKE_CXX_FLAGS} -Wno-unknown-warning-option")
     set(BINUTILS_LDFLAGS ${CMAKE_EXE_LINKER_FLAGS})
 
     if (CMAKE_BUILD_TYPE MATCHES "^[Dd]ebug")
@@ -20,7 +20,7 @@ else()
     )
 
     # Set tag
-    set(BINUTILS_TAG binutils-2_40)
+    set(BINUTILS_TAG binutils-2_41)
 
     ExternalProject_Add(
         binutils
@@ -49,7 +49,7 @@ else()
     ExternalProject_Add_Step(binutils
                              install_libs
                              WORKING_DIRECTORY <BINARY_DIR>
-                             COMMAND cp intl/libintl.a opcodes/libopcodes.a libiberty/libiberty.a bfd/libbfd.a <INSTALL_DIR>/lib/
+                             COMMAND cp intl/libintl.a opcodes/libopcodes.a libiberty/libiberty.a bfd/.libs/libbfd.a <INSTALL_DIR>/lib/
                              DEPENDEES install_dirs)
 
     ExternalProject_Add_Step(binutils
