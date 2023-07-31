@@ -9,7 +9,7 @@
 
 namespace mavis_helpers {
     namespace __mavis_array {
-        static constexpr size_t NUM_INSTRUCTION_TYPES_ = 33;
+        static constexpr size_t NUM_INSTRUCTION_TYPES_ = 39;
 
         using IType = mavis::InstMetaData::InstructionTypes;
         using InstructionTypeArray = std::array<IType, NUM_INSTRUCTION_TYPES_>;
@@ -41,14 +41,19 @@ namespace mavis_helpers {
                 IType::CLASSIFY,
                 IType::VECTOR,
                 IType::MASKABLE,
+                IType::UNIT_STRIDE,
                 IType::STRIDE,
-                IType::INDEXED,
+                IType::ORDERED_INDEXED,
+                IType::UNORDERED_INDEXED,
                 IType::SEGMENT,
                 IType::FAULTFIRST,
                 IType::WHOLE,
                 IType::MASK,
                 IType::WIDENING,
                 IType::HYPERVISOR,
+                IType::PREFETCH,
+                IType::NTL,
+                IType::HINT,
                 IType::CACHE,
                 IType::ATOMIC,
                 IType::FENCE,
@@ -79,12 +84,17 @@ namespace mavis_helpers {
                     case IType::CLASSIFY:
                     case IType::VECTOR:
                     case IType::MASKABLE:
+                    case IType::UNIT_STRIDE:
                     case IType::STRIDE:
-                    case IType::INDEXED:
+                    case IType::ORDERED_INDEXED:
+                    case IType::UNORDERED_INDEXED:
                     case IType::SEGMENT:
                     case IType::FAULTFIRST:
                     case IType::WHOLE:
                     case IType::MASK:
+                    case IType::PREFETCH:
+                    case IType::NTL:
+                    case IType::HINT:
                     case IType::CACHE:
                     case IType::ATOMIC:
                     case IType::FENCE:
@@ -218,10 +228,14 @@ namespace mavis_helpers {
                         return "vector";
                     case enum_t::MASKABLE:
                         return "maskable";
+                    case enum_t::UNIT_STRIDE:
+                        return "unit_stride";
                     case enum_t::STRIDE:
                         return "stride";
-                    case enum_t::INDEXED:
-                        return "indexed";
+                    case enum_t::ORDERED_INDEXED:
+                        return "ordered_indexed";
+                    case enum_t::UNORDERED_INDEXED:
+                        return "unordered_indexed";
                     case enum_t::SEGMENT:
                         return "segment";
                     case enum_t::FAULTFIRST:
@@ -234,6 +248,12 @@ namespace mavis_helpers {
                         return "widening";
                     case enum_t::HYPERVISOR:
                         return "hypervisor";
+                    case enum_t::PREFETCH:
+                        return "prefetch";
+                    case enum_t::NTL:
+                        return "ntl";
+                    case enum_t::HINT:
+                        return "hint";
                     case enum_t::CACHE:
                         return "cache";
                     case enum_t::ATOMIC:
