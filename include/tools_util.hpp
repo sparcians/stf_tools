@@ -20,7 +20,7 @@ static constexpr uint32_t TRACE_TOOLS_VERSION_MINOR = 0;
 static constexpr uint32_t TRACE_TOOLS_VERSION_MINOR_MINOR = 0;
 
 template<typename T, int radix = 10>
-static inline T parseInt(const std::string_view str) {
+inline T parseInt(const std::string_view str) {
     static_assert(sizeof(T) <= sizeof(uint64_t), "parseInt only works on integers up to 64 bits");
     std::string temp;
     std::copy_if(str.begin(), str.end(), std::back_inserter(temp), [](char c){ return c != ','; });
@@ -41,12 +41,12 @@ static inline T parseInt(const std::string_view str) {
 }
 
 template<typename T>
-static inline T parseHex(const std::string& str) {
+inline T parseHex(const std::string& str) {
     static constexpr int HEX_RADIX = 16;
     return parseInt<T, HEX_RADIX>(str);
 }
 
-static inline void getVersion(std::ostream& os) {
+inline void getVersion(std::ostream& os) {
     os << "trace_tools version "
        << TRACE_TOOLS_VERSION_MAJOR << '.'
        << TRACE_TOOLS_VERSION_MINOR << '.'
@@ -55,13 +55,13 @@ static inline void getVersion(std::ostream& os) {
     stf::formatVersion(os);
 }
 
-static inline std::string getVersion() {
+inline std::string getVersion() {
     std::ostringstream ss;
     getVersion(ss);
     return ss.str();
 }
 
-static inline void printVersion() {
+inline void printVersion() {
     getVersion(std::cout);
 }
 
@@ -70,13 +70,13 @@ inline constexpr uint64_t log2_expr(const uint64_t x) {
     return NUM_U64_BITS - static_cast<uint64_t>(__builtin_clzl(x)) - 1;
 }
 
-static inline uint64_t log2(const uint64_t x) {
+inline uint64_t log2(const uint64_t x) {
     stf_assert(x != 0, "Attempted to take log2(0)");
     static constexpr uint64_t NUM_U64_BITS = 8 * sizeof(uint64_t);
     return NUM_U64_BITS - static_cast<uint64_t>(__builtin_clzl(x)) - 1;
 }
 
-static inline fs::path getExecutablePath() {
+inline fs::path getExecutablePath() {
 #ifdef __APPLE__ // OSX
     static constexpr uint32_t DEFAULT_BUF_SIZE = 256;
     uint32_t buf_size = DEFAULT_BUF_SIZE;
@@ -98,4 +98,9 @@ static inline fs::path getExecutablePath() {
     static const char* const relative_path = "/proc/self/exe"; // always a symlink
 #endif
     return fs::canonical(fs::read_symlink(relative_path));
+}
+
+inline std::string findElfFromTrace(const std::string& trace) {
+    const size_t ext_idx = trace.rfind(".zstf");
+    return trace.substr(0, ext_idx) + ".elf";
 }
