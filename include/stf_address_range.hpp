@@ -12,7 +12,7 @@ class STFAddressRange {
         uint64_t end_pc_;
 
     public:
-        STFAddressRange(const uint64_t pc) :
+        explicit STFAddressRange(const uint64_t pc) :
             STFAddressRange(pc, pc + 1)
         {
         }
@@ -34,6 +34,10 @@ class STFAddressRange {
 
         inline uint64_t range() const {
             return end_pc_ - start_pc_;
+        }
+
+        inline bool contains(const uint64_t pc) const {
+            return contains(STFAddressRange(pc));
         }
 
         inline bool contains(const STFAddressRange& rhs) const {
