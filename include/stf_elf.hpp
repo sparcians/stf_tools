@@ -54,11 +54,13 @@ class STFElf : public STFBinary {
                 if(segment->get_type() == ELFIO::PT_LOAD) {
                     const auto start_addr = segment->get_virtual_address();
                     const auto end_addr = start_addr + segment->get_memory_size();
-                    segments_.emplace(std::piecewise_construct,
-                                      std::forward_as_tuple(start_addr, end_addr),
-                                      std::forward_as_tuple(segment));
-                    file_size_ = std::max(file_size_, static_cast<size_t>(end_addr));
-                    min_address_ = std::min(min_address_, start_addr);
+                    if(start_addr != end_addr) {
+                        segments_.emplace(std::piecewise_construct,
+                                          std::forward_as_tuple(start_addr, end_addr),
+                                          std::forward_as_tuple(segment));
+                        file_size_ = std::max(file_size_, static_cast<size_t>(end_addr));
+                        min_address_ = std::min(min_address_, start_addr);
+                    }
                 }
             }
         }
