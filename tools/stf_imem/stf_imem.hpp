@@ -536,7 +536,7 @@ class IMemMapVec {
 
             std::multimap<SortedMapKey, SortedVector> sorted_map;
             bool first = true;
-            stf::Disassembler dis(inst_set_, iem_, config.use_aliases);
+            stf::Disassembler dis(findElfFromTrace(config.trace_filename), inst_set_, iem_, config.use_aliases);
             uint64_t block_count = 0;
 
             for (auto it = imem_mapvec_.rbegin(); it != imem_mapvec_.rend(); it ++) {
