@@ -29,8 +29,7 @@ void processCommandLine(int argc,
         parser.getArgumentValue('E', elf);
     }
     else {
-        const size_t ext_idx = trace.rfind(".zstf");
-        elf = trace.substr(0, ext_idx) + ".elf";
+        elf = findElfFromTrace(trace);
     }
 }
 
