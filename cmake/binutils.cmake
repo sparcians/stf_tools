@@ -61,7 +61,7 @@ else()
     ExternalProject_Get_Property(binutils SOURCE_DIR)
     ExternalProject_Get_Property(binutils INSTALL_DIR)
 
-    set(BINUTILS_INCLUDE_DIRS ${INSTALL_DIR}/include ${SOURCE_DIR}/include ${SOURCE_DIR}/opcodes)
+    set(BINUTILS_INCLUDE_DIRS ${INSTALL_DIR}/include ${SOURCE_DIR}/include ${SOURCE_DIR}/bfd ${SOURCE_DIR}/opcodes)
     set(BINUTILS_LIB_DIR ${INSTALL_DIR}/lib)
 
     unset(SOURCE_DIR)

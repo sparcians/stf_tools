@@ -54,7 +54,10 @@ namespace stf {
             /**
              * Constructs a Disassembler
              */
-            Disassembler(const ISA inst_set, const INST_IEM iem, const bool use_aliases) :
+            Disassembler(const std::string& elf,
+                         const ISA inst_set,
+                         const INST_IEM iem,
+                         const bool use_aliases) :
                 BaseDisassembler(inst_set, iem, use_aliases)
             {
                 STFValidatedEnvVar disasm_var("STF_DISASM",
@@ -71,7 +74,8 @@ namespace stf {
                 }
 #ifdef ENABLE_BINUTILS_DISASM
                 else if(disasm == "BINUTILS") {
-                    dis_ = std::make_unique<disassemblers::BinutilsDisassembler>(inst_set,
+                    dis_ = std::make_unique<disassemblers::BinutilsDisassembler>(elf,
+                                                                                 inst_set,
                                                                                  iem,
                                                                                  use_aliases);
                 }

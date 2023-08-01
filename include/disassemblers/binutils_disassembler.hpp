@@ -37,7 +37,7 @@ namespace stf {
                 /**
                  * \brief Construct a BinutilsDisassembler
                  */
-                explicit BinutilsDisassembler(const ISA inst_set, const INST_IEM iem, const bool use_aliases);
+                explicit BinutilsDisassembler(const std::string& elf, const ISA inst_set, const INST_IEM iem, const bool use_aliases);
 
                 ~BinutilsDisassembler();
         };
