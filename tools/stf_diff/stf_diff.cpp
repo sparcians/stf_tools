@@ -149,7 +149,8 @@ int streamingDiff(const STFDiffConfig &config,
     stf_assert(iem == rdr2.getInitialIEM(), "Traces must have the same instruction encoding in order to be compared!");
 
     stf::STFDecoder decoder(iem);
-    stf::Disassembler dis(inst_set, iem, config.use_aliases);
+    stf::Disassembler dis1(findElfFromTrace(config.trace1), inst_set, iem, config.use_aliases);
+    stf::Disassembler dis2(findElfFromTrace(config.trace2), inst_set, iem, config.use_aliases);
 
     const bool spike_lr_sc_workaround = config.workarounds.at("spike_lr_sc");
 
@@ -184,7 +185,7 @@ int streamingDiff(const STFDiffConfig &config,
                 std::cout << "+ "
                           << STFDiffInst(inst2,
                                          config,
-                                         &dis)
+                                         &dis2)
                           << std::endl;
             }
             reader2++;
@@ -200,7 +201,7 @@ int streamingDiff(const STFDiffConfig &config,
                 std::cout << "- "
                           << STFDiffInst(inst1,
                                          config,
-                                         &dis)
+                                         &dis1)
                           << std::endl;
             }
             reader1++;
@@ -213,10 +214,10 @@ int streamingDiff(const STFDiffConfig &config,
 
         STFDiffInst diff1(inst1,
                           config,
-                          &dis);
+                          &dis1);
         STFDiffInst diff2(inst2,
                           config,
-                          &dis);
+                          &dis2);
 
         if (diff1 != diff2) {
             diff_count++;
@@ -244,7 +245,7 @@ void extractInstructions(const std::string &trace,
                          const STFDiffConfig &config) {
     // Open stf trace reader
     stf::STFInstReader rdr(trace, config.ignore_kernel);
-    stf::Disassembler dis(rdr.getISA(), rdr.getInitialIEM(), config.use_aliases);
+    stf::Disassembler dis(findElfFromTrace(trace), rdr.getISA(), rdr.getInitialIEM(), config.use_aliases);
     auto reader = getBeginIterator(start, config.diff_markpointed_region, config.diff_tracepointed_region, rdr);
 
     uint64_t count = 0;
