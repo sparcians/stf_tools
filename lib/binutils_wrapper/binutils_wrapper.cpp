@@ -84,10 +84,14 @@ namespace binutils_wrapper {
 
                 --bfd_count_;
                 if(bfd_count_ > 0) {
-                    bfd_close(abfd);
+                    if(abfd) {
+                        bfd_close(abfd);
+                    }
                 }
                 else {
-                    bfd_close_all_done(abfd);
+                    if(abfd) {
+                        bfd_close_all_done(abfd);
+                    }
                     bfd_initialized_ = false;
                 }
             }
@@ -95,6 +99,9 @@ namespace binutils_wrapper {
             bfd* bfd_ = nullptr;
 
         public:
+            class ElfNotFoundException : public std::exception {
+            };
+
             Bfd() = default;
 
             explicit Bfd(const std::string& elf) :
@@ -110,6 +117,9 @@ namespace binutils_wrapper {
             inline void open(const std::string& elf) {
                 init_();
                 bfd_ = bfd_openr(elf.c_str(), nullptr);
+                if(STF_EXPECT_FALSE(!bfd_)) {
+                    throw ElfNotFoundException();
+                }
                 stf_assert(bfd_check_format(bfd_, bfd_object), "Specified ELF is not an object file");
             }
 
@@ -312,9 +322,13 @@ namespace binutils_wrapper {
                                                              const char* default_isa) {
                 std::string isa_str;
                 if(!elf.empty()) {
-                    Bfd bfd(elf);
-                    if(auto* attr = bfd.getAttributes()) {
-                        isa_str = attr[Tag_RISCV_arch].s;
+                    try {
+                        Bfd bfd(elf);
+                        if(auto* attr = bfd.getAttributes()) {
+                            isa_str = attr[Tag_RISCV_arch].s;
+                        }
+                    }
+                    catch(const Bfd::ElfNotFoundException&) {
                     }
                 }
 
