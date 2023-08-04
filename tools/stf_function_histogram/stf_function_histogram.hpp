@@ -14,6 +14,7 @@ class SymbolHistogram {
         explicit SymbolHistogram(const std::string& elf) :
             symbol_table_(elf)
         {
+            stf_assert(!symbol_table_.empty(), elf << " does not contain any symbol information!");
         }
 
         inline bool validPC(const uint64_t pc) const {
