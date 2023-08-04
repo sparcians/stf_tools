@@ -1,30 +1,26 @@
 #pragma once
 
+#include <memory>
 #include "dwarf_attributes.hpp"
 
 namespace dwarf_wrapper {
-    class Die {
+    class Die : public std::enable_shared_from_this<Die> {
         private:
+            struct enable_make_shared;
+
             const DwarfInterface* dwarf_ = nullptr;
+            const Dwarf_Die die_ = nullptr;
             const Dwarf_Half tag_ = 0;
-            Dwarf_Die die_ = nullptr;
 
-            inline void nullify_() {
-                dwarf_ = nullptr;
-                die_ = nullptr;
+            inline std::shared_ptr<Die> makeDie_(const Dwarf_Die die) const {
+                return construct(dwarf_, die);
             }
 
-            inline Die makeDie_(const Dwarf_Die die) const {
-                return Die(dwarf_, die);
-            }
-
-        public:
-            Die() = default;
-
+        protected:
             Die(const DwarfInterface* dwarf, const Dwarf_Die die) :
                 dwarf_(dwarf),
-                tag_(die ? dwarf_->getTag(die) : 0),
-                die_(die)
+                die_(die),
+                tag_(die_ ? dwarf_->getTag(die_) : 0)
             {
             }
 
@@ -33,18 +29,18 @@ namespace dwarf_wrapper {
             {
             }
 
+        public:
             Die(const Die&) = delete;
 
-            Die(Die&& rhs) :
-                dwarf_(rhs.dwarf_),
-                tag_(rhs.tag_),
-                die_(rhs.die_)
-            {
-                rhs.nullify_();
-            }
+            Die(Die&& rhs) = delete;
 
-            inline operator bool() const {
-                return die_;
+            Die& operator=(const Die&) = delete;
+
+            Die& operator=(Die&& rhs) = delete;
+
+            template<typename ... Args>
+            static inline std::shared_ptr<Die> construct(Args&&... args) {
+                return std::make_shared<enable_make_shared>(std::forward<Args>(args)...);
             }
 
             ~Die() {
@@ -61,11 +57,11 @@ namespace dwarf_wrapper {
                 return tag_ == DW_TAG_subprogram;
             }
 
-            inline Die getSpecificationDie() const {
+            inline std::shared_ptr<Die> getSpecificationDie() const {
                 if(const SpecificationAttribute spec_attr(dwarf_, die_); spec_attr) {
-                    return Die(dwarf_, spec_attr.getReference());
+                    return makeDie_(spec_attr.getReference());
                 }
-                return Die();
+                return nullptr;
             }
 
             template<typename AttributeType>
@@ -74,7 +70,7 @@ namespace dwarf_wrapper {
 
                 if(!result) {
                     if(const auto spec_die = getSpecificationDie()) {
-                        return spec_die.getAttribute<AttributeType>();
+                        return spec_die->getAttribute<AttributeType>();
                     }
                 }
 
@@ -93,7 +89,7 @@ namespace dwarf_wrapper {
                 std::optional<uint64_t> result = dwarf_->lowPc(die_);
                 if(!result) {
                     if(const auto spec_die = getSpecificationDie()) {
-                        return spec_die.getLowPC();
+                        return spec_die->getLowPC();
                     }
                 }
                 return result;
@@ -112,7 +108,7 @@ namespace dwarf_wrapper {
                 }
                 else {
                     if(const auto spec_die = getSpecificationDie()) {
-                        return spec_die.getHighPC(low_pc);
+                        return spec_die->getHighPC(low_pc);
                     }
                     high_pc = low_pc + 1;
                 }
@@ -145,7 +141,7 @@ namespace dwarf_wrapper {
                     name = getLinkageName();
                     if(!name) {
                         if(const auto spec_die = getSpecificationDie()) {
-                            name = spec_die.getName();
+                            name = spec_die->getName();
                         }
                     }
                 }
@@ -154,12 +150,8 @@ namespace dwarf_wrapper {
             }
 
             inline std::vector<STFAddressRange> getRanges() const {
-                try {
-                    if(const auto range_attr = getAttribute<RangeAttribute>()) {
-                        return range_attr.getRanges(die_);
-                    }
-                }
-                catch(const RangeAttribute::InvalidRangeAttribute&) {
+                if(const auto range_attr = getAttribute<RangeAttribute>()) {
+                    return range_attr.getRanges(die_);
                 }
 
                 return std::vector<STFAddressRange>();
@@ -170,24 +162,33 @@ namespace dwarf_wrapper {
             }
 
             template<typename Callback>
-            inline void iterateChildren(Callback&& callback,
-                                        const Dwarf_Bool is_info,
-                                        const int in_level = 0) const {
-                if(const auto child = dwarf_->child(die_)) {
-                    makeDie_(child).iterateSiblings(callback, is_info, in_level + 1);
-                }
-            }
-
-            template<typename Callback>
             inline void iterateSiblings(Callback&& callback,
-                                        const Dwarf_Bool is_info,
-                                        const int in_level = 0) const {
-                callback(*this);
-                iterateChildren(callback, is_info, in_level);
+                                        const Dwarf_Bool is_info) {
+                std::shared_ptr<Die> cur_die = shared_from_this();
 
-                if(const auto sib_die = dwarf_->siblingOf(die_, is_info)) {
-                    makeDie_(sib_die).iterateSiblings(callback, is_info, in_level);
+                do {
+                    callback(cur_die);
+
+                    if(const auto child = dwarf_->child(cur_die->die_)) {
+                        makeDie_(child)->iterateSiblings(callback, is_info);
+                    }
+
+                    if(const auto sib_die = dwarf_->siblingOf(cur_die->die_, is_info)) {
+                        cur_die = makeDie_(sib_die);
+                    }
+                    else {
+                        cur_die.reset();
+                    }
                 }
+                while(cur_die);
             }
+    };
+
+    struct Die::enable_make_shared : public Die {
+        template<typename ... Args>
+        enable_make_shared(Args&&... args) :
+            Die(std::forward<Args>(args)...)
+        {
+        }
     };
 } // end namespace dwarf_wrapper

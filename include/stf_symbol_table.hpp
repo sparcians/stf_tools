@@ -15,10 +15,8 @@ class STFSymbol {
     public:
         using DwarfInlineMap = std::unordered_map<uint64_t, std::string>;
 
-        class InvalidSymbolException : public std::exception {
-        };
-
     private:
+        const bool valid_ = true;
         const bool inlined_ = false;
         const std::string name_;
         const std::vector<STFAddressRange> ranges_;
@@ -27,7 +25,7 @@ class STFSymbol {
             const auto low_pc = die.getLowPC();
 
             if(!low_pc) {
-                throw InvalidSymbolException();
+                return STFAddressRange::invalid();
             }
 
             const uint64_t high_pc = die.getHighPC(*low_pc);
@@ -39,7 +37,7 @@ class STFSymbol {
                 return boost::core::demangle(name_result);
             }
 
-            throw InvalidSymbolException();
+            return "";
         }
 
         static inline std::string getDwarfDieName_(const dwarf_wrapper::Die& die,
@@ -48,7 +46,7 @@ class STFSymbol {
                 return inline_map.at(*inline_offset);
             }
 
-            throw InvalidSymbolException();
+            return "";
         }
 
         static inline STFSymbol makeFromELF_(const ELFIO::symbol_section_accessor& symbols,
@@ -69,7 +67,7 @@ class STFSymbol {
                                                     type,
                                                     section_index,
                                                     other) || !value || symbol_name.empty())) {
-                throw InvalidSymbolException();
+                return STFSymbol();
             }
 
             size = std::max(size, static_cast<decltype(size)>(1)); // If the symbol has 0 size, override to 1
@@ -77,16 +75,25 @@ class STFSymbol {
                              STFAddressRange(value, value + size));
         }
 
+        static inline bool checkValid_(const std::string& name, const std::vector<STFAddressRange>& range) {
+            // Ignore empty symbols
+            // RISC-V and ARM also define mapping symbols ($d, $x, $t, etc.) that should be ignored
+            return !(name.empty() ||
+                    (name.size() == 2 && name[0] == '$') ||
+                    (range.size() == 1 && range.front() == STFAddressRange::invalid()));
+        }
+
+        STFSymbol() :
+            valid_(false)
+        {
+        }
+
         STFSymbol(std::string&& name, std::vector<STFAddressRange>&& range, const bool inlined = false) :
+            valid_(checkValid_(name, range)),
             inlined_(inlined),
             name_(std::move(name)),
             ranges_(std::move(range))
         {
-            // Ignore empty symbols
-            // RISC-V and ARM also define mapping symbols ($d, $x, $t, etc.) that should be ignored
-            if(STF_EXPECT_FALSE(name_.empty() || (name_.size() == 2 && name_[0] == '$'))) {
-                throw InvalidSymbolException();
-            }
         }
 
         STFSymbol(std::string&& name, STFAddressRange&& range, const bool inlined = false) :
@@ -186,6 +193,10 @@ class STFSymbol {
         inline const std::string& name() const {
             return name_;
         }
+
+        inline operator bool() const {
+            return valid_;
+        }
 };
 
 class STFSymbolTable {
@@ -195,25 +206,28 @@ class STFSymbolTable {
         uint64_t elf_max_address_ = 0;
 
         template<typename... Args>
-        inline void emplaceSymbol_(Args&&... args) {
+        inline bool emplaceSymbol_(Args&&... args) {
             auto new_symbol = std::make_shared<STFSymbol>(std::forward<Args>(args)...);
-            stf_assert(new_symbol, "Failed to allocate new symbol");
 
-            for(const auto& p: new_symbol->getRanges()) {
-                symbols_.emplace(p, new_symbol);
+            if(*new_symbol) {
+                for(const auto& p: new_symbol->getRanges()) {
+                    symbols_.emplace(p, new_symbol);
+                }
+
+                return true;
             }
+
+            return false;
         }
 
         template<typename... Args>
         inline void emplaceSymbolFromDwarf_(const dwarf_wrapper::Die& die, Args&&... args) {
-            try {
-                emplaceSymbol_(die, std::forward<Args>(args)...);
-            }
-            catch(const STFSymbol::InvalidSymbolException&) {
+            if(!emplaceSymbol_(die, std::forward<Args>(args)...)) {
                 auto ranges = die.getRanges();
                 if(!ranges.empty()) {
                     std::sort(ranges.begin(), ranges.end());
-                    emplaceSymbol_(die, std::forward<Args>(args)..., std::move(ranges));
+                    stf_assert(emplaceSymbol_(die, std::forward<Args>(args)..., std::move(ranges)),
+                               "Failed to create symbol");
                 }
             }
         }
@@ -225,29 +239,29 @@ class STFSymbolTable {
                 STFDwarf dwarf(elf.getFilename());
 
                 STFSymbol::DwarfInlineMap inlined_cus;
-                std::vector<uint64_t> unresolved_inlines;
+                std::vector<std::shared_ptr<dwarf_wrapper::Die>> unresolved_inlines;
 
                 dwarf.iterateDies(
-                    [this, &inlined_cus, &unresolved_inlines](const dwarf_wrapper::Die& die) {
-                        if(die.isSubprogram()) {
-                            if(die.isInlined()) {
-                                const auto die_name = die.getName();
+                    [this, &inlined_cus, &unresolved_inlines](const std::shared_ptr<dwarf_wrapper::Die>& die) {
+                        if(die->isSubprogram()) {
+                            if(die->isInlined()) {
+                                const auto die_name = die->getName();
                                 stf_assert(die_name, "Couldn't get name for inlined function");
 
-                                inlined_cus[die.getOffset()] = boost::core::demangle(die_name);
+                                inlined_cus[die->getOffset()] = boost::core::demangle(die_name);
                             }
                             else {
-                                emplaceSymbolFromDwarf_(die);
+                                emplaceSymbolFromDwarf_(*die);
                             }
                         }
-                        else if(die.isInlinedSubroutine()) {
-                            unresolved_inlines.emplace_back(die.getOffset());
+                        else if(die->isInlinedSubroutine()) {
+                            unresolved_inlines.emplace_back(die);
                         }
                     }
                 );
 
-                for(const auto inlined_die_offset: unresolved_inlines) {
-                    emplaceSymbolFromDwarf_(dwarf.getDieFromOffset(inlined_die_offset), inlined_cus);
+                for(const auto& inlined_die: unresolved_inlines) {
+                    emplaceSymbolFromDwarf_(*inlined_die, inlined_cus);
                 }
             }
             catch(const dwarf_wrapper::NoDwarfInfoException&) {
@@ -262,11 +276,9 @@ class STFSymbolTable {
                 if(STF_EXPECT_FALSE(section->get_type() == ELFIO::SHT_SYMTAB)) {
                     const ELFIO::symbol_section_accessor symbols(elf_reader, section);
                     for(unsigned int j = 0; j < symbols.get_symbols_num(); ++j) {
-                        try {
-                            auto new_symbol = std::make_shared<STFSymbol>(symbols, j);
+                        auto new_symbol = std::make_shared<STFSymbol>(symbols, j);
+                        if(*new_symbol) {
                             symbols_.emplace(new_symbol->getRanges().front(), std::move(new_symbol));
-                        }
-                        catch(const STFSymbol::InvalidSymbolException&) {
                         }
                     }
                 }
@@ -318,5 +330,9 @@ class STFSymbolTable {
             }
 
             return std::make_pair(nullptr, false);
+        }
+
+        inline bool empty() const {
+            return symbols_.empty();
         }
 };

@@ -8,10 +8,17 @@
 
 class STFAddressRange {
     private:
-        uint64_t start_pc_;
-        uint64_t end_pc_;
+        uint64_t start_pc_ = 0;
+        uint64_t end_pc_ = 0;
+
+        STFAddressRange() = default;
 
     public:
+        static inline const STFAddressRange& invalid() {
+            static const STFAddressRange invalid;
+            return invalid;
+        }
+
         explicit STFAddressRange(const uint64_t pc) :
             STFAddressRange(pc, pc + 1)
         {

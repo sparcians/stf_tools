@@ -130,12 +130,21 @@ namespace dwarf_wrapper {
 
     class RangeAttribute : public FormAttribute {
         private:
+            static inline constexpr auto INVALID_OFFSET_ = std::numeric_limits<Dwarf_Off>::max();
+
             const Dwarf_Unsigned offset_;
 
             template<typename RangeList, typename ... Args>
             static inline std::vector<STFAddressRange> populateRanges_(Args&&... range_list_args) {
-                const auto range_list = RangeList(std::forward<Args>(range_list_args)...);
-                return std::vector<STFAddressRange>(range_list.begin(), range_list.end());
+                try {
+                    if(const auto range_list = RangeList(std::forward<Args>(range_list_args)...);
+                       STF_EXPECT_TRUE(range_list.valid())) {
+                        return std::vector<STFAddressRange>(range_list.begin(), range_list.end());
+                    }
+                }
+                catch(const typename RangeList::InvalidRangeList&) {
+                }
+                return std::vector<STFAddressRange>();
             }
 
             struct RangeEntry {
@@ -256,6 +265,9 @@ namespace dwarf_wrapper {
                     }
 
                 public:
+                    class InvalidRangeList : public std::exception {
+                    };
+
                     RangeListBase(const DwarfInterface* const dwarf,
                                   const Pointer head,
                                   const Size size) :
@@ -287,6 +299,10 @@ namespace dwarf_wrapper {
                     inline size_t size() const {
                         return static_cast<size_t>(size_);
                     }
+
+                    inline bool valid() const {
+                        return head_;
+                    }
             };
 
             class RangeListDW4 final : public RangeListBase<Dwarf_Ranges*, Dwarf_Signed> {
@@ -295,9 +311,6 @@ namespace dwarf_wrapper {
                                  std::pair<Dwarf_Ranges*, Dwarf_Signed>&& range_info) :
                         RangeListDW4(dwarf, range_info.first, range_info.second)
                     {
-                        if(STF_EXPECT_FALSE(!head_)) {
-                            throw InvalidRangeAttribute();
-                        }
                     }
 
                 public:
@@ -366,7 +379,7 @@ namespace dwarf_wrapper {
                     RangeListDW4& operator=(RangeListDW4&&) = default;
 
                     ~RangeListDW4() {
-                        if(STF_EXPECT_TRUE(dwarf_)) {
+                        if(STF_EXPECT_TRUE(dwarf_ && head_)) {
                             dwarf_->deallocRanges(head_, size_);
                         }
                     }
@@ -401,7 +414,7 @@ namespace dwarf_wrapper {
                                                                        rle_code,
                                                                        entry.start_address,
                                                                        entry.end_address))) {
-                            throw InvalidRangeAttribute();
+                            throw InvalidRangeList();
                         }
                     }
 
@@ -409,9 +422,6 @@ namespace dwarf_wrapper {
                                  std::pair<Dwarf_Rnglists_Head, Dwarf_Unsigned>&& range_info) :
                         RangeListDW5(dwarf, range_info.first, range_info.second)
                     {
-                        if(STF_EXPECT_FALSE(!head_)) {
-                            throw InvalidRangeAttribute();
-                        }
                     }
 
                 public:
@@ -541,25 +551,18 @@ namespace dwarf_wrapper {
             };
 
             inline Dwarf_Off getOffset_() const {
-                try {
-                    if(form_ == DW_FORM_rnglistx) {
-                        return formUData_();
-                    }
+                if(form_ == DW_FORM_rnglistx) {
+                    return formUData_();
+                }
 
-                    return globalFormRef_();
+                if(const auto result = dwarf_->globalFormRefOptional(attr_)) {
+                    return *result;
                 }
-                catch(const dwarf_wrapper::DwarfError&) {
-                    if(STF_EXPECT_FALSE(form_ == DW_FORM_rnglistx)) {
-                        throw;
-                    }
-                    throw InvalidRangeAttribute();
-                }
+
+                return INVALID_OFFSET_;
             }
 
         public:
-            class InvalidRangeAttribute : public std::exception {
-            };
-
             RangeAttribute(const DwarfInterface* dwarf, const Dwarf_Die die) :
                 FormAttribute(dwarf, die, DW_AT_ranges),
                 offset_(getOffset_())
@@ -569,17 +572,18 @@ namespace dwarf_wrapper {
             inline std::vector<STFAddressRange> getRanges(const Dwarf_Die die) const {
                 static constexpr Dwarf_Half DWVERSION5 = 5;
 
-                const auto cu_version = dwarf_->getDieVersion(die);
-
-                if(STF_EXPECT_FALSE(!cu_version)) {
-                    throw InvalidRangeAttribute();
+                if(const auto cu_version = dwarf_->getDieVersion(die); STF_EXPECT_FALSE(!cu_version)) {
+                    return std::vector<STFAddressRange>();
                 }
-
-                if(cu_version < DWVERSION5) {
+                else if(cu_version < DWVERSION5) {
                     return populateRanges_<RangeListDW4>(dwarf_, die, offset_);
                 }
 
                 return populateRanges_<RangeListDW5>(dwarf_, attr_, form_, offset_);
+            }
+
+            inline operator bool() const {
+                return FormAttribute::operator bool() && (offset_ != INVALID_OFFSET_);
             }
     };
 } // end namespace dwarf_wrapper

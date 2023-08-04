@@ -223,7 +223,7 @@ namespace dwarf_wrapper {
             }
 
             inline void deallocDie(const Dwarf_Die die) const {
-                dwarf_dealloc(dbg_, die, DW_DLA_DIE);
+                dwarf_dealloc_die(die);
             }
 
             inline std::pair<Dwarf_Rnglists_Head, Dwarf_Unsigned> getDwarfRngLists(const Dwarf_Attribute attr,
@@ -340,6 +340,16 @@ namespace dwarf_wrapper {
                 Dwarf_Off offset;
                 DWARF_CALL_ASSERT_OK(dwarf_global_formref, attr, &offset);
                 return offset;
+            }
+
+            inline std::optional<Dwarf_Off> globalFormRefOptional(const Dwarf_Attribute attr) const {
+                std::optional<Dwarf_Off> result;
+                Dwarf_Off offset;
+                dwarf_global_formref(attr, &offset, &err_);
+                if(STF_EXPECT_TRUE(isOk_())) {
+                    result.emplace(offset);
+                }
+                return result;
             }
 
             inline const char* formString(const Dwarf_Attribute attr) const {

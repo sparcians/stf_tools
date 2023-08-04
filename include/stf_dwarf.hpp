@@ -27,11 +27,7 @@ class STFDwarf {
                 /* The CU will have a single sibling, a cu_die. */
                 const auto cu_die = dwarf_.siblingOf(no_die, is_info);
                 stf_assert(cu_die, "Error reading CU siblings");
-                dwarf_wrapper::Die(&dwarf_, cu_die).iterateSiblings(callback, is_info);
+                dwarf_wrapper::Die::construct(&dwarf_, cu_die)->iterateSiblings(callback, is_info);
             }
-        }
-
-        inline dwarf_wrapper::Die getDieFromOffset(const uint64_t die_offset) const {
-            return dwarf_wrapper::Die(&dwarf_, die_offset);
         }
 };
