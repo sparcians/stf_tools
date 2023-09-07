@@ -17,6 +17,7 @@ else()
 
     set(BINUTILS_PATCHES ${STF_TOOLS_PATCHES_DIR}/riscv-binutils-gdb/0001-Add-riscv_get_disassembler_arch-function.patch
                          ${STF_TOOLS_PATCHES_DIR}/riscv-binutils-gdb/0002-Make-it-possible-to-override-opcodes_error_handler.patch
+                         ${STF_TOOLS_PATCHES_DIR}/riscv-binutils-gdb/0003-enable-zihintntl.patch
     )
 
     # Set tag

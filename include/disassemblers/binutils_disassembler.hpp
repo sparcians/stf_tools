@@ -31,7 +31,7 @@ namespace stf {
                                        const uint64_t pc,
                                        const uint32_t opcode) const final;
 
-                inline static const char* DEFAULT_DISASM_ISA_ = "rv64imafdcvh_zicbom_zicbop_zicboz_zicsr_zifencei_zihintpause_zfhmin_zba_zbb_zbs_zvbb_zvbc_zvkg_zvkned_zvknhb_zvksed_zvksh_zvkt_smaia_smstateen_ss1p12_ssaia_sscofpmf_ssstateen_sv48_svinval_svnapot_svpbmt";
+                inline static const char* DEFAULT_DISASM_ISA_ = "rv64imafdcvh_zicbom_zicbop_zicboz_zicsr_zifencei_zihintpause_zfhmin_zba_zbb_zbs_zihintntl_zvbb_zvbc_zvkg_zvkned_zvknhb_zvksed_zvksh_zvkt_smaia_smstateen_ss1p12_ssaia_sscofpmf_ssstateen_sv48_svinval_svnapot_svpbmt";
 
             public:
                 /**

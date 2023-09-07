@@ -1,0 +1,372 @@
+From 2266f8631806ec65a9a9ff8a7c68a56c83eae81d Mon Sep 17 00:00:00 2001
+From: Tsukasa OI <research_trasio@irq.a4lg.com>
+Date: Mon, 24 Jul 2023 02:45:29 +0000
+Subject: [PATCH] RISC-V: Add support for the 'Zihintntl' extension
+
+This commit adds 'Zihintntl' extension and its hint instructions.
+
+This is based on:
+<https://github.com/riscv/riscv-isa-manual/commit/0dc91f505e6da7791d5a733c553e6e2506ddcab5>,
+the first ISA Manual noting that the 'Zihintntl' extension is ratified.
+
+Note that compressed 'Zihintntl' hints require either 'C' or
+'Zca' extension.
+
+Co-authored-by: Nelson Chu <nelson@rivosinc.com>
+
+bfd/ChangeLog:
+
+	* elfxx-riscv.c (riscv_supported_std_z_ext): Add 'Zihintntl'
+	standard hint 'Z' extension.
+	(riscv_multi_subset_supports): Support new instruction classes.
+	(riscv_multi_subset_supports_ext): Likewise.
+
+gas/ChangeLog:
+
+	* testsuite/gas/riscv/zihintntl.s: New test for 'Zihintntl'
+	including auto-compression without C prefix and explicit C prefix.
+	* testsuite/gas/riscv/zihintntl.d: Likewise.
+	* testsuite/gas/riscv/zihintntl-na.d: Likewise.
+	* testsuite/gas/riscv/zihintntl-base.s: New test for correspondence
+	between 'Zihintntl' and base 'I' or 'C' instructions.
+	* testsuite/gas/riscv/zihintntl-base.d: Likewise.
+
+include/ChangeLog:
+
+	* opcode/riscv.h (enum riscv_insn_class): Add new instruction
+	classes: INSN_CLASS_ZIHINTNTL and INSN_CLASS_ZIHINTNTL_AND_C.
+	(MASK_NTL_P1, MATCH_NTL_P1, MASK_NTL_PALL,
+	MATCH_NTL_PALL, MASK_NTL_S1, MATCH_NTL_S1, MASK_NTL_ALL,
+	MATCH_NTL_ALL, MASK_C_NTL_P1, MATCH_C_NTL_P1, MASK_C_NTL_PALL,
+	MATCH_C_NTL_PALL, MASK_C_NTL_S1, MATCH_C_NTL_S1, MASK_C_NTL_ALL,
+	MATCH_C_NTL_ALL): New.
+
+opcodes/ChangeLog:
+
+	* riscv-opc.c (riscv_opcodes): Add instructions from the
+	'Zihintntl' extension.
+---
+ bfd/elfxx-riscv.c                        | 20 ++++++++++++++
+ gas/testsuite/gas/riscv/zihintntl-base.d | 24 +++++++++++++++++
+ gas/testsuite/gas/riscv/zihintntl-base.s | 29 +++++++++++++++++++++
+ gas/testsuite/gas/riscv/zihintntl-na.d   | 33 ++++++++++++++++++++++++
+ gas/testsuite/gas/riscv/zihintntl.d      | 32 +++++++++++++++++++++++
+ gas/testsuite/gas/riscv/zihintntl.s      | 32 +++++++++++++++++++++++
+ include/opcode/riscv-opc.h               | 26 +++++++++++++++++++
+ include/opcode/riscv.h                   |  2 ++
+ opcodes/riscv-opc.c                      | 12 +++++++++
+ 9 files changed, 210 insertions(+)
+ create mode 100644 gas/testsuite/gas/riscv/zihintntl-base.d
+ create mode 100644 gas/testsuite/gas/riscv/zihintntl-base.s
+ create mode 100644 gas/testsuite/gas/riscv/zihintntl-na.d
+ create mode 100644 gas/testsuite/gas/riscv/zihintntl.d
+ create mode 100644 gas/testsuite/gas/riscv/zihintntl.s
+
+diff --git a/bfd/elfxx-riscv.c b/bfd/elfxx-riscv.c
+index 9cc0c7b1c10..6b34c2feda8 100644
+--- a/bfd/elfxx-riscv.c
++++ b/bfd/elfxx-riscv.c
+@@ -1254,6 +1254,7 @@ static struct riscv_supported_ext riscv_supported_std_z_ext[] =
+   {"zicsr",		ISA_SPEC_CLASS_20190608,	2, 0,  0 },
+   {"zifencei",		ISA_SPEC_CLASS_20191213,	2, 0,  0 },
+   {"zifencei",		ISA_SPEC_CLASS_20190608,	2, 0,  0 },
++  {"zihintntl",		ISA_SPEC_CLASS_DRAFT,		1, 0,  0 },
+   {"zihintpause",	ISA_SPEC_CLASS_DRAFT,		2, 0,  0 },
+   {"zmmul",		ISA_SPEC_CLASS_DRAFT,		1, 0,  0 },
+   {"zawrs",		ISA_SPEC_CLASS_DRAFT,		1, 0,  0 },
+@@ -2391,6 +2392,12 @@ riscv_multi_subset_supports (riscv_parse_subset_t *rps,
+       return riscv_subset_supports (rps, "zicsr");
+     case INSN_CLASS_ZIFENCEI:
+       return riscv_subset_supports (rps, "zifencei");
++    case INSN_CLASS_ZIHINTNTL:
++      return riscv_subset_supports (rps, "zihintntl");
++    case INSN_CLASS_ZIHINTNTL_AND_C:
++      return (riscv_subset_supports (rps, "zihintntl")
++	      && (riscv_subset_supports (rps, "c")
++		  || riscv_subset_supports (rps, "zca")));
+     case INSN_CLASS_ZIHINTPAUSE:
+       return riscv_subset_supports (rps, "zihintpause");
+     case INSN_CLASS_M:
+@@ -2584,6 +2591,19 @@ riscv_multi_subset_supports_ext (riscv_parse_subset_t *rps,
+       return "zicsr";
+     case INSN_CLASS_ZIFENCEI:
+       return "zifencei";
++    case INSN_CLASS_ZIHINTNTL:
++      return "zihintntl";
++    case INSN_CLASS_ZIHINTNTL_AND_C:
++      if (!riscv_subset_supports (rps, "zihintntl"))
++	{
++	  if (!riscv_subset_supports (rps, "c")
++	      && !riscv_subset_supports (rps, "zca"))
++	    return _("zihintntl' and `c', or `zihintntl' and `zca");
++	  else
++	    return "zihintntl";
++	}
++      else
++	return _("c' or `zca");
+     case INSN_CLASS_ZIHINTPAUSE:
+       return "zihintpause";
+     case INSN_CLASS_M:
+diff --git a/gas/testsuite/gas/riscv/zihintntl-base.d b/gas/testsuite/gas/riscv/zihintntl-base.d
+new file mode 100644
+index 00000000000..5d445204d81
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/zihintntl-base.d
+@@ -0,0 +1,24 @@
++#as: -march=rv32i_zihintntl
++#objdump: -d
++
++.*:[ 	]+file format .*
++
++Disassembly of section .text:
++
++0+000 <target>:
++[ 	]+[0-9a-f]+:[ 	]+00200033[ 	]+ntl\.p1
++[ 	]+[0-9a-f]+:[ 	]+01b28023[ 	]+sb[ 	]+s11,0\(t0\)
++[ 	]+[0-9a-f]+:[ 	]+00300033[ 	]+ntl\.pall
++[ 	]+[0-9a-f]+:[ 	]+01b28123[ 	]+sb[ 	]+s11,2\(t0\)
++[ 	]+[0-9a-f]+:[ 	]+00400033[ 	]+ntl\.s1
++[ 	]+[0-9a-f]+:[ 	]+01b28223[ 	]+sb[ 	]+s11,4\(t0\)
++[ 	]+[0-9a-f]+:[ 	]+00500033[ 	]+ntl\.all
++[ 	]+[0-9a-f]+:[ 	]+01b28323[ 	]+sb[ 	]+s11,6\(t0\)
++[ 	]+[0-9a-f]+:[ 	]+900a[ 	]+ntl\.p1
++[ 	]+[0-9a-f]+:[ 	]+01b28423[ 	]+sb[ 	]+s11,8\(t0\)
++[ 	]+[0-9a-f]+:[ 	]+900e[ 	]+ntl\.pall
++[ 	]+[0-9a-f]+:[ 	]+01b28523[ 	]+sb[ 	]+s11,10\(t0\)
++[ 	]+[0-9a-f]+:[ 	]+9012[ 	]+ntl\.s1
++[ 	]+[0-9a-f]+:[ 	]+01b28623[ 	]+sb[ 	]+s11,12\(t0\)
++[ 	]+[0-9a-f]+:[ 	]+9016[ 	]+ntl\.all
++[ 	]+[0-9a-f]+:[ 	]+01b28723[ 	]+sb[ 	]+s11,14\(t0\)
+diff --git a/gas/testsuite/gas/riscv/zihintntl-base.s b/gas/testsuite/gas/riscv/zihintntl-base.s
+new file mode 100644
+index 00000000000..84ea13fbfab
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/zihintntl-base.s
+@@ -0,0 +1,29 @@
++target:
++	# ntl.p1   == add x0, x0, x2
++	# ntl.pall == add x0, x0, x3
++	# ntl.s1   == add x0, x0, x4
++	# ntl.all  == add x0, x0, x5
++	add x0, x0, x2
++	sb	s11, 0(t0)
++	add x0, x0, x3
++	sb	s11, 2(t0)
++	add x0, x0, x4
++	sb	s11, 4(t0)
++	add x0, x0, x5
++	sb	s11, 6(t0)
++
++	# c.ntl.p1   == c.add x0, x2
++	# c.ntl.pall == c.add x0, x3
++	# c.ntl.s1   == c.add x0, x4
++	# c.ntl.all  == c.add x0, x5
++	.option	push
++	.option	arch, +zca
++	c.add	x0, x2
++	sb	s11, 8(t0)
++	c.add	x0, x3
++	sb	s11, 10(t0)
++	c.add	x0, x4
++	sb	s11, 12(t0)
++	c.add	x0, x5
++	sb	s11, 14(t0)
++	.option	pop
+diff --git a/gas/testsuite/gas/riscv/zihintntl-na.d b/gas/testsuite/gas/riscv/zihintntl-na.d
+new file mode 100644
+index 00000000000..c32b563ca27
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/zihintntl-na.d
+@@ -0,0 +1,33 @@
++#as: -march=rv32i_zihintntl
++#source: zihintntl.s
++#objdump: -d -M no-aliases
++
++.*:[ 	]+file format .*
++
++Disassembly of section .text:
++
++0+000 <target>:
++[ 	]+[0-9a-f]+:[ 	]+00200033[ 	]+ntl\.p1
++[ 	]+[0-9a-f]+:[ 	]+01b28023[ 	]+sb[ 	]+s11,0\(t0\)
++[ 	]+[0-9a-f]+:[ 	]+00300033[ 	]+ntl\.pall
++[ 	]+[0-9a-f]+:[ 	]+01b28123[ 	]+sb[ 	]+s11,2\(t0\)
++[ 	]+[0-9a-f]+:[ 	]+00400033[ 	]+ntl\.s1
++[ 	]+[0-9a-f]+:[ 	]+01b28223[ 	]+sb[ 	]+s11,4\(t0\)
++[ 	]+[0-9a-f]+:[ 	]+00500033[ 	]+ntl\.all
++[ 	]+[0-9a-f]+:[ 	]+01b28323[ 	]+sb[ 	]+s11,6\(t0\)
++[ 	]+[0-9a-f]+:[ 	]+900a[ 	]+c\.ntl\.p1
++[ 	]+[0-9a-f]+:[ 	]+01b28023[ 	]+sb[ 	]+s11,0\(t0\)
++[ 	]+[0-9a-f]+:[ 	]+900e[ 	]+c\.ntl\.pall
++[ 	]+[0-9a-f]+:[ 	]+01b28123[ 	]+sb[ 	]+s11,2\(t0\)
++[ 	]+[0-9a-f]+:[ 	]+9012[ 	]+c\.ntl\.s1
++[ 	]+[0-9a-f]+:[ 	]+01b28223[ 	]+sb[ 	]+s11,4\(t0\)
++[ 	]+[0-9a-f]+:[ 	]+9016[ 	]+c\.ntl\.all
++[ 	]+[0-9a-f]+:[ 	]+01b28323[ 	]+sb[ 	]+s11,6\(t0\)
++[ 	]+[0-9a-f]+:[ 	]+900a[ 	]+c\.ntl\.p1
++[ 	]+[0-9a-f]+:[ 	]+01b28423[ 	]+sb[ 	]+s11,8\(t0\)
++[ 	]+[0-9a-f]+:[ 	]+900e[ 	]+c\.ntl\.pall
++[ 	]+[0-9a-f]+:[ 	]+01b28523[ 	]+sb[ 	]+s11,10\(t0\)
++[ 	]+[0-9a-f]+:[ 	]+9012[ 	]+c\.ntl\.s1
++[ 	]+[0-9a-f]+:[ 	]+01b28623[ 	]+sb[ 	]+s11,12\(t0\)
++[ 	]+[0-9a-f]+:[ 	]+9016[ 	]+c\.ntl\.all
++[ 	]+[0-9a-f]+:[ 	]+01b28723[ 	]+sb[ 	]+s11,14\(t0\)
+diff --git a/gas/testsuite/gas/riscv/zihintntl.d b/gas/testsuite/gas/riscv/zihintntl.d
+new file mode 100644
+index 00000000000..d799a662d70
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/zihintntl.d
+@@ -0,0 +1,32 @@
++#as: -march=rv32i_zihintntl
++#objdump: -d
++
++.*:[ 	]+file format .*
++
++Disassembly of section .text:
++
++0+000 <target>:
++[ 	]+[0-9a-f]+:[ 	]+00200033[ 	]+ntl\.p1
++[ 	]+[0-9a-f]+:[ 	]+01b28023[ 	]+sb[ 	]+s11,0\(t0\)
++[ 	]+[0-9a-f]+:[ 	]+00300033[ 	]+ntl\.pall
++[ 	]+[0-9a-f]+:[ 	]+01b28123[ 	]+sb[ 	]+s11,2\(t0\)
++[ 	]+[0-9a-f]+:[ 	]+00400033[ 	]+ntl\.s1
++[ 	]+[0-9a-f]+:[ 	]+01b28223[ 	]+sb[ 	]+s11,4\(t0\)
++[ 	]+[0-9a-f]+:[ 	]+00500033[ 	]+ntl\.all
++[ 	]+[0-9a-f]+:[ 	]+01b28323[ 	]+sb[ 	]+s11,6\(t0\)
++[ 	]+[0-9a-f]+:[ 	]+900a[ 	]+ntl\.p1
++[ 	]+[0-9a-f]+:[ 	]+01b28023[ 	]+sb[ 	]+s11,0\(t0\)
++[ 	]+[0-9a-f]+:[ 	]+900e[ 	]+ntl\.pall
++[ 	]+[0-9a-f]+:[ 	]+01b28123[ 	]+sb[ 	]+s11,2\(t0\)
++[ 	]+[0-9a-f]+:[ 	]+9012[ 	]+ntl\.s1
++[ 	]+[0-9a-f]+:[ 	]+01b28223[ 	]+sb[ 	]+s11,4\(t0\)
++[ 	]+[0-9a-f]+:[ 	]+9016[ 	]+ntl\.all
++[ 	]+[0-9a-f]+:[ 	]+01b28323[ 	]+sb[ 	]+s11,6\(t0\)
++[ 	]+[0-9a-f]+:[ 	]+900a[ 	]+ntl\.p1
++[ 	]+[0-9a-f]+:[ 	]+01b28423[ 	]+sb[ 	]+s11,8\(t0\)
++[ 	]+[0-9a-f]+:[ 	]+900e[ 	]+ntl\.pall
++[ 	]+[0-9a-f]+:[ 	]+01b28523[ 	]+sb[ 	]+s11,10\(t0\)
++[ 	]+[0-9a-f]+:[ 	]+9012[ 	]+ntl\.s1
++[ 	]+[0-9a-f]+:[ 	]+01b28623[ 	]+sb[ 	]+s11,12\(t0\)
++[ 	]+[0-9a-f]+:[ 	]+9016[ 	]+ntl\.all
++[ 	]+[0-9a-f]+:[ 	]+01b28723[ 	]+sb[ 	]+s11,14\(t0\)
+diff --git a/gas/testsuite/gas/riscv/zihintntl.s b/gas/testsuite/gas/riscv/zihintntl.s
+new file mode 100644
+index 00000000000..6c100f70d92
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/zihintntl.s
+@@ -0,0 +1,32 @@
++.macro	INSN_SEQ
++	ntl.p1
++	sb	s11, 0(t0)
++	ntl.pall
++	sb	s11, 2(t0)
++	ntl.s1
++	sb	s11, 4(t0)
++	ntl.all
++	sb	s11, 6(t0)
++.endm
++
++.macro	INSN_SEQ_C
++	c.ntl.p1
++	sb	s11, 8(t0)
++	c.ntl.pall
++	sb	s11, 10(t0)
++	c.ntl.s1
++	sb	s11, 12(t0)
++	c.ntl.all
++	sb	s11, 14(t0)
++.endm
++
++target:
++	INSN_SEQ	# RV32I_Zihintntl
++
++	# 'Zcb' is chosen to test complex cases to enable
++	# compressed instructions.
++	.option	push
++	.option	arch, +zcb
++	INSN_SEQ	# RV32I_Zihintntl_Zca_Zcb (auto compression without prefix)
++	INSN_SEQ_C	# RV32I_Zihintntl_Zca_Zcb (with compressed prefix)
++	.option pop
+diff --git a/include/opcode/riscv-opc.h b/include/opcode/riscv-opc.h
+index 53f5f200508..26d2c04bf24 100644
+--- a/include/opcode/riscv-opc.h
++++ b/include/opcode/riscv-opc.h
+@@ -2298,6 +2298,23 @@
+ #define MASK_CZERO_EQZ 0xfe00707f
+ #define MATCH_CZERO_NEZ 0xe007033
+ #define MASK_CZERO_NEZ 0xfe00707f
++/* Zihintntl hint instructions.  */
++#define MATCH_NTL_P1 0x200033
++#define MASK_NTL_P1 0xffffffff
++#define MATCH_NTL_PALL 0x300033
++#define MASK_NTL_PALL 0xffffffff
++#define MATCH_NTL_S1 0x400033
++#define MASK_NTL_S1 0xffffffff
++#define MATCH_NTL_ALL 0x500033
++#define MASK_NTL_ALL 0xffffffff
++#define MATCH_C_NTL_P1 0x900a
++#define MASK_C_NTL_P1 0xffff
++#define MATCH_C_NTL_PALL 0x900e
++#define MASK_C_NTL_PALL 0xffff
++#define MATCH_C_NTL_S1 0x9012
++#define MASK_C_NTL_S1 0xffff
++#define MATCH_C_NTL_ALL 0x9016
++#define MASK_C_NTL_ALL 0xffff
+ /* Zawrs intructions.  */
+ #define MATCH_WRS_NTO 0x00d00073
+ #define MASK_WRS_NTO 0xffffffff
+@@ -3341,6 +3358,15 @@ DECLARE_INSN(cbo_zero, MATCH_CBO_ZERO, MASK_CBO_ZERO);
+ /* Zicond instructions. */
+ DECLARE_INSN(czero_eqz, MATCH_CZERO_EQZ, MASK_CZERO_EQZ)
+ DECLARE_INSN(czero_nez, MATCH_CZERO_NEZ, MASK_CZERO_NEZ)
++/* Zihintntl hint instructions.  */
++DECLARE_INSN(ntl_p1, MATCH_NTL_P1, MASK_NTL_P1);
++DECLARE_INSN(ntl_pall, MATCH_NTL_PALL, MASK_NTL_PALL);
++DECLARE_INSN(ntl_s1, MATCH_NTL_S1, MASK_NTL_S1);
++DECLARE_INSN(ntl_all, MATCH_NTL_ALL, MASK_NTL_ALL);
++DECLARE_INSN(c_ntl_p1, MATCH_C_NTL_P1, MASK_C_NTL_P1);
++DECLARE_INSN(c_ntl_pall, MATCH_C_NTL_PALL, MASK_C_NTL_PALL);
++DECLARE_INSN(c_ntl_s1, MATCH_C_NTL_S1, MASK_C_NTL_S1);
++DECLARE_INSN(c_ntl_all, MATCH_C_NTL_ALL, MASK_C_NTL_ALL);
+ /* Zawrs instructions.  */
+ DECLARE_INSN(wrs_nto, MATCH_WRS_NTO, MASK_WRS_NTO)
+ DECLARE_INSN(wrs_sto, MATCH_WRS_STO, MASK_WRS_STO)
+diff --git a/include/opcode/riscv.h b/include/opcode/riscv.h
+index 3ed365ec4aa..0b8fde9cc27 100644
+--- a/include/opcode/riscv.h
++++ b/include/opcode/riscv.h
+@@ -392,6 +392,8 @@ enum riscv_insn_class
+   INSN_CLASS_ZICOND,
+   INSN_CLASS_ZICSR,
+   INSN_CLASS_ZIFENCEI,
++  INSN_CLASS_ZIHINTNTL,
++  INSN_CLASS_ZIHINTNTL_AND_C,
+   INSN_CLASS_ZIHINTPAUSE,
+   INSN_CLASS_ZMMUL,
+   INSN_CLASS_ZAWRS,
+diff --git a/opcodes/riscv-opc.c b/opcodes/riscv-opc.c
+index 380d8c28bce..02f993dbaaf 100644
+--- a/opcodes/riscv-opc.c
++++ b/opcodes/riscv-opc.c
+@@ -337,6 +337,18 @@ const struct riscv_opcode riscv_opcodes[] =
+ {"prefetch.i",  0, INSN_CLASS_ZICBOP, "Wif(s)", MATCH_PREFETCH_I, MASK_PREFETCH_I, match_opcode, 0 },
+ {"prefetch.r",  0, INSN_CLASS_ZICBOP, "Wif(s)", MATCH_PREFETCH_R, MASK_PREFETCH_R, match_opcode, 0 },
+ {"prefetch.w",  0, INSN_CLASS_ZICBOP, "Wif(s)", MATCH_PREFETCH_W, MASK_PREFETCH_W, match_opcode, 0 },
++{"ntl.p1",      0, INSN_CLASS_ZIHINTNTL_AND_C, "", MATCH_C_NTL_P1, MASK_C_NTL_P1, match_opcode, INSN_ALIAS },
++{"ntl.p1",      0, INSN_CLASS_ZIHINTNTL,       "", MATCH_NTL_P1, MASK_NTL_P1, match_opcode, 0 },
++{"ntl.pall",    0, INSN_CLASS_ZIHINTNTL_AND_C, "", MATCH_C_NTL_PALL, MASK_C_NTL_PALL, match_opcode, INSN_ALIAS },
++{"ntl.pall",    0, INSN_CLASS_ZIHINTNTL,       "", MATCH_NTL_PALL, MASK_NTL_PALL, match_opcode, 0 },
++{"ntl.s1",      0, INSN_CLASS_ZIHINTNTL_AND_C, "", MATCH_C_NTL_S1, MASK_C_NTL_S1, match_opcode, INSN_ALIAS },
++{"ntl.s1",      0, INSN_CLASS_ZIHINTNTL,       "", MATCH_NTL_S1, MASK_NTL_S1, match_opcode, 0 },
++{"ntl.all",     0, INSN_CLASS_ZIHINTNTL_AND_C, "", MATCH_C_NTL_ALL, MASK_C_NTL_ALL, match_opcode, INSN_ALIAS },
++{"ntl.all",     0, INSN_CLASS_ZIHINTNTL,       "", MATCH_NTL_ALL, MASK_NTL_ALL, match_opcode, 0 },
++{"c.ntl.p1",    0, INSN_CLASS_ZIHINTNTL_AND_C, "", MATCH_C_NTL_P1, MASK_C_NTL_P1, match_opcode, 0 },
++{"c.ntl.pall",  0, INSN_CLASS_ZIHINTNTL_AND_C, "", MATCH_C_NTL_PALL, MASK_C_NTL_PALL, match_opcode, 0 },
++{"c.ntl.s1",    0, INSN_CLASS_ZIHINTNTL_AND_C, "", MATCH_C_NTL_S1, MASK_C_NTL_S1, match_opcode, 0 },
++{"c.ntl.all",   0, INSN_CLASS_ZIHINTNTL_AND_C, "", MATCH_C_NTL_ALL, MASK_C_NTL_ALL, match_opcode, 0 },
+ {"pause",       0, INSN_CLASS_ZIHINTPAUSE, "", MATCH_PAUSE, MASK_PAUSE, match_opcode, 0 },
+ 
+ /* Basic RVI instructions and aliases.  */
+-- 
+2.39.3
+
