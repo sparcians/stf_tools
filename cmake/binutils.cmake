@@ -56,7 +56,7 @@ else()
     ExternalProject_Add_Step(binutils
                              install_generated_headers
                              WORKING_DIRECTORY <BINARY_DIR>
-                             COMMAND cp bfd/bfd.h <INSTALL_DIR>/include/
+                             COMMAND cp bfd/bfd.h bfd/config.h <INSTALL_DIR>/include/
                              DEPENDEES install_dirs)
 
     ExternalProject_Get_Property(binutils SOURCE_DIR)

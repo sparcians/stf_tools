@@ -1,3 +1,7 @@
+extern "C" {
+#include "config.h"
+}
+
 #include <array>
 #include <cstdarg>
 #include <cstdio>
@@ -13,8 +17,6 @@
 #include "stf_exception.hpp"
 #include "format_utils.hpp"
 #include "util.hpp"
-
-#define PACKAGE "trace_tools" // Needed to avoid compile error in dis-asm.h
 
 #define OVERRIDE_OPCODES_ERROR_HANDLER 1
 
