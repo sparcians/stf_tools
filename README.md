@@ -31,9 +31,9 @@ OS X users may need to add the following to their `cmake` invocation if Python w
 ```
 -DPYTHON_LIBRARY=$(python3-config --prefix)/lib/libpython3.8.dylib -DPYTHON_INCLUDE_DIR=$(python3-config --prefix)/include/python3.8
 ```
-Ubuntu users may need to install the following dependency for binutils
+Ubuntu users may need to install the following dependencies for binutils
 ```
-sudo apt-get install libmpc-dev
+sudo apt-get install libmpc-dev liblzma-dev libbz2-dev
 ```
 
 ## RISC-V Disassembly Support
