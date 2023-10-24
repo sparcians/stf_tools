@@ -51,6 +51,7 @@ namespace mavis_helpers {
                 IType::MASK,
                 IType::WIDENING,
                 IType::HYPERVISOR,
+                IType::CRYPTO,
                 IType::PREFETCH,
                 IType::NTL,
                 IType::HINT,
@@ -92,6 +93,9 @@ namespace mavis_helpers {
                     case IType::FAULTFIRST:
                     case IType::WHOLE:
                     case IType::MASK:
+                    case IType::WIDENING:
+                    case IType::HYPERVISOR:
+                    case IType::CRYPTO:
                     case IType::PREFETCH:
                     case IType::NTL:
                     case IType::HINT:
@@ -100,8 +104,6 @@ namespace mavis_helpers {
                     case IType::FENCE:
                     case IType::SYSTEM:
                     case IType::CSR:
-                    case IType::WIDENING:
-                    case IType::HYPERVISOR:
                         break;
                 };
             }
@@ -248,6 +250,8 @@ namespace mavis_helpers {
                         return "widening";
                     case enum_t::HYPERVISOR:
                         return "hypervisor";
+                    case enum_t::CRYPTO:
+                        return "crypto";
                     case enum_t::PREFETCH:
                         return "prefetch";
                     case enum_t::NTL:
