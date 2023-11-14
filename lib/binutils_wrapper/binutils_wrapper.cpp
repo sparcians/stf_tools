@@ -57,6 +57,7 @@ static inline int varListFormatter(const char** output_str, const char* format, 
     return retval;
 }
 
+// cppcheck-suppress unusedFunction
 void opcodes_error_handler(const char* fmt, ...) {
     const char* formatted_str;
     va_list args;
@@ -130,6 +131,7 @@ namespace binutils_wrapper {
             }
 
             inline const obj_attribute* getAttributes() const {
+                // cppcheck-suppress cstyleCast
                 if(getSection(get_elf_backend_data(bfd_)->obj_attrs_section)) {
                     return elf_known_obj_attributes_proc(bfd_);
                 }
@@ -286,6 +288,7 @@ namespace binutils_wrapper {
             /**
              * Copies a uint16_t to a 4-byte array
              */
+            // cppcheck-suppress unusedFunction
             static inline void copyU16_(std::array<uint8_t, 4>& array,
                                         const uint16_t val) {
                 array[0] = getByte_(val, 0);
@@ -348,7 +351,7 @@ namespace binutils_wrapper {
             mutable struct disassemble_info dis_info_;
 
             //! A 4 byte "memory" to hold an opcode for the binutils-required read memory function
-            mutable std::array<uint8_t, 4> opcode_mem_;
+            mutable std::array<uint8_t, 4> opcode_mem_{};
 
             //! The PC of the opcode held in the 4 byte opcode memory
             mutable uint64_t opcode_pc_ = 0;

@@ -7,7 +7,7 @@
 #include "stf_address_range.hpp"
 #include "stf_bin.hpp"
 
-#include "elfio/elfio.hpp"
+#include <elfio/elfio.hpp>
 
 class STFElf : public STFBinary {
     private:

@@ -2,7 +2,7 @@
 
 #include <limits>
 #include <ostream>
-#include "mavis/Mavis.h"
+#include <mavis/Mavis.h>
 #include "mavis_json_files.hpp"
 #include "stf_enum_utils.hpp"
 #include "stf_exception.hpp"
