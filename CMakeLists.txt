@@ -22,7 +22,7 @@ if(NOT EXISTS ${STF_TOOLS_BASE}/stf_lib/.git)
     message(FATAL_ERROR "stf_lib hasn't been checked out. Please run git submodule update --init --recursive")
 endif()
 
-add_compile_options(-Werror -std=c++17 -fPIC -Wall -Wextra -pedantic -Wconversion -Wno-unused-parameter -Wno-unused-function -pipe)
+add_compile_options(-Werror -std=c++17 -fPIC -Wall -Wextra -pedantic -Wconversion -Wno-unused-parameter -Wno-unused-function -Wno-gnu-zero-variadic-macro-arguments -pipe)
 
 include(std_filesystem)
 
