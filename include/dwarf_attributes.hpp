@@ -202,7 +202,7 @@ namespace dwarf_wrapper {
                                 return *ptr_;
                             }
 
-                            inline const pointer operator->() const {
+                            inline std::conditional_t<std::is_const_v<pointer>, pointer, const pointer> operator->() const {
                                 return ptr_;
                             }
 
