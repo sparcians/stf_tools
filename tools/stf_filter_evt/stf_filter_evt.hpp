@@ -218,7 +218,6 @@ class STFEventFilter {
                 first_inst = false;
             }
 
-            // write pid, tid, asid;
             for (const auto& rec: filtered_pte_) {
                 stf_writer << rec;
             }
