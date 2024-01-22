@@ -83,7 +83,7 @@ class STFExtractor {
                 const auto result = record_map_.emplace(p->clone());
                 const auto& pte_rec = result->as<stf::PageTableWalkRecord>();
                 const_cast<stf::PageTableWalkRecord&>(pte_rec).setIndex(inst_count);
-                page_table_.UpdatePTE(inst.asid(), &pte_rec);
+                page_table_.UpdatePTE(inst.pid(), &pte_rec);
             }
 
             pc_tracker_.track(inst);
@@ -126,7 +126,7 @@ class STFExtractor {
                 stf_writer_.setHeaderPC(pc_tracker_.getNextPC());
 
                 if (stf_reader_.getTraceFeatures()->hasFeature(stf::TRACE_FEATURES::STF_CONTAIN_PROCESS_ID)) {
-                    stf_writer_ << stf::ProcessIDExtRecord(inst_it_->tgid(), inst_it_->tid(), inst_it_->asid());
+                    stf_writer_ << stf::ProcessIDExtRecord(inst_it_->hwtid(), inst_it_->pid(), inst_it_->tid());
                 }
 
                 stf_writer_.finalizeHeader();
@@ -142,7 +142,7 @@ class STFExtractor {
 
                         //Output first PTE for first PC
                         page_table_.CheckAndDumpNewPTESingle(stf_writer_,
-                                                             inst_it_->asid(),
+                                                             inst_it_->pid(),
                                                              pc_tracker_.getNextPC(),
                                                              count,
                                                              4);
@@ -161,7 +161,7 @@ class STFExtractor {
                 if(dump_ptes_on_demand_) {
                     for(const auto& mem_access: inst_it_->getMemoryAccesses()) {
                         page_table_.CheckAndDumpNewPTESingle(stf_writer_,
-                                                             inst_it_->asid(),
+                                                             inst_it_->pid(),
                                                              mem_access.getAddress(),
                                                              count,
                                                              static_cast<uint32_t>(mem_access.getSize()));
@@ -169,7 +169,7 @@ class STFExtractor {
 
                     if(inst_it_->isCoF()) {
                         page_table_.CheckAndDumpNewPTESingle(stf_writer_,
-                                                             inst_it_->asid(),
+                                                             inst_it_->pid(),
                                                              inst_it_->pc(),
                                                              count,
                                                              4);
@@ -177,7 +177,7 @@ class STFExtractor {
 
                     if(inst_it_->isTakenBranch()) {
                         page_table_.CheckAndDumpNewPTESingle(stf_writer_,
-                                                             inst_it_->asid(),
+                                                             inst_it_->pid(),
                                                              inst_it_->branchTarget(),
                                                              count,
                                                              4);
