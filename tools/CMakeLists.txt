@@ -35,8 +35,55 @@ add_subdirectory(stf_branch_dump)
 add_subdirectory(stf_transaction_dump)
 add_subdirectory(stf_transaction_extract)
 add_subdirectory(stf_function_histogram)
+add_subdirectory(stf_st_ld)
+add_subdirectory(stf_cmov)
+add_subdirectory(stf_ld_ld)
+add_subdirectory(stf_ls_access_map)
+add_subdirectory(stf_tuple)
+add_subdirectory(stf_hammock)
+add_subdirectory(stf_cstar)
+add_subdirectory(stf_address_sequence)
+add_subdirectory(stf_branch_lhr)
+add_subdirectory(stf_branch_correlator)
 
-set(STF_INSTALL_TARGETS stf_dump stf_check stf_extract stf_trace_info stf_count stf_find stf_verify_pc stf_merge stf_filter_evt stf_imem stf_imix stf_bench stf_recompress stf_count_multi_process stf_record_dump stf_strip stf_address_map stf_branch_classify stf_bbv stf_diff stf_morph stf_branch_hdf5 stf_branch_dump stf_transaction_dump stf_transaction_extract stf_function_histogram)
+set(STF_INSTALL_TARGETS
+    stf_dump
+    stf_check
+    stf_extract
+    stf_trace_info
+    stf_count
+    stf_find
+    stf_verify_pc
+    stf_merge
+    stf_filter_evt
+    stf_imem
+    stf_imix
+    stf_bench
+    stf_recompress
+    stf_count_multi_process
+    stf_record_dump
+    stf_strip
+    stf_address_map
+    stf_branch_classify
+    stf_bbv
+    stf_diff
+    stf_morph
+    stf_branch_hdf5
+    stf_branch_dump
+    stf_transaction_dump
+    stf_transaction_extract
+    stf_function_histogram
+    stf_st_ld
+    stf_cmov
+    stf_ld_ld
+    stf_ls_access_map
+    stf_tuple
+    stf_hammock
+    stf_cstar
+    stf_address_sequence
+    stf_branch_lhr
+    stf_branch_correlator
+)
 
 include(stf_extra_tools.cmake OPTIONAL)
 
