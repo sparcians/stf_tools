@@ -134,13 +134,12 @@ int main (int argc, char **argv) {
         ecount.setContinueOnError(config.continue_on_error);
 
         // Keep track of thread_info;
-        // NOTE: PT-364 - stf_check to work with multi thread traces
-        uint32_t tid = 0;
+        uint32_t hw_tid = 0;
         uint32_t pid = 0;
-        uint32_t asid = 0;
-        uint32_t tid_prev = std::numeric_limits<uint32_t>::max();
+        uint32_t tid = 0;
+        uint32_t hw_tid_prev = std::numeric_limits<uint32_t>::max();
         uint32_t pid_prev = std::numeric_limits<uint32_t>::max();
-        uint32_t asid_prev = std::numeric_limits<uint32_t>::max();
+        uint32_t tid_prev = std::numeric_limits<uint32_t>::max();
         bool thread_switch = false;
         ThreadMap thread_pc_prev;
         ThreadMapKey thread_id;
@@ -158,10 +157,10 @@ int main (int argc, char **argv) {
         // Get initial trace thread info
         if(it != stf_reader.end()) {
             const auto& inst = *it;
+            hw_tid_prev = inst.hwtid();
+            pid_prev = inst.pid();
             tid_prev = inst.tid();
-            pid_prev = inst.tgid();
-            asid_prev = inst.asid();
-            thread_id = std::make_tuple(tid_prev, pid_prev, asid_prev);
+            thread_id = std::make_tuple(hw_tid_prev, pid_prev, tid_prev);
             thread_pc_prev[thread_id] = inst;
         }
 
@@ -206,14 +205,14 @@ int main (int argc, char **argv) {
                 msg << std::endl;
             }
 
+            hw_tid = inst.hwtid();
+            pid = inst.pid();
             tid = inst.tid();
-            pid = inst.tgid();
-            asid = inst.asid();
-            thread_id = std::make_tuple(tid, pid, asid);
-            thread_switch = (tid != tid_prev || pid != pid_prev || asid != asid_prev);
-            tid_prev = tid;
+            thread_id = std::make_tuple(hw_tid, pid, tid);
+            thread_switch = (tid != tid_prev || pid != pid_prev || hw_tid != hw_tid_prev);
+            hw_tid_prev = hw_tid;
             pid_prev = pid;
-            asid_prev = asid;
+            tid_prev = tid;
             const auto& inst_prev = thread_pc_prev[thread_id];
             decoder.decode(inst_prev.opcode());
 

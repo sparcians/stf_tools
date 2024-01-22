@@ -516,12 +516,12 @@ struct STFCheckConfig {
 /**
  * \typedef ThreadMapKey
  * Key type used for ThreadMap
- * Combines TID, TGID, and ASID
+ * Combines Hardware Thread ID, PID, and TID
  */
 using ThreadMapKey = std::tuple<uint32_t, uint32_t, uint32_t>;
 
 /**
  * \typedef ThreadMap
- * Maps TID, TGID, and ASID to an STFInst
+ * Maps Hardware Thread ID, PID, and TID to an STFInst
  */
 using ThreadMap = std::unordered_map<ThreadMapKey, stf::STFInst, boost::hash<ThreadMapKey>>;
