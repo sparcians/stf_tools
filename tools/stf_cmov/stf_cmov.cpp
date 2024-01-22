@@ -4,7 +4,6 @@
 #include <set>
 #include <string>
 
-#include "stf_gzip_bin.hpp"
 #include "stf_elf.hpp"
 #include "stf_decoder.hpp"
 #include "disassembler.hpp"
@@ -96,12 +95,7 @@ int main(int argc, char** argv) {
         binary = std::make_unique<STFElf>();
     }
     else if(bin) {
-        if(binary_file.rfind(".gz") == binary_file.size() - 3) {
-            binary = std::make_unique<STFGzipBinary>(binary_offset);
-        }
-        else {
-            binary = std::make_unique<STFBinary>(binary_offset);
-        }
+        binary = std::make_unique<STFBinary>(binary_offset);
     }
 
     if(binary) {
