@@ -25,7 +25,8 @@ struct STFImemConfig {
     bool show_percentage = false;                                       /**< If true, show percentages */
     std::string trace_filename;                                         /**< Trace filename to read */
     std::string output_filename;                                        /**< Filename to write output to */
-    uint32_t g_tgid = 0;                                                /**< If nonzero, will only include records with this TGID */
+    uint32_t g_hw_tid = 0;                                              /**< If nonzero, will only include records with this hardware TID */
+    uint32_t g_pid = 0;                                                 /**< If nonzero, will only include records with this PID */
     uint32_t g_tid = 0;                                                 /**< If nonzero, will only include records with this TID */
     uint64_t skip_count = 0;                                            /**< Skip this number of instructions */
     uint64_t keep_count = std::numeric_limits<uint64_t>::max();         /**< Stop generating IMEM after this many instructions */
@@ -681,7 +682,10 @@ class IMemMapVecIntf : public IMemMapVec {
                     std::cerr << std::endl;
                 }
 
-                if (STF_EXPECT_FALSE(config.g_tgid != 0 && config.g_tgid != inst.tgid())) {
+                if (STF_EXPECT_FALSE(config.g_hw_tid != 0 && config.g_hw_tid != inst.hwtid())) {
+                    continue;
+                }
+                if (STF_EXPECT_FALSE(config.g_pid != 0 && config.g_pid != inst.pid())) {
                     continue;
                 }
                 if (STF_EXPECT_FALSE(config.g_tid != 0 && config.g_tid != inst.tid())) {

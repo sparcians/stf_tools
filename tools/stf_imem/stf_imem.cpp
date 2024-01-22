@@ -23,7 +23,8 @@ static STFImemConfig parse_command_line (int argc, char **argv) {
     parser.addFlag('A', "use aliases for disassembly");
     parser.addFlag('s', "n", "skip the first n instructions");
     parser.addFlag('t', "n", "Count all records with thread ID <n>");
-    parser.addFlag('g', "n", "Count all records with process ID (i.e., TGID) <n>");
+    parser.addFlag('g', "n", "Count all records with process ID <n>");
+    parser.addFlag('c', "n", "Count all records with hardware thread ID <n>");
     parser.addFlag('j', "Java");
     parser.addFlag('P', "Show physical address");
     parser.addFlag('w', "n", "warmup for trace");
@@ -39,8 +40,9 @@ static STFImemConfig parse_command_line (int argc, char **argv) {
     config.use_aliases = parser.hasArgument('A');
     parser.getArgumentValue('s', config.skip_count);
     config.java_trace = parser.hasArgument('j');
+    parser.getArgumentValue<uint32_t, 0>('c', config.g_hw_tid);
+    parser.getArgumentValue<uint32_t, 0>('g', config.g_pid);
     parser.getArgumentValue<uint32_t, 0>('t', config.g_tid);
-    parser.getArgumentValue<uint32_t, 0>('g', config.g_tid);
     config.show_percentage = parser.hasArgument('p');
     config.show_physpc = parser.hasArgument('P');
     const bool has_r = parser.getArgumentValue('r', config.keep_count);
