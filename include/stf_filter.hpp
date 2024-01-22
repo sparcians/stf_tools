@@ -159,7 +159,7 @@ namespace stf {
                 }
 
                 for(const auto& walk_info: orig_records.at(stf::descriptors::internal::Descriptor::STF_PAGE_TABLE_WALK)) {
-                    page_table_.UpdatePTE(inst.asid(), &walk_info->as<PageTableWalkRecord>());
+                    page_table_.UpdatePTE(inst.pid(), &walk_info->as<PageTableWalkRecord>());
                 }
 
                 for(const auto& rec: orig_records.at(stf::descriptors::internal::Descriptor::STF_COMMENT)) {
@@ -182,7 +182,7 @@ namespace stf {
                                 break;
 
                             case stf::descriptors::internal::Descriptor::STF_PAGE_TABLE_WALK:
-                                page_table_.UpdatePTE(inst.asid(),
+                                page_table_.UpdatePTE(inst.pid(),
                                                       std::static_pointer_cast<PageTableWalkRecord>(std::shared_ptr<stf::STFRecord>(rec->clone())));
                                 break;
 
@@ -207,7 +207,7 @@ namespace stf {
                 stf_writer_->setHeaderPC(inst.pc());
 
                 if (stf_inst_reader_.getTraceFeatures()->hasFeature(TRACE_FEATURES::STF_CONTAIN_PROCESS_ID)) {
-                    *stf_writer_ << ProcessIDExtRecord(inst.tgid(), inst.tid(), inst.asid());
+                    *stf_writer_ << ProcessIDExtRecord(inst.hwtid(), inst.pid(), inst.tid());
                 }
 
                 stf_writer_->finalizeHeader();
@@ -222,7 +222,7 @@ namespace stf {
                         page_table_.ResetUsage();
 
                         //Output first PTE for first PC
-                        page_table_.CheckAndDumpNewPTESingle(*stf_writer_, inst.asid(), inst.pc(), 1, 4);
+                        page_table_.CheckAndDumpNewPTESingle(*stf_writer_, inst.pid(), inst.pc(), 1, 4);
                     }
                 }
             }
