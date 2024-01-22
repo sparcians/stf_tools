@@ -133,9 +133,9 @@ int main (int argc, char **argv)
             }
         }
 
-        uint32_t tid_prev = std::numeric_limits<uint32_t>::max();
+        uint32_t hw_tid_prev = std::numeric_limits<uint32_t>::max();
         uint32_t pid_prev = std::numeric_limits<uint32_t>::max();
-        uint32_t asid_prev = std::numeric_limits<uint32_t>::max();
+        uint32_t tid_prev = std::numeric_limits<uint32_t>::max();
 
         const auto start_inst = config.start_inst ? config.start_inst - 1 : 0;
 
@@ -146,21 +146,21 @@ int main (int argc, char **argv)
                 std::cerr << "ERROR: " << inst.index() << " invalid instruction " << std::hex << inst.opcode() << " PC " << inst.pc() << std::endl;
             }
 
+            const uint32_t hw_tid = inst.hwtid();
+            const uint32_t pid = inst.pid();
             const uint32_t tid = inst.tid();
-            const uint32_t pid = inst.tgid();
-            const uint32_t asid = inst.asid();
-            if (STF_EXPECT_FALSE(!config.concise_mode && (tid != tid_prev || pid != pid_prev || asid != asid_prev))) {
+            if (STF_EXPECT_FALSE(!config.concise_mode && (tid != tid_prev || pid != pid_prev || hw_tid != hw_tid_prev))) {
                 stf::print_utils::printLabel("PID");
+                stf::print_utils::printTID(hw_tid);
+                std::cout << ':';
                 stf::print_utils::printTID(pid);
                 std::cout << ':';
                 stf::print_utils::printTID(tid);
-                std::cout << ':';
-                stf::print_utils::printTID(asid);
                 std::cout << std::endl;
             }
-            tid_prev = tid;
+            hw_tid_prev = hw_tid;
             pid_prev = pid;
-            asid_prev = asid;
+            tid_prev = tid;
 
             // Opcode width string (INST32/INST16) and index should each take up half of the label column
             stf::print_utils::printLeft(inst.getOpcodeWidthStr(), stf::format_utils::LABEL_WIDTH / 2);
