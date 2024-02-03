@@ -31,6 +31,14 @@ namespace stf {
                 /**
                  * \brief Construct a MavisDisassembler
                  */
+                explicit MavisDisassembler(const std::string&, const ISA inst_set, const INST_IEM iem, const bool use_aliases) :
+                    MavisDisassembler(inst_set, iem, use_aliases)
+                {
+                }
+
+                /**
+                 * \brief Construct a MavisDisassembler
+                 */
                 explicit MavisDisassembler(const ISA inst_set, const INST_IEM iem, const bool use_aliases) :
                     BaseDisassembler(inst_set, iem, use_aliases),
                     decoder_(iem)
