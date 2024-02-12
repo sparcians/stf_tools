@@ -34,6 +34,8 @@ enum class Direction : uint8_t {
     INVALID,
     FORWARD,
     BACKWARD,
+    CALL,
+    RETURN,
     MULTIPLE
 };
 
@@ -73,7 +75,16 @@ int main(int argc, char** argv) {
         branch_info.targets[branch.getTargetPC()] += is_taken;
         branch_info.indirect = branch.isIndirect();
 
-        const Direction new_dir = branch.isBackwards() ? Direction::BACKWARD : Direction::FORWARD;
+        Direction new_dir = Direction::FORWARD;
+        if(branch.isCall()) {
+            new_dir = Direction::CALL;
+        }
+        else if(branch.isReturn()) {
+            new_dir = Direction::RETURN;
+        }
+        else if(branch.isBackwards()) {
+            new_dir = Direction::BACKWARD;
+        }
         if(branch_info.direction == Direction::INVALID) {
             branch_info.direction = new_dir;
         }
@@ -134,6 +145,12 @@ int main(int argc, char** argv) {
                 break;
             case Direction::BACKWARD:
                 stf::print_utils::printLeft("BACKWARD", COLUMN_WIDTH);
+                break;
+            case Direction::CALL:
+                stf::print_utils::printLeft("CALL", COLUMN_WIDTH);
+                break;
+            case Direction::RETURN:
+                stf::print_utils::printLeft("RETURN", COLUMN_WIDTH);
                 break;
             case Direction::MULTIPLE:
                 stf::print_utils::printLeft("MULTIPLE", COLUMN_WIDTH);
