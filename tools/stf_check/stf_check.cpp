@@ -357,11 +357,13 @@ int main (int argc, char **argv) {
                         msg << std::endl;
                     }
                 }
-                if (STF_EXPECT_FALSE(mem_access.getAttr() == 0)) {
-                    ecount.countError(ErrorCode::MEM_ATTR);
-                    auto& msg = ecount.reportError(ErrorCode::MEM_ATTR);
-                    msg << "The Instruction accesses memory. But there is no memory access attribute record at instruction index " << inst.index() << std::endl;
-                }
+
+                // Commenting this check out for now because the attribute field isn't really used for anything yet
+                //if (STF_EXPECT_FALSE(mem_access.getAttr() == 0)) {
+                //    ecount.countError(ErrorCode::MEM_ATTR);
+                //    auto& msg = ecount.reportError(ErrorCode::MEM_ATTR);
+                //    msg << "The Instruction accesses memory. But there is no memory access attribute record at instruction index " << inst.index() << std::endl;
+                //}
 
                 // Check to see if paddr is valid.
 
