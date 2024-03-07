@@ -46,6 +46,7 @@ add_subdirectory(stf_address_sequence)
 add_subdirectory(stf_branch_lhr)
 add_subdirectory(stf_branch_correlator)
 add_subdirectory(stf_disable_feature)
+add_subdirectory(stf_ls_access_dump)
 
 set(STF_INSTALL_TARGETS
     stf_dump
@@ -85,6 +86,7 @@ set(STF_INSTALL_TARGETS
     stf_branch_lhr
     stf_branch_correlator
     stf_disable_feature
+    stf_ls_access_dump
 )
 
 include(stf_extra_tools.cmake OPTIONAL)
