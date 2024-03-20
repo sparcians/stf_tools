@@ -97,10 +97,26 @@ namespace stf {
                     return std::string(mavis_path_env);
                 }
 
-                const auto relative_path = getExecutablePath().parent_path() / DEFAULT_RELATIVE_JSON_PATH_;
+                const auto exe_dir = getExecutablePath().parent_path();
+
+                const auto relative_path = exe_dir / DEFAULT_RELATIVE_JSON_PATH_;
 
                 if(fs::exists(relative_path)) {
                     return relative_path;
+                }
+
+                static constexpr std::string_view SHARE_RELATIVE_JSON_PATH_ = "../share/stf_tools/mavis";
+
+                const auto share_relative_path = exe_dir / SHARE_RELATIVE_JSON_PATH_;
+
+                if(fs::exists(share_relative_path)) {
+                    return share_relative_path;
+                }
+
+                static constexpr std::string_view SHARE_GLOBAL_JSON_PATH_ = "/usr/share/stf_tools/mavis";
+
+                if(fs::exists(SHARE_GLOBAL_JSON_PATH_)) {
+                    return std::string(SHARE_GLOBAL_JSON_PATH_);
                 }
 
 #ifdef MAVIS_GLOBAL_PATH
