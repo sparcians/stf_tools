@@ -38,7 +38,13 @@ setup_stf_linker(true)
 
 set (DISABLE_STF_DOXYGEN ON)
 
-set(BUILD_STF_PYTHON_LIB ON)
+if(NOT DISABLE_STF_PYTHON_LIB)
+    if(NOT STFPY_INSTALL_DIR)
+        set(STFPY_INSTALL_DIR ${STF_INSTALL_DIR})
+    endif()
+
+    set(BUILD_STF_PYTHON_LIB ON)
+endif()
 
 add_subdirectory(stf_lib)
 
