@@ -28,8 +28,13 @@ extern "C" {
 #include "disassemble.h"
 #include "elf-bfd.h"
 #include "elf/riscv.h"
+#include "bfdver.h"
 #pragma GCC diagnostic pop
 }
+
+#if BFD_VERSION >= 239000000
+    #define ENABLE_STYLED_FPRINTF_WRAPPER
+#endif
 
 static inline int varListFormatter(const char** output_str, const char* format, va_list args) {
     static constexpr size_t INITIAL_BUF_SIZE = 32;
@@ -249,6 +254,7 @@ namespace binutils_wrapper {
                 return retval;
             }
 
+#ifdef ENABLE_STYLED_FPRINTF_WRAPPER
             /**
              * Binutils 2.39 added a styled fprintf option for syntax highlighting.
              * Right now this is a stub that will call the existing (unformatted) fprintf handler.
@@ -264,6 +270,7 @@ namespace binutils_wrapper {
 
                 return retval;
             }
+#endif
 
             /**
              * Gets a specific byte from a given value
@@ -364,10 +371,14 @@ namespace binutils_wrapper {
                                   const bool use_aliases) :
                 disasm_func_(initDisasmFunc_(elf, default_isa))
             {
-                init_disassemble_info (&dis_info_,
-                                       0,
-                                       static_cast<fprintf_ftype>(fprintf_wrapper_),
-                                       static_cast<fprintf_styled_ftype>(fprintf_styled_wrapper_));
+                init_disassemble_info (
+                    &dis_info_,
+                    0,
+                    static_cast<fprintf_ftype>(fprintf_wrapper_)
+#ifdef ENABLE_STYLED_FPRINTF_WRAPPER
+                    , static_cast<fprintf_styled_ftype>(fprintf_styled_wrapper_)
+#endif
+                );
                 dis_info_.read_memory_func = readMemoryWrapper_;
                 dis_info_.application_data = static_cast<void*>(this);
                 dis_info_.mach = bfd_mach_riscv64;
