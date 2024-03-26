@@ -52,6 +52,8 @@ int main(int argc, char** argv) {
     stf::print_utils::printLeft(col_sep);
     stf::print_utils::printLeft("Address", addr_width);
     stf::print_utils::printLeft(addr_sep);
+    stf::print_utils::printLeft("Data", addr_width);
+    stf::print_utils::printLeft(addr_sep);
     stf::print_utils::printLeft("Size");
 
     std::cout << std::endl;
@@ -82,6 +84,8 @@ int main(int argc, char** argv) {
             stf::print_utils::printLeft(col_sep);
 
             stf::print_utils::printVA(m.getAddress());
+            stf::print_utils::printLeft(addr_sep);
+            stf::print_utils::printVA(m.getData());
             stf::print_utils::printLeft(addr_sep);
             stf::print_utils::printDecLeft(m.getSize());
             std::cout << std::endl;
