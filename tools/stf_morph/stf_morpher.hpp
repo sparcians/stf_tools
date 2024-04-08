@@ -230,4 +230,6 @@ class STFMorpher {
         {
             processOpcodeMorphArguments_(parser);
         }
+
+        STFMorpher(STFMorpher&& rhs) = default;
 };

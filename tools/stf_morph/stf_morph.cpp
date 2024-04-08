@@ -30,7 +30,7 @@ static STFMorpher parseCommandLine(int argc, char **argv) {
 
 int main(int argc, char** argv) {
     try {
-        STFMorpher morphs = parseCommandLine(argc, argv);
+        STFMorpher morphs(parseCommandLine(argc, argv));
         morphs.process();
     }
     catch(const trace_tools::CommandLineParser::EarlyExitException& e) {
