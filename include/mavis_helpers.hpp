@@ -359,7 +359,7 @@ namespace mavis_helpers {
      */
     class AnnotationType : public DummyAnnotationType {
         private:
-            const mavis::FormWrapperIF* form_;
+            const mavis::FormBase* form_;
             inline static std::unordered_map<std::string, std::string> mnemonic_map_;
 
         public:
