@@ -35,6 +35,11 @@ Ubuntu users may need to install the following dependencies for binutils
 ```
 sudo apt-get install libmpc-dev liblzma-dev libbz2-dev
 ```
+May also need to install the following dependencies for libdwarf
+- See: libdwarf [README](https://github.com/davea42/libdwarf-code?tab=readme-ov-file#building-on-linux-from-a-git-clone-with-configureautotools)
+```
+sudo apt-get install autoconf automake libtool pkg-config
+```
 
 ## RISC-V Disassembly Support
 

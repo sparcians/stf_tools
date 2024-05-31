@@ -198,8 +198,12 @@ int main (int argc, char **argv) {
     }
 
     if(writer) {
-        while (reader >> rec) {
-            writer << *rec;
+        try {
+            while (reader >> rec) {
+                writer << *rec;
+            }
+        }
+        catch(const stf::EOFException& e) {
         }
     }
 
