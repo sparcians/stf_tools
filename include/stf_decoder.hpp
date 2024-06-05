@@ -2,6 +2,7 @@
 
 #include <bitset>
 #include <cstdlib>
+#include <mavis/DecoderTypes.h>
 #include <memory>
 #include <ostream>
 #include <string_view>
@@ -168,6 +169,50 @@ namespace stf {
                 return mnemonic.compare(1, mnemonic.size() - 1, suffix) == 0;
             }
 
+            /**
+             * Decodes an instruction from an STFRecord
+             * \param rec Record to decode
+             */
+            inline void decode_(const STFRecord& rec) {
+                if(rec.getId() == stf::descriptors::internal::Descriptor::STF_INST_OPCODE16) {
+                    decode_(rec.as<InstOpcode16Record>());
+                }
+                else if(rec.getId() == stf::descriptors::internal::Descriptor::STF_INST_OPCODE32) {
+                    decode_(rec.as<InstOpcode32Record>());
+                }
+                else {
+                    stf_throw("Attempted to decode a non-instruction: " << rec.getId());
+                }
+            }
+
+            /**
+             * Decodes an instruction from an InstOpcode16Record
+             * \param rec Record to decode
+             */
+            inline void decode_(const InstOpcode16Record& rec) {
+                decode_(rec.getOpcode());
+            }
+
+            /**
+             * Decodes an instruction from an InstOpcode32Record
+             * \param rec Record to decode
+             */
+            inline void decode_(const InstOpcode32Record& rec) {
+                decode_(rec.getOpcode());
+            }
+
+            /**
+             * Decodes an instruction from a raw opcode
+             * \param opcode Opcode to decode
+             */
+            inline void decode_(const uint32_t opcode) {
+                is_compressed_ = isCompressed(opcode);
+                if(!opcode_.valid() || opcode_.get() != opcode) {
+                    opcode_ = opcode;
+                    has_pending_decode_info_ = true;
+                }
+            }
+
             template<typename>
             struct bitset_size;
 
@@ -203,51 +248,6 @@ namespace stf {
 
             STFDecoderBase(STFDecoderBase&&) = default;
             STFDecoderBase& operator=(STFDecoderBase&&) = default;
-
-            /**
-             * Decodes an instruction from an STFRecord
-             * \param rec Record to decode
-             */
-            inline STFDecoderBase& decode(const STFRecord& rec) {
-                if(rec.getId() == stf::descriptors::internal::Descriptor::STF_INST_OPCODE16) {
-                    return decode(rec.as<InstOpcode16Record>());
-                }
-                else if(rec.getId() == stf::descriptors::internal::Descriptor::STF_INST_OPCODE32) {
-                    return decode(rec.as<InstOpcode32Record>());
-                }
-                else {
-                    stf_throw("Attempted to decode a non-instruction: " << rec.getId());
-                }
-            }
-
-            /**
-             * Decodes an instruction from an InstOpcode16Record
-             * \param rec Record to decode
-             */
-            inline STFDecoderBase& decode(const InstOpcode16Record& rec) {
-                return decode(rec.getOpcode());
-            }
-
-            /**
-             * Decodes an instruction from an InstOpcode32Record
-             * \param rec Record to decode
-             */
-            inline STFDecoderBase& decode(const InstOpcode32Record& rec) {
-                return decode(rec.getOpcode());
-            }
-
-            /**
-             * Decodes an instruction from a raw opcode
-             * \param opcode Opcode to decode
-             */
-            inline STFDecoderBase& decode(const uint32_t opcode) {
-                is_compressed_ = isCompressed(opcode);
-                if(!opcode_.valid() || opcode_.get() != opcode) {
-                    opcode_ = opcode;
-                    has_pending_decode_info_ = true;
-                }
-                return *this;
-            }
 
             /**
              * Returns whether the decoded instruction has the given type
@@ -678,12 +678,46 @@ namespace stf {
                 }
             }
 
-            const auto& getAnnotation() const {
-                return getDecodeInfo_()->uinfo;
+            bool hasTag(const std::string& tag) const {
+                return getDecodeInfo_()->opinfo->getTags().isMember(tag);
+            }
+
+            mavis::InstructionUniqueID lookupInstructionUID(const std::string& mnemonic) const {
+                return mavis_.lookupInstructionUniqueID(mnemonic);
+            }
+
+            mavis::InstructionUniqueID getInstructionUID() const {
+                return getDecodeInfo_()->opinfo->getInstructionUniqueID();
+            }
+
+            const std::string& getMnemonicFromUID(const mavis::InstructionUniqueID uid) const {
+                return mavis_.lookupInstructionMnemonic(uid);
             }
     };
 
-    using STFDecoder = STFDecoderBase<mavis_helpers::Mavis>;
+    class STFDecoder : public STFDecoderBase<mavis_helpers::Mavis> {
+        public:
+            explicit STFDecoder(const stf::INST_IEM iem) :
+                STFDecoder(iem, getDefaultPath_())
+            {
+            }
+
+            /**
+             * Constructs an STFDecoderBase
+             * \param iem Instruction encoding
+             * \param mavis_path Path to Mavis checkout
+             */
+            STFDecoder(const stf::INST_IEM iem, const std::string& mavis_path) :
+                STFDecoderBase(mavis_helpers::getMavisJSONs(mavis_path, iem), mavis_helpers::getMavisJSONs(mavis_path, iem))
+            {
+            }
+
+            template<typename T>
+            STFDecoder& decode(const T& op) {
+                decode_(op);
+                return *this;
+            }
+    };
 
     class STFDecoderFull : public STFDecoderBase<mavis_helpers::FullMavis> {
         public:
@@ -693,7 +727,7 @@ namespace stf {
             }
 
             /**
-             * Constructs an STFDecoderBase
+             * Constructs an STFDecoderFull
              * \param iem Instruction encoding
              * \param mavis_path Path to Mavis checkout
              */
@@ -702,6 +736,15 @@ namespace stf {
             {
             }
 
+            template<typename T>
+            STFDecoderFull& decode(const T& op) {
+                decode_(op);
+                return *this;
+            }
+
+            const auto& getAnnotation() const {
+                return getDecodeInfo_()->uinfo;
+            }
     };
 
 } // end namespace stf
