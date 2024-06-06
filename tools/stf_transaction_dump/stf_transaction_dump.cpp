@@ -7,7 +7,7 @@
 
 void parseCommandLine (int argc, char **argv, uint64_t& start_transaction, uint64_t& end_transaction, std::string& trace_filename) {
     // Parse options
-    trace_tools::CommandLineParser parser("stf_dump");
+    trace_tools::CommandLineParser parser("stf_transaction_dump");
 
     parser.addFlag('s', "N", "start dumping at N-th transaction");
     parser.addFlag('e', "M", "end dumping at M-th transaction");
