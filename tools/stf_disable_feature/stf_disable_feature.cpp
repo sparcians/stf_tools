@@ -53,9 +53,9 @@ static void parseCommandLine(int argc,
                              bool& overwrite) {
     overwrite = false;
 
-    trace_tools::CommandLineParser parser("stf_recompress");
+    trace_tools::CommandLineParser parser("stf_disable_feature");
     parser.addFlag('f', "Overwrite existing file");
-    parser.addPositionalArgument("infile", "STF to recompress");
+    parser.addPositionalArgument("infile", "Original STF file");
     parser.addPositionalArgument("outfile", "Output STF file");
     parser.addPositionalArgument("features", "Feature(s) to disable", true);
 
