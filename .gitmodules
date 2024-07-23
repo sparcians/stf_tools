@@ -6,7 +6,7 @@
     url = git@github.com:sparcians/stf_lib.git
 [submodule "ELFIO"]
     path = ELFIO
-    url = https://github.com/serge1/ELFIO.git
+    url = git@github.com:serge1/ELFIO.git
 [submodule "dtl"]
 	path = dtl
 	url = git@github.com:cubicdaiya/dtl.git
