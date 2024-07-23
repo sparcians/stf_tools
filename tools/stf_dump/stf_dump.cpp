@@ -118,8 +118,11 @@ int main (int argc, char **argv)
             }
 
             // Print Instruction set info
-            stf::print_utils::printLabel("INST_IEM");
+            stf::print_utils::printLabel("ISA");
             std::cout << stf_reader.getISA() << std::endl;
+
+            stf::print_utils::printLabel("INST_IEM");
+            std::cout << stf_reader.getInitialIEM() << std::endl;
 
             if(config.start_inst || config.end_inst) {
                 std::cout << "Start Inst:" << config.start_inst;
