@@ -37,6 +37,7 @@ set(FULL_LTO true)
 setup_stf_linker(true)
 
 set (DISABLE_STF_DOXYGEN ON)
+set (DISABLE_STF_TESTS ON)
 
 if(NOT DISABLE_STF_PYTHON_LIB)
     if(NOT STFPY_INSTALL_DIR)
