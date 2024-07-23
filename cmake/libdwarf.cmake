@@ -29,7 +29,7 @@ ExternalProject_Add_Step(libdwarf_build
                          autoreconf
                          WORKING_DIRECTORY <SOURCE_DIR>
                          COMMAND ${CMAKE_COMMAND} -E env CC=${CMAKE_C_COMPILER} CXX=${CMAKE_CXX_COMPILER} CFLAGS=${BINUTILS_CFLAGS} CPPFLAGS=${BINUTILS_CFLAGS} CXXFLAGS=${BINUTILS_CXXFLAGS} LDFLAGS=${BINUTILS_LDFLAGS} autoreconf -f -i
-                         DEPENDEES update
+                         DEPENDEES download
                          DEPENDERS configure)
 
 ExternalProject_Get_Property(libdwarf_build SOURCE_DIR)
