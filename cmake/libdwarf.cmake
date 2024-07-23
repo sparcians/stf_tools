@@ -17,7 +17,8 @@ set(LIBDWARF_VERSION 0.10.1)
 
 ExternalProject_Add(
     libdwarf_build
-    URL https://github.com/davea42/libdwarf-code/releases/download/v${LIBDWARF_VERSION}/libdwarf-${LIBDWARF_VERSION}.tar.xz
+    GIT_REPOSITORY git@github.com:davea42/libdwarf-code.git
+    GIT_TAG v${LIBDWARF_VERSION}
     CONFIGURE_COMMAND ${CMAKE_COMMAND} -E env CFLAGS=${LIBDWARF_CFLAGS} CPPFLAGS=${LIBDWARF_CFLAGS} CXXFLAGS=${LIBDWARF_CXXFLAGS} LDFLAGS=${LIBDWARF_LDFLAGS} <SOURCE_DIR>/configure --prefix=<INSTALL_DIR>
     BUILD_COMMAND $(MAKE)
     INSTALL_COMMAND $(MAKE) install
