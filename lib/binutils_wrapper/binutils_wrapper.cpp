@@ -367,6 +367,7 @@ namespace binutils_wrapper {
 
         public:
             DisassemblerInternals(const std::string& elf,
+                                  const unsigned long bfd_mach,
                                   const char* default_isa,
                                   const bool use_aliases) :
                 disasm_func_(initDisasmFunc_(elf, default_isa))
@@ -381,7 +382,7 @@ namespace binutils_wrapper {
                 );
                 dis_info_.read_memory_func = readMemoryWrapper_;
                 dis_info_.application_data = static_cast<void*>(this);
-                dis_info_.mach = bfd_mach_riscv64;
+                dis_info_.mach = bfd_mach;
                 dis_info_.stream = static_cast<void *>(&dismStr_);
                 if (!use_aliases) {
                     dis_info_.disassembler_options = "no-aliases,numeric";
@@ -403,12 +404,28 @@ namespace binutils_wrapper {
 
 namespace stf {
     namespace disassemblers {
+        unsigned long BinutilsDisassembler::getBfdMach_(const INST_IEM iem)
+        {
+            switch(iem)
+            {
+                case INST_IEM::STF_INST_IEM_RV32:
+                    return bfd_mach_riscv32;
+                case INST_IEM::STF_INST_IEM_RV64:
+                    return bfd_mach_riscv64;
+                case INST_IEM::STF_INST_IEM_INVALID:
+                case INST_IEM::STF_INST_IEM_RESERVED:
+                    break;
+            }
+
+            stf_throw("Invalid INST_IEM value: " << iem);
+        }
+
         BinutilsDisassembler::BinutilsDisassembler(const std::string& elf,
                                                    const ISA inst_set,
                                                    const INST_IEM iem,
                                                    const bool use_aliases) :
             BaseDisassembler(inst_set, iem, use_aliases),
-            dis_(std::make_unique<binutils_wrapper::DisassemblerInternals>(elf, DEFAULT_DISASM_ISA_, use_aliases))
+            dis_(std::make_unique<binutils_wrapper::DisassemblerInternals>(elf, getBfdMach_(iem), getDefaultDisasmISA_(iem), use_aliases))
         {
         }
 
