@@ -153,9 +153,8 @@ int main (int argc, char **argv) {
         }
         */
 
-        const auto it = stf_reader.begin();
         // Get initial trace thread info
-        if(it != stf_reader.end()) {
+        if(const auto it = stf_reader.begin(); it != stf_reader.end()) {
             const auto& inst = *it;
             hw_tid_prev = inst.hwtid();
             pid_prev = inst.pid();
@@ -449,9 +448,7 @@ int main (int argc, char **argv) {
                 }
 
                 // if switch to user mode; check if previous instruction is sret or mret;
-                const bool is_mode_change_to_user = inst_prev.isChangeToUserMode();
-
-                if (STF_EXPECT_FALSE(is_mode_change_to_user && !decoder.isExceptionReturn())) {
+                if (STF_EXPECT_FALSE(inst_count > 1 && inst_prev.isChangeToUserMode() && !decoder.isExceptionReturn())) {
                     ecount.countError(ErrorCode::SWITCH_USR);
                     auto& msg = ecount.reportError(ErrorCode::SWITCH_USR);
                     stf::format_utils::formatDecLeft(msg, inst_prev.index(), MAX_COUNT_LENGTH);
