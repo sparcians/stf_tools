@@ -447,8 +447,9 @@ int main (int argc, char **argv) {
                     }
                 }
 
-                // if switch to user mode; check if previous instruction is sret or mret;
-                if (STF_EXPECT_FALSE(inst_count > 1 && inst_prev.isChangeToUserMode() && !decoder.isExceptionReturn())) {
+                // if switch to user mode; check if previous instruction is sret or mret
+                // Ignore this for the first instruction in the trace
+                if (STF_EXPECT_FALSE(inst_count > 2 && inst_prev.isChangeToUserMode() && !decoder.isExceptionReturn())) {
                     ecount.countError(ErrorCode::SWITCH_USR);
                     auto& msg = ecount.reportError(ErrorCode::SWITCH_USR);
                     stf::format_utils::formatDecLeft(msg, inst_prev.index(), MAX_COUNT_LENGTH);
