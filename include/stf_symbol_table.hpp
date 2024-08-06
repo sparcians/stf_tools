@@ -49,24 +49,38 @@ class STFSymbol {
             return "";
         }
 
-        static inline STFSymbol makeFromELF_(const ELFIO::symbol_section_accessor& symbols,
-                                             const unsigned int index) {
-            ELFIO::Elf64_Addr value = 0;
-            ELFIO::Elf_Xword size = 0;
+        // Returns true if the symbol at the given index is a valid function symbol, false otherwise
+        static inline bool getFunctionSymbol_(const ELFIO::symbol_section_accessor& symbols,
+                                              const unsigned int index,
+                                              ELFIO::Elf64_Addr& value,
+                                              ELFIO::Elf_Xword& size,
+                                              std::string& symbol_name)
+        {
             unsigned char bind = 0;
             unsigned char type = 0;
             ELFIO::Elf_Half section_index = 0;
             unsigned char other = 0;
+
+            return symbols.get_symbol(index,
+                                      symbol_name,
+                                      value,
+                                      size,
+                                      bind,
+                                      type,
+                                      section_index,
+                                      other) &&
+                   (value != 0) &&
+                   (type == ELFIO::STT_FUNC) &&
+                   !symbol_name.empty();
+        }
+
+        static inline STFSymbol makeFromELF_(const ELFIO::symbol_section_accessor& symbols,
+                                             const unsigned int index) {
+            ELFIO::Elf64_Addr value = 0;
+            ELFIO::Elf_Xword size = 0;
             std::string symbol_name;
 
-            if(STF_EXPECT_FALSE(!symbols.get_symbol(index,
-                                                    symbol_name,
-                                                    value,
-                                                    size,
-                                                    bind,
-                                                    type,
-                                                    section_index,
-                                                    other) || !value || symbol_name.empty())) {
+            if(STF_EXPECT_FALSE(!getFunctionSymbol_(symbols, index, value, size, symbol_name))) {
                 return STFSymbol();
             }
 
