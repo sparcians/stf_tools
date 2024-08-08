@@ -10,6 +10,7 @@
 #include "command_line_parser.hpp"
 #include "mavis_helpers.hpp"
 #include "stf_decoder.hpp"
+#include "stf_tracepoint_iterator.hpp"
 
 /**
  * Parses command line options
@@ -29,7 +30,8 @@ void parseCommandLine(int argc,
                       bool& by_isa_ext,
                       uint64_t& warmup,
                       bool& skip_non_user,
-                      uint64_t& run_length) {
+                      uint64_t& run_length,
+                      bool& use_tracepoint_roi) {
     trace_tools::CommandLineParser parser("stf_imix");
 
     parser.addFlag('o', "output", "output file (defaults to stdout)");
@@ -39,6 +41,7 @@ void parseCommandLine(int argc,
     parser.addFlag('w', "warmup", "number of warmup instructions");
     parser.addFlag('u', "only count user-mode instructions");
     parser.addFlag('r', "run_length", "limit to the first run_length instructions (includes warmup). Default is 0, for no limit.");
+    parser.addFlag('T', "only count region of interest between tracepoints. If specified, the -w and -r arguments apply to the ROI between tracepoints.");
     parser.addPositionalArgument("trace", "trace in STF format");
     parser.setMutuallyExclusive('m', 'e');
     parser.parseArguments(argc, argv);
@@ -50,6 +53,7 @@ void parseCommandLine(int argc,
     parser.getArgumentValue('w', warmup);
     skip_non_user = parser.hasArgument('u');
     parser.getArgumentValue('r', run_length);
+    use_tracepoint_roi = parser.hasArgument('T');
     parser.getPositionalArgument(0, trace_filename);
 
     if(run_length) {
@@ -249,33 +253,15 @@ inline void countMavisEnums(stf::enums::int_t<MavisEnum> packed_types,
     }
 }
 
-int main(int argc, char** argv) {
-    std::string output_filename = "-";
-    std::string trace_filename;
-    bool sorted = false;
-    bool by_mnemonic = false;
-    bool by_isa_ext = false;
-    uint64_t warmup = 0;
-    bool skip_non_user = false;
-    uint64_t run_length = 0;
-
-    try {
-        parseCommandLine(argc,
-                         argv,
-                         trace_filename,
-                         output_filename,
-                         sorted,
-                         by_mnemonic,
-                         by_isa_ext,
-                         warmup,
-                         skip_non_user,
-                         run_length);
-    }
-    catch(const trace_tools::CommandLineParser::EarlyExitException& e) {
-        std::cerr << e.what() << std::endl;
-        return e.getCode();
-    }
-
+template<typename IteratorType>
+void processTrace(const std::string& output_filename,
+                  const std::string& trace_filename,
+                  const bool sorted,
+                  const bool by_mnemonic,
+                  const bool by_isa_ext,
+                  const uint64_t warmup,
+                  const bool skip_non_user,
+                  const uint64_t run_length) {
     OutputFileStream output_file(output_filename);
 
     stf::STFInstReader reader(trace_filename, skip_non_user);
@@ -291,11 +277,14 @@ int main(int argc, char** argv) {
     uint64_t num_insts_read = 0;
     const uint64_t post_warmup_run_length = run_length == 0 ? std::numeric_limits<uint64_t>::max() : run_length - warmup;
 
-    for(auto it = reader.begin(warmup); it != reader.end(); ++it) {
+    for(auto it = stf::getStartIterator<IteratorType>(reader, decoder, warmup); it != reader.end(); ++it) {
+        const auto opcode = it->opcode();
+
         if(STF_EXPECT_TRUE(!it->isFault())) {
-            ++opcode_counts[it->opcode()];
+            ++opcode_counts[opcode];
             ++num_insts_read;
         }
+
         if(STF_EXPECT_FALSE(num_insts_read >= post_warmup_run_length)) {
             break;
         }
@@ -332,6 +321,42 @@ int main(int argc, char** argv) {
     else {
         sortAndPrintIMix<COLUMN_WIDTH>(output_file, category_counts, total_insts, sorted);
     }
+}
 
+int main(int argc, char** argv) {
+    std::string output_filename = "-";
+    std::string trace_filename;
+    bool sorted = false;
+    bool by_mnemonic = false;
+    bool by_isa_ext = false;
+    uint64_t warmup = 0;
+    bool skip_non_user = false;
+    uint64_t run_length = 0;
+    bool use_tracepoint_roi = false;
+
+    try {
+        parseCommandLine(argc,
+                         argv,
+                         trace_filename,
+                         output_filename,
+                         sorted,
+                         by_mnemonic,
+                         by_isa_ext,
+                         warmup,
+                         skip_non_user,
+                         run_length,
+                         use_tracepoint_roi);
+    }
+    catch(const trace_tools::CommandLineParser::EarlyExitException& e) {
+        std::cerr << e.what() << std::endl;
+        return e.getCode();
+    }
+
+    if(use_tracepoint_roi) {
+        processTrace<stf::STFTracepointIterator>(output_filename, trace_filename, sorted, by_mnemonic, by_isa_ext, warmup, skip_non_user, run_length);
+    }
+    else {
+        processTrace<stf::STFInstReader::iterator>(output_filename, trace_filename, sorted, by_mnemonic, by_isa_ext, warmup, skip_non_user, run_length);
+    }
     return 0;
 }
