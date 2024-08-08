@@ -14,6 +14,7 @@
 #include "stf_inst_reader.hpp"
 #include "file_utils.hpp"
 #include "formatters.hpp"
+#include "stf_tracepoint_iterator.hpp"
 
 /**
  * \struct STFImemConfig
@@ -38,6 +39,7 @@ struct STFImemConfig {
     bool sort_output = false;                                           /**< If true, also output sorted version */
     bool skip_non_user = false;                                         /**< If true, skip non-user mode instructions */
     bool local_history = false;                                         /**< If true, print local history for branches, loads, stores */
+    bool use_tracepoint_roi = false;                                    /**< If true, only process the ROI between tracepoints */
 };
 
 /**
@@ -318,7 +320,6 @@ class IMemMapVec {
         std::vector<IMemMap>::iterator itv_; /**< Iterator into imem_mapvec_ */
 
         uint64_t inst_count_ = 0; /**< Instruction count */
-        uint64_t inst_count_skipped_ = 0; /**< Skipped instruction count */
         bool is_rv64_ = false; /**< If true, trace is RV64 */
         stf::ISA inst_set_ = stf::ISA::RESERVED; /**< Instruction set */
         stf::INST_IEM iem_ = stf::INST_IEM::STF_INST_IEM_INVALID; /**< Instruction encoding */
@@ -652,27 +653,17 @@ class IMemMapVec {
  */
 template<typename ImplType>
 class IMemMapVecIntf : public IMemMapVec {
-    public:
-        /**
-         * Processes a trace
-         * \param config Configuration
-         */
-        void processTrace(const STFImemConfig& config) final {
+    private:
+        template<typename IteratorType>
+        void processTrace_(const STFImemConfig& config) {
             stf::STFInstReader stf_reader(config.trace_filename, config.skip_non_user);
 
-            uint64_t inst_count_skipped = 0;
             inst_set_ = stf_reader.getISA();
             iem_ = stf_reader.getInitialIEM();
             is_rv64_ = iem_ == stf::INST_IEM::STF_INST_IEM_RV64;
 
-            for (const auto& inst: stf_reader) {
-                if (STF_EXPECT_FALSE(inst_count_skipped < config.skip_count)) {
-                    ++inst_count_skipped;
-                    continue;
-                }
-                if (STF_EXPECT_FALSE(inst_count_ >= config.keep_count)) {
-                    break;
-                }
+            for (auto it = stf::getStartIterator<IteratorType>(stf_reader, config.skip_count); it != stf_reader.end(); ++it) {
+                const auto& inst = *it;
 
                 if (STF_EXPECT_FALSE(!inst.valid())) {
                     std::cerr << "ERROR: " << inst.index() << " invalid instruction ";
@@ -700,6 +691,24 @@ class IMemMapVecIntf : public IMemMapVec {
                 static_cast<ImplType*>(this)->count_impl(config, inst);
 
                 ++inst_count_;
+
+                if (STF_EXPECT_FALSE(inst_count_ >= config.keep_count)) {
+                    break;
+                }
+            }
+        }
+
+    public:
+        /**
+         * Processes a trace
+         * \param config Configuration
+         */
+        void processTrace(const STFImemConfig& config) final {
+            if(config.use_tracepoint_roi) {
+                processTrace_<stf::STFTracepointIterator>(config);
+            }
+            else {
+                processTrace_<stf::STFInstReader::iterator>(config);
             }
         }
 };
