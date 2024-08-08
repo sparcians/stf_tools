@@ -95,9 +95,7 @@ void processFiles(stf::STFWriter& writer, const FileList& tracelist) {
 
         for(uint64_t i = 0; i < f.repeat; ++i) {
             if(reopen_trace || i > 0) {
-                if(reader) {
-                    reader.close();
-                }
+                reader.close();
                 reader.open(f.filename);
             }
 
@@ -106,7 +104,8 @@ void processFiles(stf::STFWriter& writer, const FileList& tracelist) {
             stf_assert(extractor.extractSkip(reader, num_to_skip, page_table) == num_to_skip,
                        "Tried to skip past the end of the trace.");
 
-            stf_assert(extractor.extractInsts(reader, writer, num_to_extract, page_table) == num_to_extract,
+            stf_assert(extractor.extractInsts(reader, writer, num_to_extract, page_table) == num_to_extract ||
+                       num_to_extract == std::numeric_limits<uint64_t>::max() - 1,
                        "Tried to extract past the end of the trace.");
         }
 
