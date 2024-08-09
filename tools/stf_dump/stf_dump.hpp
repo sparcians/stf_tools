@@ -19,4 +19,5 @@ struct STFDumpConfig {
     bool use_aliases = false; /**< Use aliases when disassembling */
     bool show_pte = false; /**< Show PTE records */
     bool omit_header = false; /**< If true, do not dump the header information */
+    bool use_tracepoint_roi = false; /**< If true, only dump instructions between tracepoints */
 };

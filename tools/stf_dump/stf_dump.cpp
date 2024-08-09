@@ -20,7 +20,7 @@
 #include "stf_inst_reader.hpp"
 #include "stf_page_table.hpp"
 #include "tools_util.hpp"
-//#include "STFSymTab.hpp"
+#include "stf_tracepoint_iterator.hpp"
 
 static STFDumpConfig parseCommandLine (int argc, char **argv) {
     // Parse options
@@ -37,6 +37,7 @@ static STFDumpConfig parseCommandLine (int argc, char **argv) {
     parser.addFlag('e', "M", "end dumping at M-th instruction");
     parser.addFlag('y', "*_symTab.yaml", "YAML symbol table file to show annotation");
     parser.addFlag('H', "omit the header information");
+    parser.addFlag('T', "only count region of interest between tracepoints. If specified, the -s and -e arguments apply to the ROI between tracepoints.");
     parser.addPositionalArgument("trace", "trace in STF format");
 
     parser.parseArguments(argc, argv);
@@ -53,6 +54,7 @@ static STFDumpConfig parseCommandLine (int argc, char **argv) {
     parser.getArgumentValue('y', config.symbol_filename);
     config.show_annotation = !config.symbol_filename.empty();
     config.omit_header = parser.hasArgument('H');
+    config.use_tracepoint_roi = parser.hasArgument('T');
     parser.getPositionalArgument(0, config.trace_filename);
 
     stf_assert(!config.end_inst || (config.end_inst >= config.start_inst),
@@ -94,166 +96,176 @@ static inline void printOpcodeWithDisassembly(const stf::Disassembler& dis,
     std::cout << std::endl;
 }
 
+template<typename IteratorType>
+void processTrace_(const STFDumpConfig& config) {
+    // Open stf trace reader
+    stf::STFInstReader stf_reader(config.trace_filename, config.user_mode_only, stf::format_utils::showPhys());
+    stf_reader.checkVersion();
+
+    // Create disassembler
+    stf::Disassembler dis(findElfFromTrace(config.trace_filename), stf_reader.getISA(), stf_reader.getInitialIEM(), config.use_aliases);
+
+    if(!config.omit_header) {
+        // Print Version info
+        stf::print_utils::printLabel("VERSION");
+        std::cout << stf_reader.major() << '.' << stf_reader.minor() << std::endl;
+
+        // Print trace info
+        for(const auto& i: stf_reader.getTraceInfo()) {
+            std::cout << *i;
+        }
+
+        // Print Instruction set info
+        stf::print_utils::printLabel("ISA");
+        std::cout << stf_reader.getISA() << std::endl;
+
+        stf::print_utils::printLabel("INST_IEM");
+        std::cout << stf_reader.getInitialIEM() << std::endl;
+
+        if(config.start_inst || config.end_inst) {
+            std::cout << "Start Inst:" << config.start_inst;
+
+            if(config.end_inst) {
+                std::cout << "  End Inst:" << config.end_inst << std::endl;
+            }
+            else {
+                std::cout << std::endl;
+            }
+        }
+    }
+
+    uint32_t hw_tid_prev = std::numeric_limits<uint32_t>::max();
+    uint32_t pid_prev = std::numeric_limits<uint32_t>::max();
+    uint32_t tid_prev = std::numeric_limits<uint32_t>::max();
+
+    const auto start_inst = config.start_inst ? config.start_inst - 1 : 0;
+
+    for (auto it = stf::getStartIterator<IteratorType>(stf_reader, start_inst); it != stf_reader.end(); ++it) {
+        const auto& inst = *it;
+
+        if (STF_EXPECT_FALSE(!inst.valid())) {
+            std::cerr << "ERROR: " << inst.index() << " invalid instruction " << std::hex << inst.opcode() << " PC " << inst.pc() << std::endl;
+        }
+
+        const uint32_t hw_tid = inst.hwtid();
+        const uint32_t pid = inst.pid();
+        const uint32_t tid = inst.tid();
+        if (STF_EXPECT_FALSE(!config.concise_mode && (tid != tid_prev || pid != pid_prev || hw_tid != hw_tid_prev))) {
+            stf::print_utils::printLabel("PID");
+            stf::print_utils::printTID(hw_tid);
+            std::cout << ':';
+            stf::print_utils::printTID(pid);
+            std::cout << ':';
+            stf::print_utils::printTID(tid);
+            std::cout << std::endl;
+        }
+        hw_tid_prev = hw_tid;
+        pid_prev = pid;
+        tid_prev = tid;
+
+        // Opcode width string (INST32/INST16) and index should each take up half of the label column
+        stf::print_utils::printLeft(inst.getOpcodeWidthStr(), stf::format_utils::LABEL_WIDTH / 2);
+
+        stf::print_utils::printDecLeft(inst.index(), stf::format_utils::LABEL_WIDTH / 2);
+
+        stf::print_utils::printVA(inst.pc());
+
+        if (stf::format_utils::showPhys()) {
+            // Make sure we zero-fill as needed, so that the address remains "virt:phys" and not "virt:  phys"
+            std::cout << ':';
+            stf::print_utils::printPA(inst.physPc());
+        }
+        stf::print_utils::printSpaces(1);
+
+        if (STF_EXPECT_FALSE(inst.isTakenBranch())) {
+            std::cout << "PC ";
+            stf::print_utils::printVA(inst.branchTarget());
+            if (stf::format_utils::showPhys()) {
+                std::cout << ':';
+                stf::print_utils::printPA(inst.physBranchTarget());
+            }
+            stf::print_utils::printSpaces(1);
+        }
+        else if(STF_EXPECT_FALSE(config.concise_mode && (inst.isFault() || inst.isInterrupt()))) {
+            const std::string_view fault_msg = inst.isFault() ? "FAULT" : "INTERRUPT";
+            stf::print_utils::printLeft(fault_msg, stf::format_utils::VA_WIDTH + 4);
+            if (stf::format_utils::showPhys()) {
+                stf::print_utils::printSpaces(stf::format_utils::PA_WIDTH + 1);
+            }
+        }
+        else {
+            stf::print_utils::printSpaces(stf::format_utils::VA_WIDTH + 4);
+            if (stf::format_utils::showPhys()) {
+                stf::print_utils::printSpaces(stf::format_utils::PA_WIDTH + 1);
+            }
+        }
+
+        stf::print_utils::printSpaces(9); // Additional padding so that opcode lines up with operand values
+        printOpcodeWithDisassembly(dis, inst.opcode(), inst.pc());
+
+        if(!config.concise_mode) {
+            for(const auto& m: inst.getMemoryAccesses()) {
+                std::cout << m << std::endl;
+            }
+
+            if (config.show_pte) {
+                for(const auto& pte: inst.getEmbeddedPTEs()) {
+                    std::cout << pte->template as<stf::PageTableWalkRecord>();
+                }
+            }
+
+            for(const auto& reg: inst.getRegisterStates()) {
+                std::cout << reg << std::endl;
+            }
+
+            for(const auto& reg: inst.getOperands()) {
+                std::cout << reg << std::endl;
+            }
+
+            for(const auto& evt: inst.getEvents()) {
+                std::cout << evt << std::endl;
+            }
+
+            for(const auto& cmt: inst.getComments()) {
+                std::cout << cmt->template as<stf::CommentRecord>() << std::endl;
+            }
+
+            for(const auto& uop: inst.getMicroOps()) {
+                const auto& microop = uop->template as<stf::InstMicroOpRecord>();
+                stf::print_utils::printOperandLabel(microop.getSize() == 2 ? "UOp16 " : "UOp32 ");
+                stf::print_utils::printSpaces(stf::format_utils::REGISTER_NAME_WIDTH + stf::format_utils::DATA_WIDTH);
+                printOpcodeWithDisassembly(dis, microop.getMicroOp(), inst.pc());
+            }
+
+            for(const auto& reg: inst.getReadyRegs()) {
+                stf::print_utils::printOperandLabel("ReadyReg ");
+                std::cout << std::dec << reg->template as<stf::InstReadyRegRecord>().getReg() << std::endl;
+            }
+        }
+
+        if (STF_EXPECT_FALSE(config.end_inst && (inst.index() >= config.end_inst))) {
+            break;
+        }
+    }
+}
+
 int main (int argc, char **argv)
 {
     // Get arguments
     try {
         const STFDumpConfig config = parseCommandLine (argc, argv);
 
-        // Open stf trace reader
-        stf::STFInstReader stf_reader(config.trace_filename, config.user_mode_only, stf::format_utils::showPhys());
-        stf_reader.checkVersion();
-
-        // Create disassembler
-        stf::Disassembler dis(findElfFromTrace(config.trace_filename), stf_reader.getISA(), stf_reader.getInitialIEM(), config.use_aliases);
-
-        if(!config.omit_header) {
-            // Print Version info
-            stf::print_utils::printLabel("VERSION");
-            std::cout << stf_reader.major() << '.' << stf_reader.minor() << std::endl;
-
-            // Print trace info
-            for(const auto& i: stf_reader.getTraceInfo()) {
-                std::cout << *i;
-            }
-
-            // Print Instruction set info
-            stf::print_utils::printLabel("ISA");
-            std::cout << stf_reader.getISA() << std::endl;
-
-            stf::print_utils::printLabel("INST_IEM");
-            std::cout << stf_reader.getInitialIEM() << std::endl;
-
-            if(config.start_inst || config.end_inst) {
-                std::cout << "Start Inst:" << config.start_inst;
-
-                if(config.end_inst) {
-                    std::cout << "  End Inst:" << config.end_inst << std::endl;
-                }
-                else {
-                    std::cout << std::endl;
-                }
-            }
+        if(config.use_tracepoint_roi) {
+            processTrace_<stf::STFTracepointIterator>(config);
         }
-
-        uint32_t hw_tid_prev = std::numeric_limits<uint32_t>::max();
-        uint32_t pid_prev = std::numeric_limits<uint32_t>::max();
-        uint32_t tid_prev = std::numeric_limits<uint32_t>::max();
-
-        const auto start_inst = config.start_inst ? config.start_inst - 1 : 0;
-
-        for (auto it = stf_reader.begin(start_inst); it != stf_reader.end(); ++it) {
-            const auto& inst = *it;
-
-            if (STF_EXPECT_FALSE(!inst.valid())) {
-                std::cerr << "ERROR: " << inst.index() << " invalid instruction " << std::hex << inst.opcode() << " PC " << inst.pc() << std::endl;
-            }
-
-            const uint32_t hw_tid = inst.hwtid();
-            const uint32_t pid = inst.pid();
-            const uint32_t tid = inst.tid();
-            if (STF_EXPECT_FALSE(!config.concise_mode && (tid != tid_prev || pid != pid_prev || hw_tid != hw_tid_prev))) {
-                stf::print_utils::printLabel("PID");
-                stf::print_utils::printTID(hw_tid);
-                std::cout << ':';
-                stf::print_utils::printTID(pid);
-                std::cout << ':';
-                stf::print_utils::printTID(tid);
-                std::cout << std::endl;
-            }
-            hw_tid_prev = hw_tid;
-            pid_prev = pid;
-            tid_prev = tid;
-
-            // Opcode width string (INST32/INST16) and index should each take up half of the label column
-            stf::print_utils::printLeft(inst.getOpcodeWidthStr(), stf::format_utils::LABEL_WIDTH / 2);
-
-            stf::print_utils::printDecLeft(inst.index(), stf::format_utils::LABEL_WIDTH / 2);
-
-            stf::print_utils::printVA(inst.pc());
-
-            if (stf::format_utils::showPhys()) {
-                // Make sure we zero-fill as needed, so that the address remains "virt:phys" and not "virt:  phys"
-                std::cout << ':';
-                stf::print_utils::printPA(inst.physPc());
-            }
-            stf::print_utils::printSpaces(1);
-
-            if (STF_EXPECT_FALSE(inst.isTakenBranch())) {
-                std::cout << "PC ";
-                stf::print_utils::printVA(inst.branchTarget());
-                if (stf::format_utils::showPhys()) {
-                    std::cout << ':';
-                    stf::print_utils::printPA(inst.physBranchTarget());
-                }
-                stf::print_utils::printSpaces(1);
-            }
-            else if(STF_EXPECT_FALSE(config.concise_mode && (inst.isFault() || inst.isInterrupt()))) {
-                const std::string_view fault_msg = inst.isFault() ? "FAULT" : "INTERRUPT";
-                stf::print_utils::printLeft(fault_msg, stf::format_utils::VA_WIDTH + 4);
-                if (stf::format_utils::showPhys()) {
-                    stf::print_utils::printSpaces(stf::format_utils::PA_WIDTH + 1);
-                }
-            }
-            else {
-                stf::print_utils::printSpaces(stf::format_utils::VA_WIDTH + 4);
-                if (stf::format_utils::showPhys()) {
-                    stf::print_utils::printSpaces(stf::format_utils::PA_WIDTH + 1);
-                }
-            }
-
-            stf::print_utils::printSpaces(9); // Additional padding so that opcode lines up with operand values
-            printOpcodeWithDisassembly(dis, inst.opcode(), inst.pc());
-
-            if(!config.concise_mode) {
-                for(const auto& m: inst.getMemoryAccesses()) {
-                    std::cout << m << std::endl;
-                }
-
-                if (config.show_pte) {
-                    for(const auto& pte: inst.getEmbeddedPTEs()) {
-                        std::cout << pte->as<stf::PageTableWalkRecord>();
-                    }
-                }
-
-                for(const auto& reg: inst.getRegisterStates()) {
-                    std::cout << reg << std::endl;
-                }
-
-                for(const auto& reg: inst.getOperands()) {
-                    std::cout << reg << std::endl;
-                }
-
-                for(const auto& evt: inst.getEvents()) {
-                    std::cout << evt << std::endl;
-                }
-
-                for(const auto& cmt: inst.getComments()) {
-                    std::cout << cmt->as<stf::CommentRecord>() << std::endl;
-                }
-
-                for(const auto& uop: inst.getMicroOps()) {
-                    const auto& microop = uop->as<stf::InstMicroOpRecord>();
-                    stf::print_utils::printOperandLabel(microop.getSize() == 2 ? "UOp16 " : "UOp32 ");
-                    stf::print_utils::printSpaces(stf::format_utils::REGISTER_NAME_WIDTH + stf::format_utils::DATA_WIDTH);
-                    printOpcodeWithDisassembly(dis, microop.getMicroOp(), inst.pc());
-                }
-
-                for(const auto& reg: inst.getReadyRegs()) {
-                    stf::print_utils::printOperandLabel("ReadyReg ");
-                    std::cout << std::dec << reg->as<stf::InstReadyRegRecord>().getReg() << std::endl;
-                }
-            }
-
-            if (STF_EXPECT_FALSE(config.end_inst && (inst.index() >= config.end_inst))) {
-                break;
-            }
+        else {
+            processTrace_<stf::STFInstReader::iterator>(config);
         }
     }
     catch(const trace_tools::CommandLineParser::EarlyExitException& e) {
         std::cerr << e.what() << std::endl;
         return e.getCode();
     }
-    //delete annoSt;
+
     return 0;
 }
