@@ -867,18 +867,6 @@ namespace trace_tools {
                     raiseErrorWithHelp(e.what());
                 }
 
-                // Check for any missing required arguments
-                for(const auto arg: required_arguments_) {
-                    arg->checkRequired(*this);
-                }
-
-                // Check for any mutually exclusive arguments or missing argument dependencies
-                for(const auto& p: argument_dependencies_) {
-                    if(hasArgument(p.first)) {
-                        p.second.checkDependencies(*this);
-                    }
-                }
-
                 for(size_t i = 0; i < positional_arguments_.size(); ++i) {
                     positional_arguments_[i]->addValue(argv[static_cast<size_t>(optind) + i]);
                 }
@@ -892,6 +880,18 @@ namespace trace_tools {
                 }
 
                 parsed_ = true;
+
+                // Check for any missing required arguments
+                for(const auto arg: required_arguments_) {
+                    arg->checkRequired(*this);
+                }
+
+                // Check for any mutually exclusive arguments or missing argument dependencies
+                for(const auto& p: argument_dependencies_) {
+                    if(hasArgument(p.first)) {
+                        p.second.checkDependencies(*this);
+                    }
+                }
             }
 
             bool hasArgument(const FlagString& arg) const {
