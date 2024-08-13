@@ -70,7 +70,8 @@ int main(int argc, char* argv[]) {
         const bool skip_non_user = parser.hasArgument('u');
         const bool track_page_table_entries = parser.hasArgument('p');
         parser.getArgumentValue('r', reader);
-        const auto trace = parser.getPositionalArgument<std::string>(0);
+        std::string trace;
+        parser.getPositionalArgument(0, trace);
 
         switch(reader) {
             case 0:
