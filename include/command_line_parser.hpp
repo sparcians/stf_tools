@@ -14,7 +14,7 @@
 #include <unordered_map>
 #include <unordered_set>
 
-#include <unistd.h>
+#include <getopt.h>
 
 #include "format_utils.hpp"
 #include "tools_util.hpp"
@@ -26,6 +26,48 @@ namespace trace_tools {
             class MultipleValueException : public std::exception {
             };
 
+            static inline constexpr int NONFATAL_EXIT_CODE_ = 0;
+            static inline constexpr int ERROR_EXIT_CODE_ = 1;
+
+            static inline constexpr int DEFAULT_LONG_ARG_RETURN_VALUE_ = 0;
+            static inline constexpr int DEFAULT_ENUM_RADIX_ = 0;
+            static inline constexpr int DEFAULT_INTEGER_RADIX_ = 10;
+            static inline constexpr int DEFAULT_NO_RADIX_ = -1;
+
+            template<typename T, int RadixArg>
+            static constexpr int getDefaultRadix_() {
+                static_assert(!std::is_same_v<T, bool> || RadixArg == DEFAULT_NO_RADIX_,
+                              "bool types do not take a Radix argument");
+
+                static_assert(!std::is_same_v<T, std::string> || RadixArg == DEFAULT_NO_RADIX_,
+                              "std::string types do not take a Radix argument");
+
+                if constexpr(RadixArg != DEFAULT_NO_RADIX_) {
+                    return RadixArg;
+                }
+                else if constexpr(std::is_same_v<T, bool>) {
+                    return DEFAULT_NO_RADIX_;
+                }
+                else if constexpr(std::is_enum_v<T>) {
+                    return DEFAULT_ENUM_RADIX_;
+                }
+                else if constexpr(std::is_integral_v<T>) {
+                    return DEFAULT_INTEGER_RADIX_;
+                }
+                else {
+                    return DEFAULT_NO_RADIX_;
+                }
+            }
+
+            static constexpr const char* getFlagHyphens_(const bool is_long_flag) {
+                if(is_long_flag) {
+                    return "--";
+                }
+                else {
+                    return "-";
+                }
+            }
+
             class BaseArgument {
                 private:
                     static uint64_t getNextId_() {
@@ -36,14 +78,18 @@ namespace trace_tools {
                 protected:
                     const std::string help_message_;
                     const bool hidden_ = false;
+                    const bool is_long_argument_ = false;
                     const uint64_t id_ = getNextId_();
+                    bool required_ = false;
+                    std::string required_error_message_;
 
                 public:
                     BaseArgument() = default;
 
-                    explicit BaseArgument(std::string help_message) :
-                        help_message_(std::move(help_message)),
-                        hidden_(help_message_.empty())
+                    explicit BaseArgument(const std::string& help_message, const bool is_long_argument) :
+                        help_message_(help_message),
+                        hidden_(help_message_.empty()),
+                        is_long_argument_(is_long_argument)
                     {
                     }
 
@@ -55,6 +101,14 @@ namespace trace_tools {
 
                     bool isHidden() const {
                         return hidden_;
+                    }
+
+                    bool isLongArgument() const {
+                        return is_long_argument_;
+                    }
+
+                    const char* getFlagHyphens() const {
+                        return getFlagHyphens_(is_long_argument_);
                     }
 
                     virtual bool hasCountValue() const {
@@ -73,7 +127,15 @@ namespace trace_tools {
 
                     virtual void addValue(const char* arg) = 0;
 
-                    virtual void checkRequired(const CommandLineParser&) const {
+                    virtual void checkRequired(const CommandLineParser& parser) const {
+                        if(STF_EXPECT_FALSE(!isSet())) {
+                            parser.raiseErrorWithHelp(required_error_message_);
+                        }
+                    }
+
+                    void setRequired(const std::string& error_message) {
+                        required_ = true;
+                        required_error_message_ = error_message;
                     }
             };
 
@@ -84,8 +146,8 @@ namespace trace_tools {
                 public:
                     Argument() = default;
 
-                    explicit Argument(const std::string& help_message) :
-                        BaseArgument(help_message)
+                    explicit Argument(const std::string& help_message, const bool is_long_argument) :
+                        BaseArgument(help_message, is_long_argument)
                     {
                     }
 
@@ -102,39 +164,13 @@ namespace trace_tools {
                     }
             };
 
-            class RequiredArgumentOverlay : virtual public BaseArgument {
-                protected:
-                    std::string error_message_;
-
-                public:
-                    explicit RequiredArgumentOverlay(const std::string& error_message) :
-                        error_message_(error_message)
-                    {
-                    }
-
-                    void checkRequired(const CommandLineParser& parser) const final {
-                        if(STF_EXPECT_FALSE(!isSet())) {
-                            parser.raiseErrorWithHelp(error_message_);
-                        }
-                    }
-            };
-
-            class RequiredArgument : public Argument, public RequiredArgumentOverlay {
-                public:
-                    explicit RequiredArgument(const std::string& help_message, const std::string& error_message) :
-                        Argument(help_message),
-                        RequiredArgumentOverlay(error_message)
-                    {
-                    }
-            };
-
             class NamedValueArgument : virtual public BaseArgument {
                 protected:
                     const std::string name_;
 
                 public:
-                    explicit NamedValueArgument(std::string name) :
-                        name_(std::move(name))
+                    explicit NamedValueArgument(const std::string& name) :
+                        name_(name)
                     {
                     }
 
@@ -152,8 +188,8 @@ namespace trace_tools {
                     std::string value_;
 
                 public:
-                    ArgumentWithValue(const std::string& name, const std::string& help_message) :
-                        BaseArgument(help_message),
+                    ArgumentWithValue(const std::string& name, const std::string& help_message, const bool is_long_argument) :
+                        BaseArgument(help_message, is_long_argument),
                         NamedValueArgument(name)
                     {
                     }
@@ -163,58 +199,33 @@ namespace trace_tools {
                         value_ = value;
                     }
 
-                    template<typename T, int Radix = 0>
-                    inline typename std::enable_if<std::is_enum<T>::value, T>::type
-                    getValueAs() const {
-                        static thread_local std::unordered_map<uint64_t, T> parsed_values_;
-                        auto it = parsed_values_.find(id_);
+                    template<typename T, int Radix = DEFAULT_NO_RADIX_>
+                    const T& getValueAs() const {
+                        constexpr int chosen_radix = getDefaultRadix_<T, Radix>();
 
-                        if(STF_EXPECT_FALSE(it == parsed_values_.end() || it->first != id_)) {
-                            it = parsed_values_.emplace_hint(it,
-                                                             id_,
-                                                             static_cast<T>(parseInt<stf::enums::int_t<T>, Radix>(value_)));
+                        if constexpr(std::is_same_v<T, std::string>) {
+                            return value_;
                         }
+                        else {
+                            static thread_local std::unordered_map<uint64_t, T> parsed_values_;
+                            auto it = parsed_values_.find(id_);
 
-                        return it->second;
-                    }
+                            if(STF_EXPECT_FALSE(it == parsed_values_.end() || it->first != id_)) {
+                                T parsed_value{};
 
-                    template<typename T, int Radix = 10>
-                    inline typename std::enable_if<std::is_integral<T>::value && !std::is_enum<T>::value, T>::type
-                    getValueAs() const {
-                        static thread_local std::unordered_map<uint64_t, T> parsed_values_;
-                        auto it = parsed_values_.find(id_);
+                                if constexpr(std::is_integral_v<T> || std::is_enum_v<T>) {
+                                    parsed_value = static_cast<T>(parseInt<T, chosen_radix>(value_));
+                                }
+                                else {
+                                    std::istringstream temp(value_);
+                                    temp >> parsed_value;
+                                }
 
-                        if(STF_EXPECT_FALSE(it == parsed_values_.end() || it->first != id_)) {
-                            it = parsed_values_.emplace_hint(it,
-                                                             id_,
-                                                             parseInt<T, Radix>(value_));
+                                it = parsed_values_.emplace_hint(it, id_, parsed_value);
+                            }
+
+                            return it->second;
                         }
-
-                        return it->second;
-                    }
-
-                    template<typename T>
-                    inline typename std::enable_if<!std::is_integral<T>::value && !std::is_enum<T>::value && !std::is_same<T, std::string>::value, T>::type
-                    getValueAs() const {
-                        static thread_local std::unordered_map<uint64_t, T> parsed_values_;
-                        auto it = parsed_values_.find(id_);
-
-                        if(STF_EXPECT_FALSE(it == parsed_values_.end() || it->first != id_)) {
-                            std::istringstream temp(value_);
-                            T parsed_value;
-                            temp >> parsed_value;
-                            it = parsed_values_.emplace_hint(it,
-                                                             id_,
-                                                             parsed_value);
-                        }
-
-                        return it->second;
-                    }
-
-                    template<typename T>
-                    inline typename std::enable_if<std::is_same<T, std::string>::value, const T&>::type
-                    getValueAs() const {
-                        return value_;
                     }
 
                     const std::string& getArgumentName() const {
@@ -222,24 +233,13 @@ namespace trace_tools {
                     }
             };
 
-            class RequiredArgumentWithValue : public ArgumentWithValue, public RequiredArgumentOverlay {
-                public:
-                    RequiredArgumentWithValue(const std::string& name,
-                                              const std::string& help_message,
-                                              const std::string& error_message) :
-                        ArgumentWithValue(name, help_message),
-                        RequiredArgumentOverlay(error_message)
-                {
-                }
-            };
-
             class MultiArgument : virtual public BaseArgument {
                 private:
                     size_t count_ = 0;
 
                 public:
-                    explicit MultiArgument(const std::string& help_message) :
-                        BaseArgument(help_message)
+                    explicit MultiArgument(const std::string& help_message, const bool is_long_argument) :
+                        BaseArgument(help_message, is_long_argument)
                     {
                     }
 
@@ -260,22 +260,13 @@ namespace trace_tools {
                     }
             };
 
-            class RequiredMultiArgument : public MultiArgument, public RequiredArgumentOverlay {
-                public:
-                    RequiredMultiArgument(const std::string& help_message, const std::string& error_message) :
-                        MultiArgument(help_message),
-                        RequiredArgumentOverlay(error_message)
-                    {
-                    }
-            };
-
             class MultiArgumentWithValues : public NamedValueArgument {
                 protected:
                     std::deque<std::string> values_; // Using a deque ensures that pointers to the values will be stable
 
                 public:
-                    MultiArgumentWithValues(const std::string& name, const std::string& help_message) :
-                        BaseArgument(help_message),
+                    MultiArgumentWithValues(const std::string& name, const std::string& help_message, const bool is_long_argument) :
+                        BaseArgument(help_message, is_long_argument),
                         NamedValueArgument(name)
                     {
                     }
@@ -297,18 +288,9 @@ namespace trace_tools {
                     }
             };
 
-            class RequiredMultiArgumentWithValues : public MultiArgumentWithValues, public RequiredArgumentOverlay {
-                public:
-                    RequiredMultiArgumentWithValues(const std::string& name,
-                                                    const std::string& help_message,
-                                                    const std::string& error_message) :
-                        MultiArgumentWithValues(name, help_message),
-                        RequiredArgumentOverlay(error_message)
-                    {
-                    }
-            };
-
             template<typename T> struct is_argument_with_value : std::is_base_of<NamedValueArgument, T> {};
+
+            using ArgMap = std::unordered_map<std::string, std::unique_ptr<BaseArgument>>;
 
             // This class gives an ordered view of the arguments as the parser encountered them
             // Used by tools like stf_merge that have order-sensitive arguments
@@ -316,26 +298,28 @@ namespace trace_tools {
                 public:
                     class View {
                         private:
-                            std::pair<char, const std::string*> data_;
+                            const std::string* const flag_;
+                            const std::string* const value_;
 
                         public:
-                            template<typename ... Args>
-                            View(Args&&... args) :
-                                data_(std::forward<Args>(args)...)
+                            View(const std::string* flag, const std::string* value) :
+                                flag_(flag),
+                                value_(value)
                             {
+                                stf_assert(flag != nullptr, "Can't construct a View with a null flag");
                             }
 
                             inline bool hasValue() const {
-                                return data_.second != nullptr;
+                                return value_ != nullptr;
                             }
 
-                            inline char getFlag() const {
-                                return data_.first;
+                            inline const std::string& getFlag() const {
+                                return *flag_;
                             }
 
                             inline const std::string& getValue() const {
                                 stf_assert(hasValue(), "Attempted to get value of a value-less argument.");
-                                return *data_.second;
+                                return *value_;
                             }
                     };
 
@@ -345,74 +329,88 @@ namespace trace_tools {
                     VecType args_;
 
                 public:
-                    class iterator {
-                        private:
-                            VecType::const_iterator it_;
+                    using iterator = VecType::iterator;
 
-                        public:
-                            iterator(const VecType& vec, const bool is_end = false) :
-                                it_(is_end ? vec.end() : vec.begin())
-                            {
-                            }
-
-                            inline iterator& operator++() {
-                                ++it_;
-                                return *this;
-                            }
-
-                            inline iterator operator++(int) {
-                                const auto copy = *this;
-                                operator++();
-                                return copy;
-                            }
-
-                            inline bool operator==(const iterator& rhs) const {
-                                return it_ == rhs.it_;
-                            }
-
-                            inline bool operator!=(const iterator& rhs) const {
-                                return it_ != rhs.it_;
-                            }
-
-                            inline const value_type& operator*() const {
-                                return *it_;
-                            }
-
-                            inline const value_type* operator->() const {
-                                return it_.operator->();
-                            }
-                    };
-
-                    void add(const char id, const BaseArgument& arg) {
+                    void add(const std::string& id, const BaseArgument& arg) {
                         const std::string* str_ptr = nullptr;
 
                         if(arg.hasMultipleValues()) {
                             str_ptr = &dynamic_cast<const MultiArgumentWithValues&>(arg).getValues().back();
                         }
+                        else if(arg.hasNamedValue()) {
+                            str_ptr = &dynamic_cast<const ArgumentWithValue&>(arg).getValueAs<std::string>();
+                        }
 
-                        args_.emplace_back(id, str_ptr);
+                        args_.emplace_back(&id, str_ptr);
                     }
 
                     auto begin() const {
-                        return iterator(args_);
+                        return args_.begin();
                     }
 
                     auto end() const {
-                        return iterator(args_, true);
+                        return args_.end();
+                    }
+            };
+
+            // Class that allows us to specify argument flags with a single character or a string
+            // Single character flags are short flags (-a, -b) and string flags are long flags (--argument-a, --argument-b)
+            class FlagString {
+                private:
+                    const std::string str_;
+                    const bool is_long_argument_ = false;
+
+                public:
+                    FlagString(const char chr) :
+                        str_(1, chr),
+                        is_long_argument_(false)
+                    {
+                    }
+
+                    FlagString(const std::string& str) :
+                        str_(str),
+                        is_long_argument_(true)
+                    {
+                    }
+
+                    FlagString(const char* str) :
+                        FlagString(std::string(str))
+                    {
+                    }
+
+                    operator const std::string& () const {
+                        return str_;
+                    }
+
+                    const std::string& get() const {
+                        return str_;
+                    }
+
+                    size_t size() const {
+                        return str_.size();
+                    }
+
+                    bool isLongArgument() const {
+                        return is_long_argument_;
+                    }
+
+                    inline friend std::ostream& operator<<(std::ostream& os, const FlagString& flag) {
+                        os << getFlagHyphens_(flag.is_long_argument_) << flag.str_;
+                        return os;
                     }
             };
 
             class ArgumentDependency {
                 private:
-                    std::map<char, std::string> exclusive_; // Arguments that are mutually exclusive with this argument
-                    std::map<char, std::string> dependencies_; // Arguments that this argument depends on
+                    std::map<std::string, std::string> exclusive_; // Arguments that are mutually exclusive with this argument
+                    std::map<std::string, std::string> dependencies_; // Arguments that this argument depends on
 
                 public:
-                    void addExclusive(const char other_arg, const std::string& error_msg) {
+                    void addExclusive(const FlagString& other_arg, const std::string& error_msg) {
                         exclusive_.emplace(other_arg, error_msg);
                     }
 
-                    void addDependency(const char other_arg, const std::string& error_msg) {
+                    void addDependency(const FlagString& other_arg, const std::string& error_msg) {
                         dependencies_.emplace(other_arg, error_msg);
                     }
 
@@ -434,32 +432,34 @@ namespace trace_tools {
             const std::string program_name_;
             const bool allow_hidden_arguments_;
 
-            using ArgMap = std::unordered_map<char, std::unique_ptr<BaseArgument>>;
-            using ArgInsertionVec = std::vector<ArgMap::iterator>;
+            using ArgInsertionVec = std::vector<std::pair<const std::string*, const BaseArgument*>>;
 
             ArgMap arguments_;
             ArgInsertionVec arguments_insertion_ordered_;
 
             std::vector<std::unique_ptr<NamedValueArgument>> positional_arguments_;
             OrderedArgumentView ordered_arguments_;
-            std::unordered_set<char> active_arguments_;
-            std::set<char> required_arguments_;
+            std::unordered_set<std::string> active_arguments_;
+            std::vector<const BaseArgument*> required_arguments_;
             std::stringstream help_addendum_; // String that will be appended to the end of the help string
             std::ostringstream arg_str_;
+            std::vector<option> long_args_;
+            std::unordered_map<std::string, std::string> short_to_long_map_; // Maps short flags to their corresponding long flags
             size_t max_argument_width_ = 1;
+            bool parsed_ = false;
 
-            using ArgumentDependencyMap = std::map<char, ArgumentDependency>;
+            using ArgumentDependencyMap = std::map<std::string, ArgumentDependency>;
             ArgumentDependencyMap argument_dependencies_;
 
             class InvalidArgumentException : public std::exception {
                 private:
-                    std::string msg_;
+                    const std::string msg_;
 
                 public:
                     InvalidArgumentException() = default;
 
-                    explicit InvalidArgumentException(std::string msg) :
-                        msg_(std::move(msg))
+                    explicit InvalidArgumentException(const std::string& msg) :
+                        msg_(msg)
                     {
                     }
 
@@ -469,6 +469,8 @@ namespace trace_tools {
             };
 
             inline const auto& getPositionalArgument_(const size_t idx) const {
+                assertParsed_();
+
                 const auto& a = positional_arguments_.at(idx);
                 if(STF_EXPECT_FALSE(!a->isSet())) {
                     std::ostringstream ss;
@@ -479,67 +481,144 @@ namespace trace_tools {
                 return a;
             }
 
-            template<typename FlagType, typename ... FlagArgs>
-            void addFlag_(const char flag,
-                          const std::string& first_arg,
-                          FlagArgs&&... args)
-            {
-                if(is_argument_with_value<FlagType>::value) {
-                    arg_str_ << flag << ':';
-                }
-                else {
-                    arg_str_ << flag;
-                }
-                const auto result = arguments_.emplace(flag, std::make_unique<FlagType>(first_arg, args...));
-                if(STF_EXPECT_FALSE(!result.second)) {
-                    std::ostringstream ss;
-                    ss << "Attempted to add flag -" << flag << " multiple times." << std::endl;
-                    throw InvalidArgumentException(ss.str());
+            template<typename FlagType, bool is_long_and_short = false>
+            void updateMaxArgumentWidth_(const FlagString& flag, const std::string& first_arg) {
+                // Every argument needs at least 3 characters
+                size_t flag_width = 3;
+
+                if(flag.isLongArgument()) {
+                    // Long arguments need to account for the argument name
+                    flag_width += flag.size();
+                    if constexpr(is_long_and_short) {
+                        // Long args with alternative short flags need to account for a comma, space, hyphen, and short arg
+                        flag_width += 4;
+                    }
                 }
 
-                if(STF_EXPECT_FALSE(result.first->second->isHidden() && !allow_hidden_arguments_)) {
-                    std::ostringstream ss;
-                    ss << "Attempted to add hidden flag -" << flag << " without enabling hidden arguments." << std::endl;
-                    throw InvalidArgumentException(ss.str());
+                if constexpr(is_argument_with_value<FlagType>::value) {
+                    // Arguments with values need a space, a '<', and a '>'
+                    const size_t arg_width = first_arg.size() + 3;
+                    flag_width += arg_width;
+
+                    if constexpr(is_long_and_short) {
+                        // Long args with alternative short flags will print the value name twice
+                        flag_width += arg_width;
+                    }
                 }
 
-                arguments_insertion_ordered_.emplace_back(result.first);
+                max_argument_width_ = std::max(max_argument_width_, flag_width);
+            }
 
-                // The first argument is the arg name for flags with values
-                if(is_argument_with_value<FlagType>::value) {
-                    max_argument_width_ = std::max(max_argument_width_, first_arg.size() + 3);
-                }
+            void assertParsed_() const {
+                stf_assert(parsed_, "Can't get argument values before we've parsed the arguments!");
+            }
+
+            void assertNotParsed_() const {
+                stf_assert(!parsed_, "Can't alter the parser after we've already parsed the arguments!");
+            }
+
+            template<bool has_value>
+            void addLongArg_(const char* name, const char short_flag) {
+                long_args_.emplace_back(option{name, has_value ? required_argument : no_argument, nullptr, short_flag});
             }
 
             template<typename FlagType, typename ... FlagArgs>
-            void addRequiredFlag_(std::string_view error_message,
-                                  const char flag,
-                                  FlagArgs&&... args) {
-                std::ostringstream ss;
-                if(error_message.empty()) {
-                    ss << "Required argument -" << flag << " was not specified.";
-                    error_message = ss.str();
+            void addFlag_(const FlagString& flag, const std::string& first_arg, FlagArgs&&... args) {
+                addFlag_<FlagType>(flag, DEFAULT_LONG_ARG_RETURN_VALUE_, first_arg, std::forward<FlagArgs>(args)...);
+            }
+
+            template<typename FlagType, typename ... FlagArgs>
+            void addFlag_(const FlagString& flag, const char short_flag, const std::string& first_arg, FlagArgs&&... args) {
+                constexpr bool has_value = is_argument_with_value<FlagType>::value;
+
+                assertNotParsed_();
+
+                const bool is_long_argument = flag.isLongArgument();
+
+                // A long argument was specified with an alternative short flag
+                if(short_flag != DEFAULT_LONG_ARG_RETURN_VALUE_) {
+                    stf_assert(is_long_argument, "Can't have a short argument with an alternate short flag");
+
+                    FlagString short_flag_str(short_flag);
+                    // If a long argument has been specified with an alternate short flag, add it as a short option
+                    addFlag_<FlagType>(short_flag_str, first_arg, std::forward<FlagArgs>(args)...);
+
+                    // Add it to the short_to_long_map_ so we know what the long version of the argument is when we
+                    // print the help message
+                    const auto short_to_long_result = short_to_long_map_.emplace(short_flag_str, flag);
+
+                    // Make sure we don't have any long arg collisions
+                    if(STF_EXPECT_FALSE(!short_to_long_result.second)) {
+                        std::ostringstream ss;
+                        ss << "Attempted to add flag " << short_flag_str << " multiple times." << std::endl;
+                        throw InvalidArgumentException(ss.str());
+                    }
+
+                    if(STF_EXPECT_FALSE(arguments_.count(flag) != 0)) {
+                        std::ostringstream ss;
+                        ss << "Attempted to add flag " << flag << " multiple times." << std::endl;
+                        throw InvalidArgumentException(ss.str());
+                    }
+
+                    // Add it to long_args_ as well with the correct short_flag
+                    addLongArg_<has_value>(short_to_long_result.first->second.c_str(), short_flag);
+
+                    // Redo the argument width update to account for the extra flag
+                    updateMaxArgumentWidth_<FlagType, true>(flag, first_arg);
                 }
-                addFlag_<FlagType>(flag, args..., std::string(error_message));
-                required_arguments_.emplace(flag);
+                else {
+                    // This is either a short argument or a long argument with no alternate flags
+                    const auto result = arguments_.emplace(flag, std::make_unique<FlagType>(first_arg, args..., is_long_argument));
+
+                    if(STF_EXPECT_FALSE(!result.second)) {
+                        std::ostringstream ss;
+                        ss << "Attempted to add flag " << flag << " multiple times." << std::endl;
+                        throw InvalidArgumentException(ss.str());
+                    }
+
+                    const auto& it = result.first;
+
+                    if(STF_EXPECT_FALSE(it->second->isHidden() && !allow_hidden_arguments_)) {
+                        std::ostringstream ss;
+                        ss << "Attempted to add hidden flag " << flag << " without enabling hidden arguments." << std::endl;
+                        throw InvalidArgumentException(ss.str());
+                    }
+
+                    if(is_long_argument) {
+                        addLongArg_<has_value>(it->first.c_str(), short_flag);
+                    }
+                    else {
+                        arg_str_ << flag.get();
+
+                        if constexpr(has_value) {
+                            arg_str_ << ':';
+                        }
+                    }
+
+                    const BaseArgument* const arg_ptr = it->second.get();
+                    arguments_insertion_ordered_.emplace_back(&it->first, arg_ptr);
+
+                    // The first argument is the arg name for flags with values
+                    updateMaxArgumentWidth_<FlagType>(flag, first_arg);
+                }
             }
 
         public:
             class EarlyExitException : public std::exception {
                 private:
-                    int code_ = 0;
-                    std::string msg_;
+                    const int code_ = 0;
+                    const std::string msg_;
 
                 public:
-                    explicit EarlyExitException(int code = 0, const char* message = nullptr) :
+                    explicit EarlyExitException(const int code = 0, const char* message = nullptr) :
                         code_(code),
                         msg_(message ? message : "")
                     {
                     }
 
-                    EarlyExitException(int code, std::string message) :
+                    EarlyExitException(const int code, const std::string& message) :
                         code_(code),
-                        msg_(std::move(message))
+                        msg_(message)
                     {
                     }
 
@@ -550,83 +629,76 @@ namespace trace_tools {
                     }
             };
 
-            explicit CommandLineParser(std::string program_name, const bool allow_hidden_arguments = false) :
-                program_name_(std::move(program_name)),
+            explicit CommandLineParser(const std::string& program_name, const bool allow_hidden_arguments = false) :
+                program_name_(program_name),
                 allow_hidden_arguments_(allow_hidden_arguments)
             {
-                addFlag('h', "show this message");
-                addFlag('V', "show the STF version the tool is built with");
+                arg_str_ << ':';
+                addFlag("help", 'h', "show this message");
+                addFlag("version", 'V', "show the STF version the tool is built with");
             }
 
-            void addFlag(const char flag,
+            // Adds a flag that does not take a value
+            void addFlag(const FlagString& flag,
+                         const std::string& help_message) {
+                addFlag_<Argument>(flag, help_message);
+            }
+
+            // Adds a long flag with an alternative short flag that does not take a value
+            void addFlag(const std::string& flag,
+                         const char short_flag,
+                         const std::string& help_message) {
+                addFlag_<Argument>(flag, short_flag, help_message);
+            }
+
+            // Adds a flag that takes a value
+            void addFlag(const FlagString& flag,
                          const std::string& arg_name,
-                         const std::string& help_message,
-                         const bool required = false,
-                         std::string_view error_message = {}) {
-                if(!required) {
-                    addFlag_<ArgumentWithValue>(flag, arg_name, help_message);
-                }
-                else {
-                    addRequiredFlag_<RequiredArgumentWithValue>(error_message, flag, arg_name, help_message);
-                }
+                         const std::string& help_message) {
+                addFlag_<ArgumentWithValue>(flag, arg_name, help_message);
             }
 
-            void addFlag(const char flag,
+            // Adds a long flag with an alternative short flag that takes a value
+            void addFlag(const std::string& flag,
+                         const char short_flag,
                          const std::string& arg_name,
-                         const char* help_message,
-                         const bool required = false,
-                         std::string_view error_message = {}) {
-                addFlag(flag, arg_name, std::string(help_message), required, error_message);
+                         const std::string& help_message) {
+                addFlag_<ArgumentWithValue>(flag, short_flag, arg_name, help_message);
             }
 
-            void addMultiFlag(const char flag,
+            // Adds a flag that does not take a value and can be specified multiple times
+            void addMultiFlag(const FlagString& flag,
+                              const std::string& help_message) {
+                addFlag_<MultiArgument>(flag, help_message);
+            }
+
+            // Adds a long flag with an alternative short flag that does not take a value and can be specified multiple times
+            void addMultiFlag(const std::string& flag,
+                              const char short_flag,
+                              const std::string& help_message) {
+                addFlag_<MultiArgument>(flag, short_flag, help_message);
+            }
+
+            // Adds a flag that takes a value and can be specified multiple times
+            void addMultiFlag(const FlagString& flag,
                               const std::string& arg_name,
-                              const std::string& help_message,
-                              const bool required = false,
-                              std::string_view error_message = {}) {
-                if(!required) {
-                    addFlag_<MultiArgumentWithValues>(flag, arg_name, help_message);
-                }
-                else {
-                    addRequiredFlag_<RequiredMultiArgumentWithValues>(error_message, flag, arg_name, help_message);
-                }
+                              const std::string& help_message) {
+                addFlag_<MultiArgumentWithValues>(flag, arg_name, help_message);
             }
 
-            void addMultiFlag(const char flag,
+            // Adds a long flag with an alternative short flag that takes a value and can be specified multiple times
+            void addMultiFlag(const std::string& flag,
+                              const char short_flag,
                               const std::string& arg_name,
-                              const char* help_message,
-                              const bool required = false,
-                              std::string_view error_message = {}) {
-                addMultiFlag(flag, arg_name, std::string(help_message), required, error_message);
-            }
-
-            void addFlag(const char flag,
-                         const std::string& help_message,
-                         const bool required = false,
-                         std::string_view error_message = {}) {
-                if(!required) {
-                    addFlag_<Argument>(flag, help_message);
-                }
-                else {
-                    addRequiredFlag_<RequiredArgument>(error_message, flag, help_message);
-                }
-            }
-
-            void addMultiFlag(const char flag,
-                              const std::string& help_message,
-                              const bool required = false,
-                              std::string_view error_message = {}) {
-                if(!required) {
-                    addFlag_<MultiArgument>(flag, help_message);
-                }
-                else {
-                    addRequiredFlag_<RequiredMultiArgument>(error_message, flag, help_message);
-                }
+                              const std::string& help_message) {
+                addFlag_<MultiArgumentWithValues>(flag, short_flag, arg_name, help_message);
             }
 
             void addPositionalArgument(const std::string& argument_name,
                                        const std::string& help_message,
                                        const bool multiple_value = false) {
+                assertNotParsed_();
+
                 if(STF_EXPECT_FALSE(!positional_arguments_.empty() &&
                                     positional_arguments_.back()->hasMultipleValues())) {
                     if(multiple_value) {
@@ -638,10 +710,10 @@ namespace trace_tools {
 
                 std::unique_ptr<NamedValueArgument> new_arg;
                 if(multiple_value) {
-                    new_arg = std::make_unique<MultiArgumentWithValues>(argument_name, help_message);
+                    new_arg = std::make_unique<MultiArgumentWithValues>(argument_name, help_message, false);
                 }
                 else {
-                    new_arg = std::make_unique<ArgumentWithValue>(argument_name, help_message);
+                    new_arg = std::make_unique<ArgumentWithValue>(argument_name, help_message, false);
                 }
 
                 if(STF_EXPECT_FALSE(new_arg->isHidden())) {
@@ -656,20 +728,7 @@ namespace trace_tools {
                 static constexpr int TAB_WIDTH = 4;
                 const int arg_field_width = static_cast<int>(max_argument_width_) + TAB_WIDTH;
 
-                os << "usage: " << program_name_;
-
-                for(const auto& it: arguments_insertion_ordered_) {
-                    const auto& a = *it;
-                    if(a.second->isHidden()) {
-                        continue;
-                    }
-                    os << " [-" << a.first;
-                    if(a.second->hasNamedValue()) {
-                        const auto named_arg = dynamic_cast<const NamedValueArgument*>(a.second.get());
-                        os << ' ' << named_arg->getArgumentName();
-                    }
-                    os << ']';
-                }
+                os << "usage: " << program_name_ << " [options]";
 
                 for(const auto& a: positional_arguments_) {
                     os << " <" << a->getArgumentName() << '>';
@@ -677,28 +736,43 @@ namespace trace_tools {
 
                 os << std::endl;
 
-                for(const auto& it: arguments_insertion_ordered_) {
-                    const auto& a = *it;
+                std::ostringstream arg_str;
+
+                for(const auto& a: arguments_insertion_ordered_) {
                     if(a.second->isHidden()) {
                         continue;
                     }
                     stf::format_utils::formatSpaces(os, TAB_WIDTH);
-                    os << '-';
-                    std::ostringstream arg_str;
-                    arg_str << a.first;
+
+                    arg_str << a.second->getFlagHyphens() << *a.first;
+
+                    std::string named_arg_str;
+
                     if(a.second->hasNamedValue()) {
-                        const auto named_arg = dynamic_cast<const NamedValueArgument*>(a.second.get());
-                        arg_str << " <" << named_arg->getArgumentName() << '>';
+                        const auto named_arg = dynamic_cast<const NamedValueArgument*>(a.second);
+                        named_arg_str = " <" + named_arg->getArgumentName() + '>';
+                        arg_str << named_arg_str;
                     }
+
+                    if(auto it = short_to_long_map_.find(*a.first); it != short_to_long_map_.end()) {
+                        arg_str << ", " << getFlagHyphens_(true) << it->second;
+
+                        if(!named_arg_str.empty()) {
+                            arg_str << named_arg_str;
+                        }
+                    }
+
                     stf::format_utils::formatLeft(os, arg_str.str(), arg_field_width);
                     os << a.second->getHelpMessage() << std::endl;
+                    arg_str.str("");
                 }
 
                 for(const auto& a: positional_arguments_) {
                     stf::format_utils::formatSpaces(os, TAB_WIDTH);
-                    os << '<';
-                    stf::format_utils::formatLeft(os, a->getArgumentName() + '>', arg_field_width);
+                    arg_str << '<' << a->getArgumentName() << '>';
+                    stf::format_utils::formatLeft(os, arg_str.str(), arg_field_width);
                     os << a->getHelpMessage() << std::endl;
+                    arg_str.str("");
                 }
 
                 os << help_addendum_.rdbuf() << std::endl;
@@ -710,33 +784,58 @@ namespace trace_tools {
                 return ss.str();
             }
 
-            void parseArguments(int argc, char** argv) {
+            void parseArguments(const int argc, char** argv) {
+                assertNotParsed_();
+
+                long_args_.emplace_back(option{0,0,0,0});
+
                 try {
                     int c;
                     opterr = 0;
-                    while((c = getopt(argc, argv, arg_str_.str().c_str())) != -1) {
-                        const char c_char = static_cast<char>(c);
+                    int option_index = 0;
+                    char short_arg[2]{'\0', '\0'};
 
+                    while((c = getopt_long(argc, argv, arg_str_.str().c_str(), long_args_.data(), &option_index)) != -1) {
                         // Special handling for -h flag
-                        if(STF_EXPECT_FALSE(c_char == 'h')) {
-                            throw EarlyExitException(0, getHelpMessage());
+                        if(STF_EXPECT_FALSE(c == 'h')) {
+                            throw EarlyExitException(NONFATAL_EXIT_CODE_, getHelpMessage());
                         }
 
                         // Special handling for -V flag
-                        if(STF_EXPECT_FALSE(c_char == 'V')) {
-                            throw EarlyExitException(0, getVersion());
+                        if(STF_EXPECT_FALSE(c == 'V')) {
+                            throw EarlyExitException(NONFATAL_EXIT_CODE_, getVersion());
                         }
 
-                        if(const auto it = arguments_.find(c_char); STF_EXPECT_TRUE(it != arguments_.end())) {
+                        const char* arg_str = nullptr;
+
+                        if(c == DEFAULT_LONG_ARG_RETURN_VALUE_) {
+                            arg_str = long_args_.at(static_cast<unsigned int>(option_index)).name;
+                        }
+                        else {
+                            short_arg[0] = static_cast<char>(c);
+                            arg_str = short_arg;
+                        }
+
+                        if(const auto it = arguments_.find(arg_str); STF_EXPECT_TRUE(it != arguments_.end())) {
                             it->second->addValue(optarg);
-                            ordered_arguments_.add(c_char, *it->second);
-                            active_arguments_.emplace(c_char);
+                            ordered_arguments_.add(it->first, *it->second);
+                            active_arguments_.emplace(arg_str);
                             continue;
                         }
 
-                        stf_assert(c_char == '?', "Argument parser is broken");
                         std::ostringstream ss;
-                        ss << "Unknown option specified: -" << static_cast<char>(optopt) << std::endl;
+                        const char* const error_arg = argv[optind-1];
+
+                        if(c == ':') {
+                            ss << "Option " << error_arg << " is missing an argument" << std::endl;
+                        }
+                        else if (c == '?') {
+                            ss << "Unknown option specified: " << error_arg << std::endl;
+                        }
+                        else {
+                            stf_throw("Argument parser is broken");
+                        }
+
                         throw InvalidArgumentException(ss.str());
                     }
 
@@ -770,7 +869,7 @@ namespace trace_tools {
 
                 // Check for any missing required arguments
                 for(const auto arg: required_arguments_) {
-                    arguments_.at(arg)->checkRequired(*this);
+                    arg->checkRequired(*this);
                 }
 
                 // Check for any mutually exclusive arguments or missing argument dependencies
@@ -791,15 +890,19 @@ namespace trace_tools {
                         positional_arguments_.back()->addValue(argv[i]);
                     }
                 }
+
+                parsed_ = true;
             }
 
-            bool hasArgument(const char arg) const {
+            bool hasArgument(const FlagString& arg) const {
+                assertParsed_();
                 return active_arguments_.count(arg) != 0;
             }
 
-            template<typename T>
-            inline typename std::enable_if<!std::is_integral<T>::value && !std::is_enum<T>::value, bool>::type
-            getArgumentValue(const char arg, T& value) const {
+            template<typename T, int Radix = DEFAULT_NO_RADIX_>
+            bool getArgumentValue(const FlagString& arg, T& value) const {
+                assertParsed_();
+
                 const auto& a = arguments_.at(arg);
                 if(STF_EXPECT_FALSE(a->hasMultipleValues())) {
                     throw InvalidArgumentException("Attempted to call getArgumentValue on a multi-value argument.");
@@ -808,7 +911,14 @@ namespace trace_tools {
                 if(a->isSet()) {
                     if(STF_EXPECT_TRUE(a->hasNamedValue())) {
                         const auto value_arg = dynamic_cast<const ArgumentWithValue*>(a.get());
-                        value = value_arg->getValueAs<T>();
+
+                        if constexpr(std::is_same_v<T, std::string_view>) {
+                            value = value_arg->getValueAs<std::string>();
+                        }
+                        else {
+                            value = value_arg->getValueAs<T, Radix>();
+                        }
+
                         return true;
                     }
 
@@ -818,87 +928,18 @@ namespace trace_tools {
                 return false;
             }
 
-            template<typename T, int Radix = 0>
-            inline typename std::enable_if<std::is_enum<T>::value, bool>::type
-            getArgumentValue(const char arg, T& value) const {
-                const auto& a = arguments_.at(arg);
-                if(STF_EXPECT_FALSE(a->hasMultipleValues())) {
-                    throw InvalidArgumentException("Attempted to call getArgumentValue on a multi-value argument.");
-                }
-
-                if(a->isSet()) {
-                    if(STF_EXPECT_TRUE(a->hasNamedValue())) {
-                        const auto value_arg = dynamic_cast<const ArgumentWithValue*>(a.get());
-                        value = value_arg->getValueAs<T, Radix>();
-                        return true;
-                    }
-
-                    throw InvalidArgumentException("Attempted to get a non-boolean value from a boolean-only argument.");
-                }
-
-                return false;
-            }
-
-            template<typename T, int Radix = 10>
-            inline typename std::enable_if<std::is_integral<T>::value && !std::is_enum<T>::value, bool>::type
-            getArgumentValue(const char arg, T& value) const {
-                const auto& a = arguments_.at(arg);
-                if(STF_EXPECT_FALSE(a->hasMultipleValues())) {
-                    throw InvalidArgumentException("Attempted to call getArgumentValue on a multi-value argument.");
-                }
-
-                if(a->isSet()) {
-                    if(STF_EXPECT_TRUE(a->hasNamedValue())) {
-                        const auto value_arg = dynamic_cast<const ArgumentWithValue*>(a.get());
-                        value = value_arg->getValueAs<T, Radix>();
-                        return true;
-                    }
-
-                    throw InvalidArgumentException("Attempted to get a non-boolean value from a boolean-only argument.");
-                }
-
-                return false;
-            }
-
-            template<typename T>
-            inline typename std::enable_if<!std::is_scalar<T>::value, const T&>::type
-            getPositionalArgument(const size_t idx) const {
+            template<typename T, int Radix = DEFAULT_NO_RADIX_>
+            void getPositionalArgument(const size_t idx, T& value) const {
                 const auto& a = getPositionalArgument_(idx);
                 if(STF_EXPECT_FALSE(a->hasMultipleValues())) {
                     throw InvalidArgumentException("Attempted to call getPositionalArgument on a multi-value argument.");
                 }
                 const auto pos_arg = static_cast<const ArgumentWithValue*>(a.get());
-                return pos_arg->getValueAs<T>();
+
+                value = pos_arg->getValueAs<T, Radix>();
             }
 
-            template<typename T>
-            inline typename std::enable_if<std::is_scalar<T>::value && !std::is_integral<T>::value, T>::type
-            getPositionalArgument(const size_t idx) const {
-                const auto& a = getPositionalArgument_(idx);
-                if(STF_EXPECT_FALSE(a->hasMultipleValues())) {
-                    throw InvalidArgumentException("Attempted to call getPositionalArgument on a multi-value argument.");
-                }
-                const auto pos_arg = static_cast<const ArgumentWithValue*>(a.get());
-                return pos_arg->getValueAs<T>();
-            }
-
-            template<typename T, int Radix = 10>
-            inline typename std::enable_if<std::is_integral<T>::value, T>::type
-            getPositionalArgument(const size_t idx) const {
-                const auto& a = getPositionalArgument_(idx);
-                if(STF_EXPECT_FALSE(a->hasMultipleValues())) {
-                    throw InvalidArgumentException("Attempted to call getPositionalArgument on a multi-value argument.");
-                }
-                const auto pos_arg = static_cast<const ArgumentWithValue*>(a.get());
-                return pos_arg->getValueAs<T, Radix>();
-            }
-
-            template<typename T>
-            inline void getPositionalArgument(const size_t idx, T& value) const {
-                value = getPositionalArgument<T>(idx);
-            }
-
-            const auto& getMultipleValueArgument(const char arg) const {
+            const auto& getMultipleValueArgument(const FlagString& arg) const {
                 const auto& a = arguments_.at(arg);
                 if(STF_EXPECT_FALSE(!a->hasMultipleValues())) {
                     throw InvalidArgumentException("Attempted to call getMultipleValueArgument on a single-value argument.");
@@ -916,15 +957,16 @@ namespace trace_tools {
                 return dynamic_cast<const MultiArgumentWithValues*>(a.get())->getValues();
             }
 
-            void appendHelpText(const std::string_view append_str) {
+            void appendHelpText(const std::string& append_str) {
+                assertNotParsed_();
                 help_addendum_ << std::endl << append_str;
             }
 
-            void raiseErrorWithHelp(const std::string_view msg) const {
+            void raiseErrorWithHelp(const std::string& msg) const {
                 std::ostringstream ss;
                 ss << msg << std::endl;
                 getHelpMessage(ss);
-                throw EarlyExitException(1, ss.str());
+                throw EarlyExitException(ERROR_EXIT_CODE_, ss.str());
             }
 
             /**
@@ -939,55 +981,61 @@ namespace trace_tools {
                 }
             }
 
-            void setMutuallyExclusive(const char arg1, const char arg2) {
-                std::ostringstream ss;
-                ss << "-" << arg1 << " and -" << arg2 << " flags are mutually exclusive";
-                setMutuallyExclusive(arg1, arg2, ss.str());
+            void setMutuallyExclusive(const FlagString& arg1,
+                                      const FlagString& arg2,
+                                      const std::string& msg = {}) {
+                assertNotParsed_();
+
+                if(msg.empty()) {
+                    std::ostringstream ss;
+                    ss << arg1 << " and " << arg2 << " flags are mutually exclusive";
+                    setMutuallyExclusive(arg1, arg2, ss.str());
+                }
+                else {
+                    argument_dependencies_[arg1].addExclusive(arg2, msg);
+                    argument_dependencies_[arg2].addExclusive(arg1, msg);
+                }
             }
 
-            void setMutuallyExclusive(const char arg1, const char arg2, const std::string& msg) {
-                argument_dependencies_[arg1].addExclusive(arg2, msg);
-                argument_dependencies_[arg2].addExclusive(arg1, msg);
+            void setDependentArgument(const FlagString& dependent_arg,
+                                      const FlagString& dependency_arg,
+                                      const std::string& msg = {}) {
+                assertNotParsed_();
+
+                if(msg.empty()) {
+                    std::ostringstream ss;
+                    ss << dependent_arg << " requires the " << dependency_arg << " flag";
+                    setDependentArgument(dependent_arg, dependency_arg, ss.str());
+                }
+                else {
+                    argument_dependencies_[dependent_arg].addDependency(dependency_arg, msg);
+                }
             }
 
-            void setDependentArgument(const char dependent_arg, const char dependency_arg) {
-                std::ostringstream ss;
-                ss << "-" << dependent_arg << " requires the -" << dependency_arg << " flag";
-                setDependentArgument(dependent_arg, dependency_arg, ss.str());
-            }
+            void setRequired(const FlagString& flag,
+                             const std::string& error_message = {}) {
+                assertNotParsed_();
 
-            void setDependentArgument(const char dependent_arg, const char dependency_arg, const std::string& msg) {
-                argument_dependencies_[dependent_arg].addDependency(dependency_arg, msg);
+                const auto& arg = arguments_.at(flag);
+
+                if(error_message.empty()) {
+                    std::ostringstream ss;
+                    ss << "Required argument " << flag << " was not specified.";
+                    arg->setRequired(ss.str());
+                }
+                else {
+                    arg->setRequired(error_message);
+                }
             }
 
             auto begin() const {
+                assertParsed_();
                 return ordered_arguments_.begin();
             }
 
             auto end() const {
+                assertParsed_();
                 return ordered_arguments_.end();
             }
     };
-
-    template<>
-    inline std::string_view CommandLineParser::ArgumentWithValue::getValueAs<std::string_view>() const {
-        return value_;
-    }
-
-    template<>
-    inline bool CommandLineParser::getArgumentValue(const char arg, bool& value) const {
-        const auto& a = arguments_.at(arg);
-        if(STF_EXPECT_FALSE(a->hasMultipleValues())) {
-            throw InvalidArgumentException("Attempted to call getArgumentValue on a multi-value argument.");
-        }
-
-        value = a->isSet();
-        if(value && a->hasNamedValue()) {
-            const auto value_arg = dynamic_cast<const ArgumentWithValue*>(a.get());
-            value = value_arg->getValueAs<bool>();
-        }
-
-        return value;
-    }
-
 } // end namespace trace_tools

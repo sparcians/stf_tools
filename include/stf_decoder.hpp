@@ -58,12 +58,10 @@ namespace stf {
             // * stop tracepoint = xor x0, x1, x1
             // * start markpoint = or x0, x0, x0
             // * stop markpoint = or x0, x1, x1
-            inline static constexpr std::string_view DEFAULT_MARKPOINT_MNEMONIC_ = "or";
-            inline static constexpr std::string_view DEFAULT_TRACEPOINT_MNEMONIC_ = "xor";
-            inline static constexpr mavis::OperandInfo::OpcodeFieldValueType DEFAULT_START_TRACEPOINT_VALUE_ = 0;
-            inline static constexpr mavis::OperandInfo::OpcodeFieldValueType DEFAULT_STOP_TRACEPOINT_VALUE_ = 1;
-            inline static constexpr mavis::OperandInfo::OpcodeFieldValueType DEFAULT_START_MARKPOINT_VALUE_ = 0;
-            inline static constexpr mavis::OperandInfo::OpcodeFieldValueType DEFAULT_STOP_MARKPOINT_VALUE_ = 1;
+            inline static constexpr uint32_t DEFAULT_START_TRACEPOINT_OPCODE_ = 0x00004033;
+            inline static constexpr uint32_t DEFAULT_STOP_TRACEPOINT_OPCODE_ = 0x0010c033;
+            inline static constexpr uint32_t DEFAULT_START_MARKPOINT_OPCODE_ = 0x00006033;
+            inline static constexpr uint32_t DEFAULT_STOP_MARKPOINT_OPCODE_ = 0x0010e033;
 
             const std::vector<std::string> isa_jsons_; /**< Cached paths to ISA jsons so that we can make a copy of this decoder */
             const std::vector<std::string> anno_jsons_; /**< Cached paths to annotation jsons so that we can make a copy of this decoder */
@@ -77,16 +75,12 @@ namespace stf {
             const mavis::InstructionUniqueID uret_uid_;
 
             // Tracepoint info. Can be changed by the user if they do not want to use the default values
-            std::string tracepoint_mnemonic_{DEFAULT_TRACEPOINT_MNEMONIC_};
-            mavis::InstructionUniqueID tracepoint_uid_;
-            mavis::OperandInfo::OpcodeFieldValueType start_tracepoint_value_ = DEFAULT_START_TRACEPOINT_VALUE_;
-            mavis::OperandInfo::OpcodeFieldValueType stop_tracepoint_value_ = DEFAULT_STOP_TRACEPOINT_VALUE_;
+            uint32_t start_tracepoint_opcode_ = DEFAULT_START_TRACEPOINT_OPCODE_;
+            uint32_t stop_tracepoint_opcode_ = DEFAULT_STOP_TRACEPOINT_OPCODE_;
 
             // Markpoint info. Can be changed by the user if they do not want to use the default values
-            std::string markpoint_mnemonic_{DEFAULT_MARKPOINT_MNEMONIC_};
-            mavis::InstructionUniqueID markpoint_uid_;
-            mavis::OperandInfo::OpcodeFieldValueType start_markpoint_value_ = DEFAULT_START_MARKPOINT_VALUE_;
-            mavis::OperandInfo::OpcodeFieldValueType stop_markpoint_value_ = DEFAULT_STOP_MARKPOINT_VALUE_;
+            uint32_t start_markpoint_opcode_ = DEFAULT_START_MARKPOINT_OPCODE_;
+            uint32_t stop_markpoint_opcode_ = DEFAULT_STOP_MARKPOINT_OPCODE_;
 
             mutable typename MavisType::DecodeInfoType decode_info_; /**< Cached decode info */
             mutable bool has_pending_decode_info_ = false; /**< Cached decode info */
@@ -209,73 +203,6 @@ namespace stf {
                 }
             }
 
-            /**
-             * Checks if a the current decoded instruction matches a tracepoint/markpoint form, i.e.:
-             * It matches the tracepoint/markpoint mavis UID
-             * Destination register is X0
-             * Both source registers are the same
-             */
-            inline bool isTraceOrMarkpoint_(const mavis::InstructionUniqueID uid) const {
-                if(getInstructionUID() != uid) {
-                    return false;
-                }
-
-                if(!hasDestRegister(stf::Registers::STF_REG::STF_REG_X0)) {
-                    return false;
-                }
-
-                try {
-                    const auto& opinfo = getDecodeInfo_()->opinfo;
-                    if(opinfo->numSourceRegs() != 2) {
-                        return false;
-                    }
-
-                    const auto& op_list = opinfo->getSourceOpInfoList();
-                    if(op_list[0].field_value != op_list[1].field_value) {
-                        return false;
-                    }
-                }
-                catch(const InvalidInstException&) {
-                    return false;
-                }
-
-                return true;
-            }
-
-            /**
-             * Checks if a the current decoded instruction matches is a specific tracepoint/markpoint form, i.e.:
-             * It matches the tracepoint/markpoint mavis UID
-             * Destination register is X0
-             * Both source registers are the expected value for the tracepoint/markpoint
-             */
-            inline bool isSpecificTraceOrMarkpoint_(const mavis::InstructionUniqueID uid,
-                                                    const mavis::OperandInfo::OpcodeFieldValueType value) const {
-                if(getInstructionUID() != uid) {
-                    return false;
-                }
-
-                if(!hasDestRegister(stf::Registers::STF_REG::STF_REG_X0)) {
-                    return false;
-                }
-
-                try {
-                    const auto& opinfo = getDecodeInfo_()->opinfo;
-                    if(opinfo->numSourceRegs() != 2) {
-                        return false;
-                    }
-
-                    const auto& op_list = opinfo->getSourceOpInfoList();
-                    if(op_list[0].field_value != value || op_list[1].field_value != value) {
-                        return false;
-                    }
-                }
-                catch(const InvalidInstException&) {
-                    return false;
-                }
-
-                return true;
-            }
-
             template<typename>
             struct bitset_size;
 
@@ -292,9 +219,7 @@ namespace stf {
                 ecall_uid_(lookupInstructionUID("ecall")),
                 mret_uid_(lookupInstructionUID("mret")),
                 sret_uid_(lookupInstructionUID("sret")),
-                uret_uid_(lookupInstructionUID("uret")),
-                tracepoint_uid_(lookupInstructionUID(tracepoint_mnemonic_)),
-                markpoint_uid_(lookupInstructionUID(markpoint_mnemonic_))
+                uret_uid_(lookupInstructionUID("uret"))
             {
             }
 
@@ -329,14 +254,10 @@ namespace stf {
                 mret_uid_(lookupInstructionUID("mret")),
                 sret_uid_(lookupInstructionUID("sret")),
                 uret_uid_(lookupInstructionUID("uret")),
-                tracepoint_mnemonic_(rhs.tracepoint_mnemonic_),
-                tracepoint_uid_(lookupInstructionUID(tracepoint_mnemonic_)),
-                start_tracepoint_value_(rhs.start_tracepoint_value_),
-                stop_tracepoint_value_(rhs.stop_tracepoint_value_),
-                markpoint_mnemonic_(rhs.markpoint_mnemonic_),
-                markpoint_uid_(lookupInstructionUID(markpoint_mnemonic_)),
-                start_markpoint_value_(rhs.start_markpoint_value_),
-                stop_markpoint_value_(rhs.stop_markpoint_value_)
+                start_tracepoint_opcode_(rhs.start_tracepoint_opcode_),
+                stop_tracepoint_opcode_(rhs.stop_tracepoint_opcode_),
+                start_markpoint_opcode_(rhs.start_markpoint_opcode_),
+                stop_markpoint_opcode_(rhs.stop_markpoint_opcode_)
             {
                 if(rhs.opcode_.valid()) {
                     decode_(rhs.opcode_.get());
@@ -694,42 +615,42 @@ namespace stf {
              * Returns whether the current decoded instruction is a markpoint
              */
             inline bool isMarkpoint() const {
-                return isTraceOrMarkpoint_(markpoint_uid_);
+                return isStartMarkpoint() || isStopMarkpoint();
             }
 
             /**
              * Returns whether the current decoded instruction is a start markpoint
              */
             inline bool isStartMarkpoint() const {
-                return isSpecificTraceOrMarkpoint_(markpoint_uid_, start_markpoint_value_);
+                return opcode_.get() == start_markpoint_opcode_;
             }
 
             /**
              * Returns whether the current decoded instruction is a stop markpoint
              */
             inline bool isStopMarkpoint() const {
-                return isSpecificTraceOrMarkpoint_(markpoint_uid_, stop_markpoint_value_);
+                return opcode_.get() == stop_markpoint_opcode_;
             }
 
             /**
              * Returns whether the current decoded instruction is a tracepoint
              */
             inline bool isTracepoint() const {
-                return isTraceOrMarkpoint_(tracepoint_uid_);
+                return isStartTracepoint() || isStopTracepoint();
             }
 
             /**
              * Returns whether the current decoded instruction is a start tracepoint
              */
             inline bool isStartTracepoint() const {
-                return isSpecificTraceOrMarkpoint_(tracepoint_uid_, start_tracepoint_value_);
+                return opcode_.get() == start_tracepoint_opcode_;
             }
 
             /**
              * Returns whether the current decoded instruction is a stop tracepoint
              */
             inline bool isStopTracepoint() const {
-                return isSpecificTraceOrMarkpoint_(tracepoint_uid_, stop_tracepoint_value_);
+                return opcode_.get() == stop_tracepoint_opcode_;
             }
 
             /**
@@ -795,53 +716,40 @@ namespace stf {
             /**
              * Allows user to alter which instruction mnemonic is used for markpoints
              */
-            void setMarkpointMnemonic(const std::string& mnemonic) {
-                markpoint_mnemonic_ = mnemonic;
-                markpoint_uid_ = lookupInstructionUID(mnemonic);
+            void setStartMarkpointOpcode(const uint32_t opcode) {
+                stf_assert(opcode != 0, "Invalid start markpoint opcode");
+                start_markpoint_opcode_ = opcode;
             }
 
-            /**
-             * Allows user to alter which register value indicates a start markpoint
-             * Example: calling this method with value=4 would cause or x0, x4, x4 to be treated as
-             * a start markpoint
-             */
-            void setStartMarkpointValue(const mavis::OperandInfo::OpcodeFieldValueType value) {
-                start_markpoint_value_ = value;
+            uint32_t getStartMarkpointOpcode() const {
+                return start_markpoint_opcode_;
             }
 
-            /**
-             * Allows user to alter which register value indicates a stop markpoint
-             * Example: calling this method with value=5 would cause or x0, x5, x5 to be treated as
-             * a stop markpoint
-             */
-            void setStopMarkpointValue(const mavis::OperandInfo::OpcodeFieldValueType value) {
-                stop_markpoint_value_ = value;
+            void setStopMarkpointOpcode(const uint32_t opcode) {
+                stf_assert(opcode != 0, "Invalid stop markpoint opcode");
+                stop_markpoint_opcode_ = opcode;
             }
 
-            /**
-             * Allows user to alter which instruction mnemonic is used for tracepoints
-             */
-            void setTracepointMnemonic(const std::string& mnemonic) {
-                tracepoint_mnemonic_ = mnemonic;
-                tracepoint_uid_ = lookupInstructionUID(mnemonic);
+            uint32_t getStopMarkpointOpcode() const {
+                return stop_markpoint_opcode_;
             }
 
-            /**
-             * Allows user to alter which register value indicates a start tracepoint
-             * Example: calling this method with value=4 would cause xor x0, x4, x4 to be treated as
-             * a start tracepoint
-             */
-            void setStartTracepointValue(const mavis::OperandInfo::OpcodeFieldValueType value) {
-                start_tracepoint_value_ = value;
+            void setStartTracepointOpcode(const uint32_t opcode) {
+                stf_assert(opcode != 0, "Invalid start tracepoint opcode");
+                start_tracepoint_opcode_ = opcode;
             }
 
-            /**
-             * Allows user to alter which register value indicates a stop tracepoint
-             * Example: calling this method with value=5 would cause xor x0, x5, x5 to be treated as
-             * a stop tracepoint
-             */
-            void setStopTracepointValue(const mavis::OperandInfo::OpcodeFieldValueType value) {
-                stop_tracepoint_value_ = value;
+            uint32_t getStartTracepointOpcode() const {
+                return start_tracepoint_opcode_;
+            }
+
+            void setStopTracepointOpcode(const uint32_t opcode) {
+                stf_assert(opcode != 0, "Invalid stop tracepoint opcode");
+                stop_tracepoint_opcode_ = opcode;
+            }
+
+            uint32_t getStopTracepointOpcode() const {
+                return stop_tracepoint_opcode_;
             }
     };
 

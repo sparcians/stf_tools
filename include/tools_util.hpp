@@ -13,6 +13,7 @@
 #include "filesystem.hpp"
 #include "stf.hpp"
 #include "trace_tools_git_version.hpp"
+#include "stf_enum_utils.hpp"
 
 /// Current STF tool version
 static constexpr uint32_t TRACE_TOOLS_VERSION_MAJOR = 1;
@@ -22,22 +23,28 @@ static constexpr uint32_t TRACE_TOOLS_VERSION_MINOR_MINOR = 0;
 template<typename T, int radix = 10>
 inline T parseInt(const std::string_view str) {
     static_assert(sizeof(T) <= sizeof(uint64_t), "parseInt only works on integers up to 64 bits");
-    std::string temp;
-    std::copy_if(str.begin(), str.end(), std::back_inserter(temp), [](char c){ return c != ','; });
 
-    if(sizeof(T) <= 4) {
-        if(std::is_signed<T>::value) {
-            return static_cast<T>(std::stol(temp, nullptr, radix));
+    if constexpr(std::is_enum_v<T>) {
+        return static_cast<T>(parseInt<stf::enums::int_t<T>, radix>(str));
+    }
+    else {
+        std::string temp;
+        std::copy_if(str.begin(), str.end(), std::back_inserter(temp), [](char c){ return c != ','; });
+
+        if(sizeof(T) <= 4) {
+            if(std::is_signed<T>::value) {
+                return static_cast<T>(std::stol(temp, nullptr, radix));
+            }
+
+            return static_cast<T>(std::stoul(temp, nullptr, radix));
         }
 
-        return static_cast<T>(std::stoul(temp, nullptr, radix));
-    }
+        if(std::is_signed<T>::value) {
+            return static_cast<T>(std::stoll(temp, nullptr, radix));
+        }
 
-    if(std::is_signed<T>::value) {
-        return static_cast<T>(std::stoll(temp, nullptr, radix));
+        return static_cast<T>(std::stoull(temp, nullptr, radix));
     }
-
-    return static_cast<T>(std::stoull(temp, nullptr, radix));
 }
 
 template<typename T>
