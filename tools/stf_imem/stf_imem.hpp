@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <limits>
 #include <map>
+#include <optional>
 #include <string>
 #include <vector>
 #include <bitset>
@@ -14,7 +15,7 @@
 #include "stf_inst_reader.hpp"
 #include "file_utils.hpp"
 #include "formatters.hpp"
-#include "stf_tracepoint_iterator.hpp"
+#include "stf_region_iterators.hpp"
 
 /**
  * \struct STFImemConfig
@@ -40,6 +41,11 @@ struct STFImemConfig {
     bool skip_non_user = false;                                         /**< If true, skip non-user mode instructions */
     bool local_history = false;                                         /**< If true, print local history for branches, loads, stores */
     bool use_tracepoint_roi = false;                                    /**< If true, only process the ROI between tracepoints */
+    uint32_t roi_start_opcode = 0;                                      /**< Overrides ROI tracepoint start opcode if nonzero */
+    uint32_t roi_stop_opcode = 0;                                       /**< Overrides ROI tracepoint stop opcode if nonzero */
+    bool use_pc_roi = false;                                            /**< If true, use PCs to detect ROI instead of tracepoint opcodes */
+    uint64_t roi_start_pc = 0;                                          /**< Start PC for ROI detection */
+    uint64_t roi_stop_pc = 0;                                           /**< Stop PC for ROI detection */
 };
 
 /**
@@ -654,15 +660,15 @@ class IMemMapVec {
 template<typename ImplType>
 class IMemMapVecIntf : public IMemMapVec {
     private:
-        template<typename IteratorType>
-        void processTrace_(const STFImemConfig& config) {
+        template<typename IteratorType, typename StartStopType = std::nullopt_t>
+        void processTrace_(const STFImemConfig& config, const StartStopType start_point = std::nullopt, const StartStopType stop_point = std::nullopt) {
             stf::STFInstReader stf_reader(config.trace_filename, config.skip_non_user);
 
             inst_set_ = stf_reader.getISA();
             iem_ = stf_reader.getInitialIEM();
             is_rv64_ = iem_ == stf::INST_IEM::STF_INST_IEM_RV64;
 
-            for (auto it = stf::getStartIterator<IteratorType>(stf_reader, config.skip_count); it != stf_reader.end(); ++it) {
+            for (auto it = stf::getStartIterator<IteratorType>(stf_reader, config.skip_count, start_point, stop_point); it != stf_reader.end(); ++it) {
                 const auto& inst = *it;
 
                 if (STF_EXPECT_FALSE(!inst.valid())) {
@@ -705,7 +711,12 @@ class IMemMapVecIntf : public IMemMapVec {
          */
         void processTrace(const STFImemConfig& config) final {
             if(config.use_tracepoint_roi) {
-                processTrace_<stf::STFTracepointIterator>(config);
+                if(config.use_pc_roi) {
+                    processTrace_<stf::STFPCIterator>(config, config.roi_start_pc, config.roi_stop_pc);
+                }
+                else {
+                    processTrace_<stf::STFTracepointIterator>(config, config.roi_start_opcode, config.roi_stop_opcode);
+                }
             }
             else {
                 processTrace_<stf::STFInstReader::iterator>(config);

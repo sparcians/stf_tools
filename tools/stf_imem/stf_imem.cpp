@@ -33,7 +33,8 @@ static STFImemConfig parse_command_line (int argc, char **argv) {
     parser.addFlag('S', "sort output from largest to smallest instruction count");
     parser.addFlag('u', "skip non-user mode instructions");
     parser.addFlag('l', "local history data for branches & load/store strides");
-    parser.addFlag('T', "only analyze region of interest between tracepoints. If specified, the -w and -r arguments apply to the ROI between tracepoints.");
+    trace_tools::addTracepointCommandLineArgs(parser, "-s/-w", "-r");
+
     parser.addPositionalArgument("trace", "trace in STF format");
 
     parser.parseArguments(argc, argv);
@@ -63,7 +64,13 @@ static STFImemConfig parse_command_line (int argc, char **argv) {
     }
     config.sort_output = parser.hasArgument('S');
     config.skip_non_user = parser.hasArgument('u');
-    config.use_tracepoint_roi = parser.hasArgument('T');
+    trace_tools::getTracepointCommandLineArgs(parser,
+                                              config.use_tracepoint_roi,
+                                              config.roi_start_opcode,
+                                              config.roi_stop_opcode,
+                                              config.use_pc_roi,
+                                              config.roi_start_pc,
+                                              config.roi_stop_pc);
 
     parser.getPositionalArgument(0, config.trace_filename);
 
