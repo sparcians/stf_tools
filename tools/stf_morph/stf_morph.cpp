@@ -2,7 +2,8 @@
 
 static STFMorpher parseCommandLine(int argc, char **argv) {
     trace_tools::CommandLineParser parser("stf_morph");
-    parser.addFlag('o', "trace", "output filename", true, "No output file specified.");
+    parser.addFlag('o', "trace", "output filename");
+    parser.setRequired('o', "No output file specified.");
     parser.addFlag('s', "N", "start at instruction N");
     parser.addFlag('e', "M", "end at instruction M");
     STFMorpher::addMorphArguments(parser);
