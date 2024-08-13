@@ -1,5 +1,6 @@
 #include <iostream>
 #include <map>
+#include <optional>
 #include <queue>
 #include <vector>
 
@@ -10,7 +11,7 @@
 #include "command_line_parser.hpp"
 #include "mavis_helpers.hpp"
 #include "stf_decoder.hpp"
-#include "stf_tracepoint_iterator.hpp"
+#include "stf_region_iterators.hpp"
 
 /**
  * Parses command line options
@@ -31,7 +32,12 @@ void parseCommandLine(int argc,
                       uint64_t& warmup,
                       bool& skip_non_user,
                       uint64_t& run_length,
-                      bool& use_tracepoint_roi) {
+                      bool& use_tracepoint_roi,
+                      uint32_t& roi_start_opcode,
+                      uint32_t& roi_stop_opcode,
+                      bool& use_pc_roi,
+                      uint64_t& roi_start_pc,
+                      uint64_t& roi_stop_pc) {
     trace_tools::CommandLineParser parser("stf_imix");
 
     parser.addFlag('o', "output", "output file (defaults to stdout)");
@@ -41,7 +47,7 @@ void parseCommandLine(int argc,
     parser.addFlag('w', "warmup", "number of warmup instructions");
     parser.addFlag('u', "only count user-mode instructions");
     parser.addFlag('r', "run_length", "limit to the first run_length instructions (includes warmup). Default is 0, for no limit.");
-    parser.addFlag('T', "only count region of interest between tracepoints. If specified, the -w and -r arguments apply to the ROI between tracepoints.");
+    trace_tools::addTracepointCommandLineArgs(parser, "-w", "-r");
     parser.addPositionalArgument("trace", "trace in STF format");
     parser.setMutuallyExclusive('m', 'e');
     parser.parseArguments(argc, argv);
@@ -53,7 +59,13 @@ void parseCommandLine(int argc,
     parser.getArgumentValue('w', warmup);
     skip_non_user = parser.hasArgument('u');
     parser.getArgumentValue('r', run_length);
-    use_tracepoint_roi = parser.hasArgument('T');
+    trace_tools::getTracepointCommandLineArgs(parser,
+                                              use_tracepoint_roi,
+                                              roi_start_opcode,
+                                              roi_stop_opcode,
+                                              use_pc_roi,
+                                              roi_start_pc,
+                                              roi_stop_pc);
     parser.getPositionalArgument(0, trace_filename);
 
     if(run_length) {
@@ -253,7 +265,7 @@ inline void countMavisEnums(stf::enums::int_t<MavisEnum> packed_types,
     }
 }
 
-template<typename IteratorType>
+template<typename IteratorType, typename StartStopType = std::nullopt_t>
 void processTrace(const std::string& output_filename,
                   const std::string& trace_filename,
                   const bool sorted,
@@ -261,7 +273,9 @@ void processTrace(const std::string& output_filename,
                   const bool by_isa_ext,
                   const uint64_t warmup,
                   const bool skip_non_user,
-                  const uint64_t run_length) {
+                  const uint64_t run_length,
+                  const StartStopType start_point = std::nullopt,
+                  const StartStopType stop_point = std::nullopt) {
     OutputFileStream output_file(output_filename);
 
     stf::STFInstReader reader(trace_filename, skip_non_user);
@@ -277,7 +291,7 @@ void processTrace(const std::string& output_filename,
     uint64_t num_insts_read = 0;
     const uint64_t post_warmup_run_length = run_length == 0 ? std::numeric_limits<uint64_t>::max() : run_length - warmup;
 
-    for(auto it = stf::getStartIterator<IteratorType>(reader, decoder, warmup); it != reader.end(); ++it) {
+    for(auto it = stf::getStartIterator<IteratorType>(reader, warmup, start_point, stop_point); it != reader.end(); ++it) {
         const auto opcode = it->opcode();
 
         if(STF_EXPECT_TRUE(!it->isFault())) {
@@ -333,6 +347,11 @@ int main(int argc, char** argv) {
     bool skip_non_user = false;
     uint64_t run_length = 0;
     bool use_tracepoint_roi = false;
+    uint32_t roi_start_opcode = 0;
+    uint32_t roi_stop_opcode = 0;
+    bool use_pc_roi = false;
+    uint64_t roi_start_pc = 0;
+    uint64_t roi_stop_pc = 0;
 
     try {
         parseCommandLine(argc,
@@ -345,7 +364,12 @@ int main(int argc, char** argv) {
                          warmup,
                          skip_non_user,
                          run_length,
-                         use_tracepoint_roi);
+                         use_tracepoint_roi,
+                         roi_start_opcode,
+                         roi_stop_opcode,
+                         use_pc_roi,
+                         roi_start_pc,
+                         roi_stop_pc);
     }
     catch(const trace_tools::CommandLineParser::EarlyExitException& e) {
         std::cerr << e.what() << std::endl;
@@ -353,7 +377,12 @@ int main(int argc, char** argv) {
     }
 
     if(use_tracepoint_roi) {
-        processTrace<stf::STFTracepointIterator>(output_filename, trace_filename, sorted, by_mnemonic, by_isa_ext, warmup, skip_non_user, run_length);
+        if(use_pc_roi) {
+            processTrace<stf::STFPCIterator>(output_filename, trace_filename, sorted, by_mnemonic, by_isa_ext, warmup, skip_non_user, run_length, roi_start_pc, roi_stop_pc);
+        }
+        else {
+            processTrace<stf::STFTracepointIterator>(output_filename, trace_filename, sorted, by_mnemonic, by_isa_ext, warmup, skip_non_user, run_length, roi_start_opcode, roi_stop_opcode);
+        }
     }
     else {
         processTrace<stf::STFInstReader::iterator>(output_filename, trace_filename, sorted, by_mnemonic, by_isa_ext, warmup, skip_non_user, run_length);
