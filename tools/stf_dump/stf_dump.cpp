@@ -11,6 +11,7 @@
 #include <cstdint>
 #include <iostream>
 #include <limits>
+#include <optional>
 #include <string>
 #include <vector>
 #include "command_line_parser.hpp"
@@ -20,7 +21,7 @@
 #include "stf_inst_reader.hpp"
 #include "stf_page_table.hpp"
 #include "tools_util.hpp"
-#include "stf_tracepoint_iterator.hpp"
+#include "stf_region_iterators.hpp"
 
 static STFDumpConfig parseCommandLine (int argc, char **argv) {
     // Parse options
@@ -37,7 +38,8 @@ static STFDumpConfig parseCommandLine (int argc, char **argv) {
     parser.addFlag('e', "M", "end dumping at M-th instruction");
     parser.addFlag('y', "*_symTab.yaml", "YAML symbol table file to show annotation");
     parser.addFlag('H', "omit the header information");
-    parser.addFlag('T', "only count region of interest between tracepoints. If specified, the -s and -e arguments apply to the ROI between tracepoints.");
+    trace_tools::addTracepointCommandLineArgs(parser, "-s", "-e");
+
     parser.addPositionalArgument("trace", "trace in STF format");
 
     parser.parseArguments(argc, argv);
@@ -54,7 +56,15 @@ static STFDumpConfig parseCommandLine (int argc, char **argv) {
     parser.getArgumentValue('y', config.symbol_filename);
     config.show_annotation = !config.symbol_filename.empty();
     config.omit_header = parser.hasArgument('H');
-    config.use_tracepoint_roi = parser.hasArgument('T');
+
+    trace_tools::getTracepointCommandLineArgs(parser,
+                                              config.use_tracepoint_roi,
+                                              config.roi_start_opcode,
+                                              config.roi_stop_opcode,
+                                              config.use_pc_roi,
+                                              config.roi_start_pc,
+                                              config.roi_stop_pc);
+
     parser.getPositionalArgument(0, config.trace_filename);
 
     stf_assert(!config.end_inst || (config.end_inst >= config.start_inst),
@@ -96,8 +106,8 @@ static inline void printOpcodeWithDisassembly(const stf::Disassembler& dis,
     std::cout << std::endl;
 }
 
-template<typename IteratorType>
-void processTrace_(const STFDumpConfig& config) {
+template<typename IteratorType, typename StartStopType = std::nullopt_t>
+void processTrace_(const STFDumpConfig& config, const StartStopType start_point = std::nullopt, const StartStopType stop_point = std::nullopt) {
     // Open stf trace reader
     stf::STFInstReader stf_reader(config.trace_filename, config.user_mode_only, stf::format_utils::showPhys());
     stf_reader.checkVersion();
@@ -140,7 +150,7 @@ void processTrace_(const STFDumpConfig& config) {
 
     const auto start_inst = config.start_inst ? config.start_inst - 1 : 0;
 
-    for (auto it = stf::getStartIterator<IteratorType>(stf_reader, start_inst); it != stf_reader.end(); ++it) {
+    for (auto it = stf::getStartIterator<IteratorType>(stf_reader, start_inst, start_point, stop_point); it != stf_reader.end(); ++it) {
         const auto& inst = *it;
 
         if (STF_EXPECT_FALSE(!inst.valid())) {
@@ -256,7 +266,12 @@ int main (int argc, char **argv)
         const STFDumpConfig config = parseCommandLine (argc, argv);
 
         if(config.use_tracepoint_roi) {
-            processTrace_<stf::STFTracepointIterator>(config);
+            if(config.use_pc_roi) {
+                processTrace_<stf::STFPCIterator>(config, config.roi_start_pc, config.roi_stop_pc);
+            }
+            else {
+                processTrace_<stf::STFTracepointIterator>(config, config.roi_start_opcode, config.roi_stop_opcode);
+            }
         }
         else {
             processTrace_<stf::STFInstReader::iterator>(config);
