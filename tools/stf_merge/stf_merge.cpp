@@ -36,7 +36,8 @@ static std::pair<FileList, std::string> parseCommandLine (int argc, char **argv)
     parser.addMultiFlag('b', "N", "starting from the n instruction (inclusive) of input trace. Default is 1.");
     parser.addMultiFlag('e', "M", "ending at the nth instruction (exclusive) of input trace");
     parser.addMultiFlag('r', "K", "repeat the specified intruction interval [N, M) K times. Default is 1.");
-    parser.addMultiFlag('f', "trace", "filename of input trace", true, "Must specify at least 1 input trace.");
+    parser.addMultiFlag('f', "trace", "filename of input trace");
+    parser.setRequired('f', "Must specify at least 1 input trace.");
     parser.addFlag('o', "trace", "output trace filename. stdout is default");
     parser.appendHelpText("-b, -e, -r, and -f flags can be specified multiple times for merging multiple traces");
 
@@ -45,27 +46,26 @@ static std::pair<FileList, std::string> parseCommandLine (int argc, char **argv)
     parser.getArgumentValue('o', output_filename);
 
     for(const auto& arg: parser) {
-        switch(arg.getFlag()) {
-            case 'b':
-                bcount = parseInt<uint64_t>(arg.getValue());
-                parser.assertCondition(bcount >= 1, "Start count must be at least 1.");
-                break;
-            case 'e':
-                ecount = parseInt<uint64_t>(arg.getValue());
-                parser.assertCondition(ecount >= 2, "End count must be at least 2.");
-                break;
-            case 'r':
-                repeat = parseInt<uint64_t>(arg.getValue());
-                break;
-            case 'f':
-                parser.assertCondition(ecount > bcount, "End count must be greater than start count");
-                tracelist.emplace_back(bcount, ecount, repeat, arg.getValue());
+        const auto& flag = arg.getFlag();
+        if(flag == "b") {
+            bcount = parseInt<uint64_t>(arg.getValue());
+            parser.assertCondition(bcount >= 1, "Start count must be at least 1.");
+        }
+        else if(flag == "e") {
+            ecount = parseInt<uint64_t>(arg.getValue());
+            parser.assertCondition(ecount >= 2, "End count must be at least 2.");
+        }
+        else if(flag == "r") {
+            repeat = parseInt<uint64_t>(arg.getValue());
+        }
+        else if(flag == "f") {
+            parser.assertCondition(ecount > bcount, "End count must be greater than start count");
+            tracelist.emplace_back(bcount, ecount, repeat, arg.getValue());
 
-                // clear it for next trace input;
-                bcount = 1;
-                ecount = std::numeric_limits<uint64_t>::max();
-                repeat = 1;
-                break;
+            // clear it for next trace input;
+            bcount = 1;
+            ecount = std::numeric_limits<uint64_t>::max();
+            repeat = 1;
         }
     }
 
