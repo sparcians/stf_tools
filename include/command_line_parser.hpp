@@ -908,24 +908,36 @@ namespace trace_tools {
                     throw InvalidArgumentException("Attempted to call getArgumentValue on a multi-value argument.");
                 }
 
-                if(a->isSet()) {
-                    if(STF_EXPECT_TRUE(a->hasNamedValue())) {
+                if constexpr(std::is_same_v<T, bool>) {
+                    value = a->isSet();
+
+                    if(value && a->hasNamedValue()) {
                         const auto value_arg = dynamic_cast<const ArgumentWithValue*>(a.get());
-
-                        if constexpr(std::is_same_v<T, std::string_view>) {
-                            value = value_arg->getValueAs<std::string>();
-                        }
-                        else {
-                            value = value_arg->getValueAs<T, Radix>();
-                        }
-
-                        return true;
+                        value = value_arg->getValueAs<bool>();
                     }
 
-                    throw InvalidArgumentException("Attempted to get a non-boolean value from a boolean-only argument.");
+                    return value;
                 }
+                else {
+                    if(a->isSet()) {
+                        if(STF_EXPECT_TRUE(a->hasNamedValue())) {
+                            const auto value_arg = dynamic_cast<const ArgumentWithValue*>(a.get());
 
-                return false;
+                            if constexpr(std::is_same_v<T, std::string_view>) {
+                                value = value_arg->getValueAs<std::string>();
+                            }
+                            else {
+                                value = value_arg->getValueAs<T, Radix>();
+                            }
+
+                            return true;
+                        }
+
+                        throw InvalidArgumentException("Attempted to get a non-boolean value from a boolean-only argument.");
+                    }
+
+                    return false;
+                }
             }
 
             template<typename T, int Radix = DEFAULT_NO_RADIX_>
