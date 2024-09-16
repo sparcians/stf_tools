@@ -28,7 +28,7 @@ static STFImemConfig parse_command_line (int argc, char **argv) {
     parser.addFlag('j', "Java");
     parser.addFlag('P', "Show physical address");
     parser.addFlag('w', "n", "warmup for trace");
-    parser.addFlag('r', "n", "runlength for trace");
+    parser.addFlag('r', "n", "runlength for trace (including warmup)");
     parser.addFlag('o', "filename", "write output to <filename>. Defaults to stdout.");
     parser.addFlag('S', "sort output from largest to smallest instruction count");
     parser.addFlag('u', "skip non-user mode instructions");
