@@ -394,8 +394,12 @@ namespace trace_tools {
                         return is_long_argument_;
                     }
 
+                    const char* getFlagHyphens() const {
+                        return getFlagHyphens_(is_long_argument_);
+                    }
+
                     inline friend std::ostream& operator<<(std::ostream& os, const FlagString& flag) {
-                        os << getFlagHyphens_(flag.is_long_argument_) << flag.str_;
+                        os << flag.getFlagHyphens() << flag.str_;
                         return os;
                     }
             };
