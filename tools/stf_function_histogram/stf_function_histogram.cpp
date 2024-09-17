@@ -9,11 +9,13 @@ void processCommandLine(int argc,
                         std::string& trace,
                         std::string& elf,
                         bool& skip_non_user,
-                        uint64_t& end_insts) {
+                        uint64_t& end_insts,
+                        bool& profile) {
     trace_tools::CommandLineParser parser("stf_function_histogram");
     parser.addFlag('E', "elf", "ELF file to analyze (defaults to trace.elf)");
     parser.addFlag('u', "skip non user-mode instructions");
     parser.addFlag('e', "end_insts", "stop after specified number of instructions");
+    parser.addFlag('p', "profile functions in program");
 
     parser.addPositionalArgument("trace", "trace in STF format");
     parser.parseArguments(argc, argv);
@@ -31,6 +33,8 @@ void processCommandLine(int argc,
     else {
         elf = findElfFromTrace(trace);
     }
+
+    profile = parser.hasArgument('p');
 }
 
 int main(int argc, char** argv) {
@@ -38,9 +42,10 @@ int main(int argc, char** argv) {
     std::string elf;
     bool skip_non_user;
     uint64_t end_insts;
+    bool profile;
 
     try {
-        processCommandLine(argc, argv, trace, elf, skip_non_user, end_insts);
+        processCommandLine(argc, argv, trace, elf, skip_non_user, end_insts, profile);
     }
     catch(const trace_tools::CommandLineParser::EarlyExitException& e) {
         std::cerr << e.what() << std::endl;
@@ -56,11 +61,13 @@ int main(int argc, char** argv) {
             if(STF_EXPECT_FALSE(inst.index() >= end_insts)) {
                 break;
             }
-            hist.count(inst.pc());
+            hist.count(inst.pc(), profile);
         }
     }
-
-    hist.dump();
-
+    if (profile) {
+        hist.dump_profile();
+    } else {
+        hist.dump();
+    }
     return 0;
 }
