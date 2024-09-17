@@ -12,9 +12,6 @@
 #include "stf_elf.hpp"
 
 class STFSymbol {
-    public:
-        using DwarfInlineMap = std::unordered_map<uint64_t, std::string>;
-
     private:
         const bool valid_ = true;
         const bool inlined_ = false;
@@ -35,15 +32,6 @@ class STFSymbol {
         static inline std::string getDwarfDieName_(const dwarf_wrapper::Die& die) {
             if(const auto name_result = die.getName(); STF_EXPECT_TRUE(name_result)) {
                 return boost::core::demangle(name_result);
-            }
-
-            return "";
-        }
-
-        static inline std::string getDwarfDieName_(const dwarf_wrapper::Die& die,
-                                                   const DwarfInlineMap& inline_map) {
-            if(const auto inline_offset = die.getInlineOffset(); STF_EXPECT_TRUE(inline_offset)) {
-                return inline_map.at(*inline_offset);
             }
 
             return "";
@@ -133,20 +121,6 @@ class STFSymbol {
 
     public:
         using Handle = std::shared_ptr<STFSymbol>;
-
-        STFSymbol(const dwarf_wrapper::Die& die, const DwarfInlineMap& inline_map) :
-            STFSymbol(die, getDwarfDieName_(die, inline_map))
-        {
-        }
-
-        STFSymbol(const dwarf_wrapper::Die& die,
-                  const DwarfInlineMap& inline_map,
-                  std::vector<STFAddressRange>&& ranges) :
-            STFSymbol(die,
-                      getDwarfDieName_(die, inline_map),
-                      std::forward<std::vector<STFAddressRange>>(ranges))
-        {
-        }
 
         STFSymbol(const dwarf_wrapper::Die& die, std::vector<STFAddressRange>&& ranges) :
             STFSymbol(die,
@@ -252,31 +226,13 @@ class STFSymbolTable {
             try {
                 STFDwarf dwarf(elf.getFilename());
 
-                STFSymbol::DwarfInlineMap inlined_cus;
-                std::vector<std::shared_ptr<dwarf_wrapper::Die>> unresolved_inlines;
-
                 dwarf.iterateDies(
-                    [this, &inlined_cus, &unresolved_inlines](const std::shared_ptr<dwarf_wrapper::Die>& die) {
-                        if(die->isSubprogram()) {
-                            if(die->isInlined()) {
-                                const auto die_name = die->getName();
-                                stf_assert(die_name, "Couldn't get name for inlined function");
-
-                                inlined_cus[die->getOffset()] = boost::core::demangle(die_name);
-                            }
-                            else {
-                                emplaceSymbolFromDwarf_(*die);
-                            }
-                        }
-                        else if(die->isInlinedSubroutine()) {
-                            unresolved_inlines.emplace_back(die);
+                    [this](const std::shared_ptr<dwarf_wrapper::Die>& die) {
+                        if(die->isSubprogram() || die->isInlinedSubroutine()) {
+                            emplaceSymbolFromDwarf_(*die);
                         }
                     }
                 );
-
-                for(const auto& inlined_die: unresolved_inlines) {
-                    emplaceSymbolFromDwarf_(*inlined_die, inlined_cus);
-                }
             }
             catch(const dwarf_wrapper::NoDwarfInfoException&) {
             }

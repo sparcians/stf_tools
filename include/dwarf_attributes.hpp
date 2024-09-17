@@ -60,10 +60,10 @@ namespace dwarf_wrapper {
             }
     };
 
-    class SpecificationAttribute : public FormAttribute {
+    class ReferenceAttribute : public FormAttribute {
         public:
-            SpecificationAttribute(const DwarfInterface* dwarf, const Dwarf_Die die) :
-                FormAttribute(dwarf, die, DW_AT_specification)
+            ReferenceAttribute(const DwarfInterface* dwarf, const Dwarf_Die die, const Dwarf_Half attr) :
+                FormAttribute(dwarf, die, attr)
             {
             }
 
@@ -90,6 +90,14 @@ namespace dwarf_wrapper {
             }
     };
 
+    class SpecificationAttribute : public ReferenceAttribute {
+        public:
+            SpecificationAttribute(const DwarfInterface* dwarf, const Dwarf_Die die) :
+                ReferenceAttribute(dwarf, die, DW_AT_specification)
+            {
+            }
+    };
+
     class InlineAttribute : public Attribute {
         public:
             InlineAttribute(const DwarfInterface* dwarf, const Dwarf_Die die) :
@@ -104,15 +112,11 @@ namespace dwarf_wrapper {
             }
     };
 
-    class AbstractOriginAttribute : public Attribute {
+    class AbstractOriginAttribute : public ReferenceAttribute {
         public:
             AbstractOriginAttribute(const DwarfInterface* dwarf, const Dwarf_Die die) :
-                Attribute(dwarf, die, DW_AT_abstract_origin)
+                ReferenceAttribute(dwarf, die, DW_AT_abstract_origin)
             {
-            }
-
-            inline uint64_t getInlineOffset() const {
-                return globalFormRef_();
             }
     };
 

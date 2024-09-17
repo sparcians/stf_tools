@@ -116,16 +116,6 @@ namespace dwarf_wrapper {
                 return high_pc;
             }
 
-            inline std::optional<uint64_t> getInlineOffset() const {
-                std::optional<uint64_t> result;
-
-                if(const auto attr = getAttribute<AbstractOriginAttribute>()) {
-                    result.emplace(attr.getInlineOffset());
-                }
-
-                return result;
-            }
-
             inline const char* getLinkageName() const {
                 if(const auto link_name_attr = getAttribute<LinkageNameAttribute>()) {
                     return link_name_attr.getName();
@@ -142,6 +132,9 @@ namespace dwarf_wrapper {
                     if(!name) {
                         if(const auto spec_die = getSpecificationDie()) {
                             name = spec_die->getName();
+                        }
+                        else if(const auto attr = getAttribute<AbstractOriginAttribute>()) {
+                            name = makeDie_(attr.getReference())->getName();
                         }
                     }
                 }
