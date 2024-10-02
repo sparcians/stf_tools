@@ -8,7 +8,8 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # Boost
 find_package (Boost 1.49.0)
-include_directories (SYSTEM ${Boost_INCLUDE_DIRS})
+find_package (RapidJSON REQUIRED)
+include_directories (SYSTEM ${Boost_INCLUDE_DIRS} ${RapidJSON_INCLUDE_DIR})
 
 set (STF_TOOLS_BASE ${CMAKE_CURRENT_SOURCE_DIR})
 include_directories(${STF_TOOLS_BASE}/include)
@@ -22,7 +23,15 @@ if(NOT EXISTS ${STF_TOOLS_BASE}/stf_lib/.git)
     message(FATAL_ERROR "stf_lib hasn't been checked out. Please run git submodule update --init --recursive")
 endif()
 
-add_compile_options(-Werror -std=c++17 -fPIC -Wall -Wextra -pedantic -Wconversion -Wno-unused-parameter -Wno-unused-function -Wno-gnu-zero-variadic-macro-arguments -pipe)
+add_compile_options(-Werror -std=c++17 -fPIC -Wall -Wextra -pedantic -Wconversion -Wno-unused-parameter -Wno-unused-function -pipe)
+
+if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    add_compile_options(-Wno-gnu-zero-variadic-macro-arguments)
+
+    if (CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 19.0)
+        add_compile_options(-Wno-c++20-extensions)
+    endif()
+endif()
 
 include(std_filesystem)
 
