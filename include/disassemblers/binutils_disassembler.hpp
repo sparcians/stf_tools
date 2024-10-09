@@ -32,7 +32,7 @@ namespace stf {
                                        const uint64_t pc,
                                        const uint32_t opcode) const final;
 
-#define DEFAULT_RISCV_ISA_EXTENSIONS "imafdcvh_zicbom_zicbop_zicboz_zicsr_zifencei_zihintpause_zfhmin_zba_zbb_zbs_zihintntl_zvbb_zvbc_zvkg_zvkned_zvknhb_zvksed_zvksh_zvkt_smaia_smstateen_ss1p12_ssaia_sscofpmf_ssstateen_sv48_svinval_svnapot_svpbmt"
+#define DEFAULT_RISCV_ISA_EXTENSIONS "imafdcvh_zicbom_zicbop_zicboz_zicsr_zicond_zifencei_zihintpause_zfhmin_zba_zbb_zbs_zihintntl_zvbb_zvbc_zvkg_zvkned_zvknhb_zvksed_zvksh_zvkt_smaia_smstateen_ss1p12_ssaia_sscofpmf_ssstateen_sv48_svinval_svnapot_svpbmt"
 #define GEN_DEFAULT_RISCV_ISA_STRING(bits) "rv" #bits DEFAULT_RISCV_ISA_EXTENSIONS
 
                 inline static constexpr char RV32_DEFAULT_DISASM_ISA_[] = GEN_DEFAULT_RISCV_ISA_STRING(32);
