@@ -10,12 +10,14 @@ void processCommandLine(int argc,
                         std::string& elf,
                         bool& skip_non_user,
                         uint64_t& end_insts,
-                        bool& profile) {
+                        bool& profile,
+                        uint64_t& warmup_insts) {
     trace_tools::CommandLineParser parser("stf_function_histogram");
     parser.addFlag('E', "elf", "ELF file to analyze (defaults to trace.elf)");
     parser.addFlag('u', "skip non user-mode instructions");
     parser.addFlag('e', "end_insts", "stop after specified number of instructions");
     parser.addFlag('p', "profile functions in program");
+    parser.addFlag('s', "warmup_insts", "Skip the the specified warmup instructions");
 
     parser.addPositionalArgument("trace", "trace in STF format");
     parser.parseArguments(argc, argv);
@@ -24,6 +26,9 @@ void processCommandLine(int argc,
 
     end_insts = std::numeric_limits<uint64_t>::max();
     parser.getArgumentValue('e', end_insts);
+
+    warmup_insts = 0;
+    parser.getArgumentValue('s', warmup_insts);
 
     parser.getPositionalArgument(0, trace);
 
@@ -43,9 +48,9 @@ int main(int argc, char** argv) {
     bool skip_non_user;
     uint64_t end_insts;
     bool profile;
-
+    uint64_t warmup_insts;
     try {
-        processCommandLine(argc, argv, trace, elf, skip_non_user, end_insts, profile);
+        processCommandLine(argc, argv, trace, elf, skip_non_user, end_insts, profile, warmup_insts);
     }
     catch(const trace_tools::CommandLineParser::EarlyExitException& e) {
         std::cerr << e.what() << std::endl;
@@ -57,7 +62,9 @@ int main(int argc, char** argv) {
     {
         // Find out where the trace starts
         stf::STFInstReader inst_reader(trace, skip_non_user);
-        for(const auto& inst: inst_reader) {
+        for(auto it = inst_reader.begin(warmup_insts); it != inst_reader.end(); ++it)
+        {
+            const auto& inst = *it;
             if(STF_EXPECT_FALSE(inst.index() >= end_insts)) {
                 break;
             }
