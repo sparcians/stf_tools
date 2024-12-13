@@ -37,6 +37,7 @@ size_t STFMorpher::OpcodeMorph::Op::write(stf::STFWriter& writer, const stf::STF
                                            0,
                                            ls_access_type_);
         writer << stf::InstMemContentRecord(0);
+        ls_address_ = static_cast<uint64_t>(static_cast<int64_t>(ls_address_) + ls_stride_);
     }
 
     if(op_size_ == 2) {
@@ -58,6 +59,10 @@ void STFMorpher::processOpcodeMorphArguments_(const trace_tools::CommandLinePars
         uint16_t global_size = 0;
         const bool has_global_size = parser.hasArgument('S');
         parser.getArgumentValue('S', global_size);
+
+        int64_t global_stride = 0;
+        const bool has_global_stride = parser.hasArgument("stride");
+        parser.getArgumentValue("stride", global_stride);
 
         const char argument_flag = getArgumentFlag_(morph_type);
 
@@ -96,6 +101,8 @@ void STFMorpher::processOpcodeMorphArguments_(const trace_tools::CommandLinePars
                     uint32_t opcode = 0;
                     uint64_t address = 0;
                     uint16_t size = 0;
+                    int64_t stride = 0;
+
                     if(has_at) {
                         const auto colon_pos = opcode_str.find(':');
                         if(STF_EXPECT_FALSE(colon_pos == std::string::npos)) {
@@ -103,8 +110,24 @@ void STFMorpher::processOpcodeMorphArguments_(const trace_tools::CommandLinePars
                                                    "Did not specify an access size for an LS op: ", opcode_str);
                             size = global_size;
                         }
+
+                        size_t size_field_length = std::string::npos;
+
+                        const auto plus_pos = opcode_str.find('+');
+                        if(STF_EXPECT_FALSE(plus_pos == std::string::npos)) {
+                            if(has_global_stride) {
+                                stride = global_stride;
+                            }
+                        }
+                        else {
+                            parser.assertCondition(colon_pos != std::string::npos,
+                                                   "An LS op with a stride field must also specify the size (e.g. opcode@addr:size+stride): ", opcode_str);
+                            size_field_length = plus_pos - colon_pos - 1;
+                            stride = static_cast<int64_t>(std::stoll(opcode_str.substr(plus_pos + 1)));
+                        }
+
                         address = std::stoull(opcode_str.substr(at_pos + 1, colon_pos - at_pos - 1), 0, 16);
-                        size = static_cast<uint16_t>(std::stoul(opcode_str.substr(colon_pos + 1)));
+                        size = static_cast<uint16_t>(std::stoul(opcode_str.substr(colon_pos + 1, size_field_length)));
                         opcode = static_cast<uint32_t>(std::stoul(opcode_str.substr(0, at_pos), 0, 16));
                     }
                     else {
@@ -136,6 +159,7 @@ void STFMorpher::processOpcodeMorphArguments_(const trace_tools::CommandLinePars
                     morph_it->second.addOp(opcode,
                                            decoder_.getRegisterOperands(),
                                            address,
+                                           stride,
                                            size,
                                            decoder_.getMemAccessType(),
                                            inst_size);

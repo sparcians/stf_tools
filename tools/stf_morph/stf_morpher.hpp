@@ -20,7 +20,8 @@ class STFMorpher {
                     private:
                         uint32_t opcode_;
                         mutable std::vector<stf::InstRegRecord> operands_;
-                        uint64_t ls_address_;
+                        mutable uint64_t ls_address_;
+                        int64_t ls_stride_;
                         uint16_t ls_size_;
                         stf::INST_MEM_ACCESS ls_access_type_;
                         size_t op_size_;
@@ -29,12 +30,14 @@ class STFMorpher {
                         Op(const uint32_t opcode,
                            std::vector<stf::InstRegRecord>&& operands,
                            const uint64_t ls_address,
+                           const int64_t ls_stride,
                            const uint16_t ls_size,
                            const stf::INST_MEM_ACCESS ls_access_type,
                            const size_t op_size) :
                             opcode_(opcode),
                             operands_(std::move(operands)),
                             ls_address_(ls_address),
+                            ls_stride_(ls_stride),
                             ls_size_(ls_size),
                             ls_access_type_(ls_access_type),
                             op_size_(op_size)
@@ -52,12 +55,14 @@ class STFMorpher {
                 inline void addOp(const uint32_t opcode,
                                   std::vector<stf::InstRegRecord>&& operands,
                                   const uint64_t ls_address,
+                                  const int64_t ls_stride,
                                   const uint16_t ls_size,
                                   const stf::INST_MEM_ACCESS ls_access_type,
                                   const size_t op_size) {
                     opcodes_.emplace_back(opcode,
                                           std::forward<std::vector<stf::InstRegRecord>>(operands),
                                           ls_address,
+                                          ls_stride,
                                           ls_size,
                                           ls_access_type,
                                           op_size);
@@ -196,17 +201,18 @@ class STFMorpher {
         static inline void addMorphArguments(trace_tools::CommandLineParser& parser) {
             parser.addFlag('A', "address", "assume all LS ops access the given address");
             parser.addFlag('S', "size", "assume all LS ops have the given size");
+            parser.addFlag("stride", "stride", "increment all LS ops' addresses by the given stride after each instance");
             parser.addFlag('C', "allow STFID and PC-based morphs to collide. STFID morphs will take precedence.");
             parser.addMultiFlag(getArgumentFlag_<MorphType::PC>(),
-                                "pc=opcode1[@addr1:size1][,opcode2[@addr2:size2],...]",
+                                "pc=opcode1[@addr1:size1[+stride1]][,opcode2[@addr2:size2[+stride2]],...]",
                                 "morph instruction(s) starting at pc to specified opcode(s). "
-                                "LS instructions can have target addresses and access sizes specified with "
-                                "`opcode@addr:size` syntax");
+                                "LS instructions can have target addresses and access sizes (and an optional stride) "
+                                "specified with `opcode@addr:size+stride` syntax");
             parser.addMultiFlag(getArgumentFlag_<MorphType::STFID>(),
-                                "stfid=opcode1[@addr1:size1][,opcode2[@addr2:size2],...]",
+                                "stfid=opcode1[@addr1:size1[+stride1]][,opcode2[@addr2:size2[+stride2]],...]",
                                 "morph instruction(s) starting at stfid to specified opcode(s). "
-                                "LS instructions can have target addresses and access sizes specified with "
-                                "`opcode@addr:size` syntax");
+                                "LS instructions can have target addresses and access sizes (and an optional stride) "
+                                "specified with `opcode@addr:size+stride` syntax");
         }
 
         inline bool empty() const {
