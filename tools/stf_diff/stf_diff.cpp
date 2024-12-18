@@ -48,8 +48,10 @@ std::ostream& operator<<(std::ostream& os, const STFDiffInst& inst) {
         os << ": [";
 
         for (const auto &mit : inst.mem_accesses_) {
-            os << ' ';
-            stf::format_utils::formatHex(os, mit.getData());
+            for(const auto val: mit.getData()) {
+                os << ' ';
+                stf::format_utils::formatHex(os, val);
+            }
         }
 
         os << " ]";
