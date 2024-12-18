@@ -106,13 +106,19 @@ class STFDiffInst {
     private:
         class MemAccess {
             private:
+                using VectorType = boost::container::small_vector<uint64_t, 1>;
                 const uint64_t addr_;
-                const uint64_t data_;
+                const VectorType data_;
+
+                MemAccess(const uint64_t addr, const stf::MemAccess::ContentValueView& data_view) :
+                    addr_(addr),
+                    data_(data_view.begin(), data_view.end())
+                {
+                }
 
             public:
                 MemAccess(const stf::MemAccess& mem_access, bool ignore_addresses) :
-                    addr_(ignore_addresses ? stf::page_utils::INVALID_PHYS_ADDR : mem_access.getAddress()),
-                    data_(mem_access.getData())
+                    MemAccess(ignore_addresses ? stf::page_utils::INVALID_PHYS_ADDR : mem_access.getAddress(), mem_access.getData())
                 {
                 }
 
@@ -120,7 +126,7 @@ class STFDiffInst {
                     return addr_;
                 }
 
-                uint64_t getData() const {
+                const VectorType& getData() const {
                     return data_;
                 }
 
