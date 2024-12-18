@@ -56,6 +56,12 @@ int main(int argc, char** argv) {
     stf::print_utils::printLeft(addr_sep);
     stf::print_utils::printLeft("Size");
 
+    // these two values only apply to non-csv
+    static constexpr size_t addr_sep_len = 4;
+    const size_t data_indent = static_cast<size_t>(index_width) + // index
+                               static_cast<size_t>(type_width) + // type
+                               static_cast<size_t>(addr_width) + addr_sep_len; // address
+
     std::cout << std::endl;
 
     for(const auto& inst: reader) {
@@ -85,7 +91,13 @@ int main(int argc, char** argv) {
 
             stf::print_utils::printVA(m.getAddress());
             stf::print_utils::printLeft(addr_sep);
-            stf::print_utils::printVA(m.getData());
+            if(csv) {
+                std::cout << "0x";
+                m.formatContent<true>(std::cout, 0, "_");
+            }
+            else {
+                m.formatContent<false, true>(std::cout, data_indent);
+            }
             stf::print_utils::printLeft(addr_sep);
             stf::print_utils::printDecLeft(m.getSize());
             std::cout << std::endl;
