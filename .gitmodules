@@ -4,9 +4,6 @@
 [submodule "stf_lib"]
 	path = stf_lib
     url = git@github.com:sparcians/stf_lib.git
-[submodule "ELFIO"]
-    path = ELFIO
-    url = git@github.com:serge1/ELFIO.git
 [submodule "dtl"]
 	path = dtl
 	url = git@github.com:cubicdaiya/dtl.git
