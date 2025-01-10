@@ -62,8 +62,6 @@ include_directories(${STF_BASE}/stf-inc)
 
 include(${STF_TOOLS_CMAKE_DIR}/mavis_setup.cmake)
 
-add_subdirectory(generators)
-
 add_subdirectory(lib)
 
 add_subdirectory(tools)

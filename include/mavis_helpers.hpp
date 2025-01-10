@@ -3,7 +3,8 @@
 #include <limits>
 #include <ostream>
 #include <mavis/Mavis.h>
-#include "mavis_json_files.hpp"
+#include "filesystem.hpp"
+#include "stf_enums.hpp"
 #include "stf_enum_utils.hpp"
 #include "stf_exception.hpp"
 
@@ -402,15 +403,23 @@ namespace mavis_helpers {
             }
     };
 
-    /**
-     * \typedef Mavis
-     * \brief Mavis decoder type
-     */
-    using Mavis = ::Mavis<InstType, DummyAnnotationType>;
+    static inline std::string getISASpecJSON(const stf::INST_IEM iem) {
+        switch(iem) {
+            case stf::INST_IEM::STF_INST_IEM_RV32:
+            case stf::INST_IEM::STF_INST_IEM_RV64:
+                return "riscv_isa_spec.json";
+            case stf::INST_IEM::STF_INST_IEM_INVALID:
+            case stf::INST_IEM::STF_INST_IEM_RESERVED:
+                stf_throw("Invalid IEM: " << iem);
+        }
+    }
 
-    /**
-     * \typedef FullMavis
-     * \brief Mavis decoder type that includes annotations
-     */
-    using FullMavis = ::Mavis<InstType, AnnotationType>;
+    static inline fs::path getMavisJSONPath(const std::string& mavis_path) {
+        return fs::path(mavis_path) / "json";
+    }
+
+    static inline fs::path getISASpecPath(const std::string& mavis_path, const stf::INST_IEM iem) {
+        return getMavisJSONPath(mavis_path) / getISASpecJSON(iem);
+    }
+
 } // end namespace mavis_helpers

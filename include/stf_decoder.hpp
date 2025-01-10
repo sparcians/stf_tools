@@ -3,11 +3,13 @@
 #include <bitset>
 #include <cstdlib>
 #include <mavis/DecoderTypes.h>
+#include <mavis/extension_managers/RISCVExtensionManager.hpp>
 #include <memory>
 #include <ostream>
 #include <string_view>
 
 #include "mavis_helpers.hpp"
+#include "isa_defs.hpp"
 #include "stf_valid_value.hpp"
 #include "stf_record_types.hpp"
 #include "filesystem.hpp"
@@ -18,7 +20,7 @@ namespace stf {
      * \class STFDecoderBase
      * \brief Class used by STF tools to decode instructions
      */
-    template<typename MavisType>
+    template<typename InstType, typename AnnotationType>
     class STFDecoderBase {
         public:
             /**
@@ -50,6 +52,8 @@ namespace stf {
                     }
             };
 
+            using MavisType = ::Mavis<InstType, AnnotationType>;
+
         protected:
             inline static const std::string UNIMP_ = "c.unimp";
 
@@ -63,9 +67,11 @@ namespace stf {
             inline static constexpr uint32_t DEFAULT_START_MARKPOINT_OPCODE_ = 0x00006033;
             inline static constexpr uint32_t DEFAULT_STOP_MARKPOINT_OPCODE_ = 0x0010e033;
 
-            const std::vector<std::string> isa_jsons_; /**< Cached paths to ISA jsons so that we can make a copy of this decoder */
-            const std::vector<std::string> anno_jsons_; /**< Cached paths to annotation jsons so that we can make a copy of this decoder */
-
+            const std::string mavis_path_;
+            const std::string mavis_isa_spec_;
+            const std::string isa_string_;
+            using ExtMan = mavis::extension_manager::riscv::RISCVExtensionManager;
+            const ExtMan ext_man_;
             mutable MavisType mavis_; /**< Mavis decoder */
 
             // Cached instruction UIDs allow us to identify ecall/mret/sret/uret without needing to check the mnemonic
@@ -211,11 +217,16 @@ namespace stf {
                 static constexpr size_t size = N;
             };
 
-            STFDecoderBase(std::vector<std::string>&& isa_jsons,
-                           std::vector<std::string>&& anno_jsons) :
-                isa_jsons_(std::move(isa_jsons)),
-                anno_jsons_(std::move(anno_jsons)),
-                mavis_(isa_jsons_, anno_jsons_),
+            static ExtMan constructExtMan_(const std::string& isa_string, const std::string& mavis_isa_spec, const std::string& mavis_path) {
+                return ExtMan::fromISA(isa_string, mavis_isa_spec, mavis_helpers::getMavisJSONPath(mavis_path));
+            }
+
+            STFDecoderBase(const std::string& mavis_path, const std::string& mavis_isa_spec, const std::string& isa_string) :
+                mavis_path_(mavis_path),
+                mavis_isa_spec_(mavis_isa_spec),
+                isa_string_(isa_string),
+                ext_man_(constructExtMan_(isa_string_, mavis_isa_spec_, mavis_path_)),
+                mavis_(ext_man_.constructMavis<InstType, AnnotationType>({})),
                 ecall_uid_(lookupInstructionUID("ecall")),
                 mret_uid_(lookupInstructionUID("mret")),
                 sret_uid_(lookupInstructionUID("sret")),
@@ -239,7 +250,7 @@ namespace stf {
              * \param mavis_path Path to Mavis checkout
              */
             STFDecoderBase(const stf::INST_IEM iem, const std::string& mavis_path) :
-                STFDecoderBase(mavis_path, mavis_helpers::getMavisJSONs(mavis_path, iem), {})
+                STFDecoderBase(mavis_path, mavis_helpers::getISASpecPath(mavis_path, iem), stf::isa_defs::getDefaultISAString(iem))
             {
             }
 
@@ -247,9 +258,11 @@ namespace stf {
              * Copy constructor
              */
             STFDecoderBase(const STFDecoderBase& rhs) :
-                isa_jsons_(rhs.isa_jsons_),
-                anno_jsons_(rhs.anno_jsons_),
-                mavis_(isa_jsons_, anno_jsons_),
+                mavis_path_(rhs.mavis_path_),
+                mavis_isa_spec_(rhs.mavis_isa_spec_),
+                isa_string_(rhs.isa_string_),
+                ext_man_(constructExtMan_(isa_string_, mavis_isa_spec_, mavis_path_)),
+                mavis_(ext_man_.constructMavis<InstType, AnnotationType>({})),
                 ecall_uid_(lookupInstructionUID("ecall")),
                 mret_uid_(lookupInstructionUID("mret")),
                 sret_uid_(lookupInstructionUID("sret")),
@@ -753,10 +766,10 @@ namespace stf {
             }
     };
 
-    class STFDecoder : public STFDecoderBase<mavis_helpers::Mavis> {
+    class STFDecoder : public STFDecoderBase<mavis_helpers::InstType, mavis_helpers::DummyAnnotationType> {
         public:
             explicit STFDecoder(const stf::INST_IEM iem) :
-                STFDecoder(iem, getDefaultPath_())
+                STFDecoderBase(iem)
             {
             }
 
@@ -766,7 +779,7 @@ namespace stf {
              * \param mavis_path Path to Mavis checkout
              */
             STFDecoder(const stf::INST_IEM iem, const std::string& mavis_path) :
-                STFDecoderBase(mavis_helpers::getMavisJSONs(mavis_path, iem), mavis_helpers::getMavisJSONs(mavis_path, iem))
+                STFDecoderBase(iem, mavis_path)
             {
             }
 
@@ -777,10 +790,10 @@ namespace stf {
             }
     };
 
-    class STFDecoderFull : public STFDecoderBase<mavis_helpers::FullMavis> {
+    class STFDecoderFull : public STFDecoderBase<mavis_helpers::InstType, mavis_helpers::AnnotationType> {
         public:
             explicit STFDecoderFull(const stf::INST_IEM iem) :
-                STFDecoderFull(iem, getDefaultPath_())
+                STFDecoderBase(iem)
             {
             }
 
@@ -790,7 +803,7 @@ namespace stf {
              * \param mavis_path Path to Mavis checkout
              */
             STFDecoderFull(const stf::INST_IEM iem, const std::string& mavis_path) :
-                STFDecoderBase(mavis_helpers::getMavisJSONs(mavis_path, iem), mavis_helpers::getMavisJSONs(mavis_path, iem))
+                STFDecoderBase(iem, mavis_path)
             {
             }
 

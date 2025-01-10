@@ -425,7 +425,7 @@ namespace stf {
                                                    const INST_IEM iem,
                                                    const bool use_aliases) :
             BaseDisassembler(inst_set, iem, use_aliases),
-            dis_(std::make_unique<binutils_wrapper::DisassemblerInternals>(elf, getBfdMach_(iem), getDefaultDisasmISA_(iem), use_aliases))
+            dis_(std::make_unique<binutils_wrapper::DisassemblerInternals>(elf, getBfdMach_(iem), isa_defs::getDefaultISAString(iem), use_aliases))
         {
         }
 
