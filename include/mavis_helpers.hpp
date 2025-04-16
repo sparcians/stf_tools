@@ -410,8 +410,10 @@ namespace mavis_helpers {
                 return "riscv_isa_spec.json";
             case stf::INST_IEM::STF_INST_IEM_INVALID:
             case stf::INST_IEM::STF_INST_IEM_RESERVED:
-                stf_throw("Invalid IEM: " << iem);
+                break;
         }
+
+        stf_throw("Invalid IEM: " << iem);
     }
 
     static inline fs::path getMavisJSONPath(const std::string& mavis_path) {

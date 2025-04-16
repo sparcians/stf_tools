@@ -9,6 +9,10 @@ add_library(trace_tools_version "${CMAKE_CURRENT_BINARY_DIR}/trace_tools_git_ver
 
 set (STF_LINK_LIBS ${EXTRA_LIBS} ${STF_LINK_LIBS} trace_tools_version stdc++)
 
+if(STATIC_BUILD)
+    add_link_options(-static -static-libstdc++ -static-libgcc)
+endif()
+
 add_subdirectory(stf_dump)
 add_subdirectory(stf_check)
 add_subdirectory(stf_extract)

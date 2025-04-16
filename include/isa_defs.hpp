@@ -20,7 +20,9 @@ namespace stf::isa_defs {
                 return riscv::RV64_DEFAULT_DISASM_ISA;
             case stf::INST_IEM::STF_INST_IEM_INVALID:
             case stf::INST_IEM::STF_INST_IEM_RESERVED:
-                stf_throw("Invalid IEM: " << iem);
+                break;
         }
+
+        stf_throw("Invalid IEM: " << iem);
     }
 }
