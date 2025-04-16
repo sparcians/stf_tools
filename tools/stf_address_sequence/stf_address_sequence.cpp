@@ -265,7 +265,9 @@ int main(int argc, char** argv) {
         const auto sorted_filename = output_filename + ".sorted";
         std::stringstream ss_sort;
         ss_sort << "sort -n -k" << Columns::ADDR + 1 << " -k" << Columns::ACCESS_ID + 1 << " -o " << sorted_filename << " " << output_filename;
-        std::system(ss_sort.str().c_str());
+        const auto& sort_cmd = ss_sort.str();
+        stf_assert(WEXITSTATUS(std::system(sort_cmd.c_str())) == 0, "Failed to run sort command: " << sort_cmd);
+
         std::ifstream ifstrm(sorted_filename);
         stf_assert(ifstrm.is_open(), "failed to open " << sorted_filename)
 
