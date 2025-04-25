@@ -151,8 +151,7 @@ class OutputFileManager {
         }
 
         void createTemporaryIfNeeded_(const std::string_view infile, const std::string_view outfile) {
-
-            if(fs::equivalent(infile, outfile)) {
+            if(fs::exists(outfile) && fs::equivalent(infile, outfile)) {
                 const auto filename_ext = fs::path(outfile).extension().string();
                 std::string temp_filename(TEMP_FILENAME_BASE_);
                 temp_filename += filename_ext;
