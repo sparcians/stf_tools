@@ -6,4 +6,6 @@ endif()
 
 include(${STF_TOOLS_CMAKE_DIR}/mavis_global_path.cmake OPTIONAL)
 
+set(STF_LINK_LIBS ${STF_LINK_LIBS} boost_json)
+
 include_directories(SYSTEM ${STF_TOOLS_BASE}/mavis)
