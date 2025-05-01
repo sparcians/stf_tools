@@ -12,6 +12,7 @@
 #include "isa_defs.hpp"
 #include "stf_valid_value.hpp"
 #include "stf_record_types.hpp"
+#include "stf_env_var.hpp"
 #include "filesystem.hpp"
 #include "tools_util.hpp"
 
@@ -250,7 +251,18 @@ namespace stf {
              * \param mavis_path Path to Mavis checkout
              */
             STFDecoderBase(const stf::INST_IEM iem, const std::string& mavis_path) :
-                STFDecoderBase(mavis_path, mavis_helpers::getISASpecPath(mavis_path, iem), stf::isa_defs::getDefaultISAString(iem))
+                STFDecoderBase(iem, mavis_path, stf::STFEnvVar("STF_DISASM_ISA", stf::isa_defs::getDefaultISAString(iem)).get())
+            {
+            }
+
+            /**
+             * Constructs an STFDecoderBase
+             * \param iem Instruction encoding
+             * \param mavis_path Path to Mavis checkout
+             * \param isa_string RISC-V ISA string used to configure Mavis
+             */
+            STFDecoderBase(const stf::INST_IEM iem, const std::string& mavis_path, const std::string& isa_string) :
+                STFDecoderBase(mavis_path, mavis_helpers::getISASpecPath(mavis_path, iem), isa_string)
             {
             }
 
