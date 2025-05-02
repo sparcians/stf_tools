@@ -6,8 +6,6 @@
 #include <unordered_map>
 #include <unordered_set>
 
-#include <boost/container_hash/hash.hpp>
-
 #include "print_utils.hpp"
 #include "stf_enums.hpp"
 #include "stf_exception.hpp"
@@ -521,7 +519,17 @@ struct STFCheckConfig {
 using ThreadMapKey = std::tuple<uint32_t, uint32_t, uint32_t>;
 
 /**
- * \typedef ThreadMap
+ * \class ThreadMap
  * Maps Hardware Thread ID, PID, and TID to an STFInst
  */
-using ThreadMap = std::unordered_map<ThreadMapKey, stf::STFInst, boost::hash<ThreadMapKey>>;
+class ThreadMap
+{
+    private:
+        std::unordered_map<uint32_t, std::unordered_map<uint32_t, std::unordered_map<uint32_t, stf::STFInst>>> map_;
+
+    public:
+        stf::STFInst& operator[](const ThreadMapKey& key)
+        {
+            return map_[std::get<0>(key)][std::get<1>(key)][std::get<2>(key)];
+        }
+};
