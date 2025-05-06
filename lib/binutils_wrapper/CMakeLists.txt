@@ -6,6 +6,9 @@ if(NOT DISABLE_BINUTILS)
     set(STF_TOOLS_BINUTILS_WRAPPER_DIR ${STF_TOOLS_LIB_DIR}/binutils_wrapper)
 
     set(BINUTILS_LIBS ${BINUTILS_LIB_DIR}/libopcodes.a ${BINUTILS_LIB_DIR}/libbfd.a ${BINUTILS_LIB_DIR}/libiberty.a)
+
+    include(isa_overrides OPTIONAL)
+
     if(BINUTILS_HAS_LIBINTL)
         set(BINUTILS_LIBS ${BINUTILS_LIBS} ${BINUTILS_LIB_DIR}/libintl.a)
     endif()
