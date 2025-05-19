@@ -26,7 +26,7 @@ else()
         )
 
         # Set tag
-        set(BINUTILS_TAG binutils-2_42)
+        set(BINUTILS_TAG binutils-2_44)
     endif()
 
     message("-- Building binutils from ${BINUTILS_REPO}, tag ${BINUTILS_TAG}")
