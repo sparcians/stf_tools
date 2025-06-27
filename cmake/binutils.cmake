@@ -70,6 +70,11 @@ else()
                                  DEPENDEES build
                                  DEPENDERS install)
         set(_BINUTILS_LIBS ${_BINUTILS_LIBS} intl/libintl.a)
+    else()
+        find_package(Intl REQUIRED)
+        if(NOT Intl_IS_BUILT_IN)
+            set(_BINUTILS_LIBS ${_BINUTILS_LIBS} Intl::Intl)
+        endif()
     endif()
 
     ExternalProject_Add_Step(binutils
