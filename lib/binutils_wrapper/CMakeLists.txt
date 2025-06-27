@@ -11,6 +11,11 @@ if(NOT DISABLE_BINUTILS)
 
     if(BINUTILS_HAS_LIBINTL)
         set(BINUTILS_LIBS ${BINUTILS_LIBS} ${BINUTILS_LIB_DIR}/libintl.a)
+    else()
+        find_package(Intl REQUIRED)
+        if(NOT Intl_IS_BUILT_IN)
+            set(BINUTILS_LIBS ${BINUTILS_LIBS} Intl::Intl)
+        endif()
     endif()
     set(BINUTILS_LIBS ${BINUTILS_LIBS} dl z ${Iconv_LIBRARIES})
 
