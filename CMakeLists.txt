@@ -11,7 +11,7 @@ if(STATIC_BUILD)
 endif()
 
 # Boost
-find_package (Boost 1.49.0)
+find_package (Boost 1.75.0 REQUIRED COMPONENTS json)
 find_package (RapidJSON REQUIRED)
 include_directories (SYSTEM ${Boost_INCLUDE_DIRS} ${RapidJSON_INCLUDE_DIR})
 
