@@ -319,11 +319,13 @@ int main (int argc, char **argv) {
                     valid_jump = true;
                 }
                 else {
-                    valid_jump = !prev_events.empty() && !std::any_of(prev_events.begin(),
-                                                                      prev_events.end(),
-                                                                      [&](const auto& event) {
-                                                                          return event.targetValid() && (event.getTarget() != inst.pc());
-                                                                      });
+                    const auto last_event_with_target_it = std::find_if(prev_events.rbegin(),
+                                                                        prev_events.rend(),
+                                                                        [](const auto& event) {
+                                                                             return event.targetValid();
+                                                                        });
+
+                    valid_jump = last_event_with_target_it != prev_events.rend() && last_event_with_target_it->getTarget() == inst.pc();
                 }
 
                 if(STF_EXPECT_FALSE(!valid_jump)) {
