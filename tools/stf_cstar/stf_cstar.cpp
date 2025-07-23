@@ -122,13 +122,13 @@ int main(int argc, char** argv) {
 
     stf::STFInstReader reader(trace, skip_non_user);
 
-    stf::Disassembler dis(findElfFromTrace(trace), reader.getISA(), reader.getInitialIEM(), false);
+    stf::Disassembler dis(findElfFromTrace(trace), reader, false);
 
     bool last_was_nt_branch = false;
     uint64_t last_branch_target = 0;
     uint64_t last_branch_pc = 0;
     uint32_t last_branch_opcode = 0;
-    stf::STFDecoder decoder(reader.getInitialIEM());
+    stf::STFDecoder decoder(reader);
     BranchMap branch_counts;
     std::map<uint64_t, CStarInfo> cstar_info;
 

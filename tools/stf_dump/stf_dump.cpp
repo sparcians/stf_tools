@@ -113,7 +113,7 @@ void processTrace_(const STFDumpConfig& config, const StartStopType start_point 
     stf_reader.checkVersion();
 
     // Create disassembler
-    stf::Disassembler dis(findElfFromTrace(config.trace_filename), stf_reader.getISA(), stf_reader.getInitialIEM(), config.use_aliases);
+    stf::Disassembler dis(findElfFromTrace(config.trace_filename), stf_reader, config.use_aliases);
 
     if(!config.omit_header) {
         // Print Version info
@@ -131,6 +131,9 @@ void processTrace_(const STFDumpConfig& config, const StartStopType start_point 
 
         stf::print_utils::printLabel("INST_IEM");
         std::cout << stf_reader.getInitialIEM() << std::endl;
+
+        stf::print_utils::printLabel("INST_EXT");
+        std::cout << stf_reader.getISAExtendedInfo() << std::endl;
 
         if(config.start_inst || config.end_inst) {
             std::cout << "Start Inst:" << config.start_inst;

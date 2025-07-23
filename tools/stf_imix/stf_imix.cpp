@@ -279,7 +279,7 @@ void processTrace(const std::string& output_filename,
     OutputFileStream output_file(output_filename);
 
     stf::STFInstReader reader(trace_filename, skip_non_user);
-    stf::STFDecoder decoder(reader.getInitialIEM());
+    stf::STFDecoder decoder(reader);
 
     static constexpr int COLUMN_WIDTH = 16;
 

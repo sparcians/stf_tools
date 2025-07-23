@@ -84,7 +84,7 @@ auto getBeginIterator(const uint64_t start, const bool diff_markpointed_region, 
     auto it = std::next(reader.begin(), static_cast<ssize_t>(start) - 1);
 
     if(diff_markpointed_region || diff_tracepointed_region) {
-        stf::STFDecoder decoder(reader.getInitialIEM());
+        stf::STFDecoder decoder(reader);
         while(it != reader.end()) {
             decoder.decode(it->opcode());
             ++it;
@@ -144,15 +144,14 @@ int streamingDiff(const STFDiffConfig &config,
     uint64_t count = 0;
     uint64_t diff_count = 0;
 
-    const auto inst_set = rdr1.getISA();
-    stf_assert(inst_set == rdr2.getISA(), "Traces must have the same instruction set in order to be compared!");
+    stf_assert(rdr1.getISA() == rdr2.getISA(), "Traces must have the same instruction set in order to be compared!");
 
-    const auto iem = rdr1.getInitialIEM();
-    stf_assert(iem == rdr2.getInitialIEM(), "Traces must have the same instruction encoding in order to be compared!");
+    stf_assert(rdr1.getInitialIEM() == rdr2.getInitialIEM(), "Traces must have the same instruction encoding in order to be compared!");
 
-    stf::STFDecoder decoder(iem);
-    stf::Disassembler dis1(findElfFromTrace(config.trace1), inst_set, iem, config.use_aliases);
-    stf::Disassembler dis2(findElfFromTrace(config.trace2), inst_set, iem, config.use_aliases);
+    stf::STFDecoder decoder1(rdr1);
+    stf::STFDecoder decoder2(rdr2);
+    stf::Disassembler dis1(findElfFromTrace(config.trace1), rdr1, config.use_aliases);
+    stf::Disassembler dis2(findElfFromTrace(config.trace2), rdr2, config.use_aliases);
 
     const bool spike_lr_sc_workaround = config.workarounds.at("spike_lr_sc");
 
@@ -162,15 +161,15 @@ int streamingDiff(const STFDiffConfig &config,
         }
 
         if (spike_lr_sc_workaround && reader1 != rdr1.end() && reader2 != rdr2.end()) {
-            const bool inst1_was_failed_sc = isFailedSC(decoder, *reader1);
-            const bool inst2_was_failed_sc = isFailedSC(decoder, *reader2);
+            const bool inst1_was_failed_sc = isFailedSC(decoder1, *reader1);
+            const bool inst2_was_failed_sc = isFailedSC(decoder2, *reader2);
 
             if(STF_EXPECT_FALSE(inst1_was_failed_sc != inst2_was_failed_sc)) {
                 if(inst1_was_failed_sc) {
-                    advanceToCompletedSC(decoder, reader1, rdr1.end());
+                    advanceToCompletedSC(decoder1, reader1, rdr1.end());
                 }
                 else {
-                    advanceToCompletedSC(decoder, reader2, rdr2.end());
+                    advanceToCompletedSC(decoder2, reader2, rdr2.end());
                 }
             }
         }
@@ -247,7 +246,7 @@ void extractInstructions(const std::string &trace,
                          const STFDiffConfig &config) {
     // Open stf trace reader
     stf::STFInstReader rdr(trace, config.ignore_kernel);
-    stf::Disassembler dis(findElfFromTrace(trace), rdr.getISA(), rdr.getInitialIEM(), config.use_aliases);
+    stf::Disassembler dis(findElfFromTrace(trace), rdr, config.use_aliases);
     auto reader = getBeginIterator(start, config.diff_markpointed_region, config.diff_tracepointed_region, rdr);
 
     uint64_t count = 0;

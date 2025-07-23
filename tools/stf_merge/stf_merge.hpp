@@ -76,6 +76,7 @@ class STFMergeExtractor {
                 case stf::descriptors::internal::Descriptor::STF_VLEN_CONFIG:
                 case stf::descriptors::internal::Descriptor::STF_PROTOCOL_ID:
                 case stf::descriptors::internal::Descriptor::STF_CLOCK_ID:
+                case stf::descriptors::internal::Descriptor::STF_ISA_EXTENDED:
                 case stf::descriptors::internal::Descriptor::STF_END_HEADER:
                 case stf::descriptors::internal::Descriptor::STF_INST_REG:
                 case stf::descriptors::internal::Descriptor::STF_INST_READY_REG:

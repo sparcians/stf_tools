@@ -70,8 +70,8 @@ int main(int argc, char** argv) {
     OutputFileStream output_file(output_filename);
 
     stf::STFInstReader reader(trace_filename);
-    stf::STFDecoder decoder0(reader.getInitialIEM());
-    stf::STFDecoder decoder1(reader.getInitialIEM());
+    stf::STFDecoder decoder0(reader);
+    stf::STFDecoder decoder1(reader);
 
     uint64_t auipc_jalr_jump{0};          // AUIPC/JALR jump (long direct)
     uint64_t auipc_jalr_return{0};        // AUIPC/JALR return (long direct return does not really make sense)

@@ -238,9 +238,9 @@ class OpcodeMap {
         }
 
     public:
-        explicit OpcodeMap(const bool return_random_for_unknown, const stf::INST_IEM iem) :
+        explicit OpcodeMap(const bool return_random_for_unknown, const stf::STFBranchReader& reader) :
             return_random_for_unknown_(return_random_for_unknown),
-            decoder_(iem)
+            decoder_(reader)
         {
         }
 
@@ -765,12 +765,12 @@ class HDF5BranchWriter {
         }
 
     public:
-        explicit HDF5BranchWriter(const std::string& filename, const bool return_random_for_unknown_target_opcode, const std::unordered_set<HDF5Field>& excluded_fields, const int32_t wkld_id, const size_t local_history_length, const stf::INST_IEM iem, const bool decode_target_opcodes) :
+        explicit HDF5BranchWriter(const std::string& filename, const bool return_random_for_unknown_target_opcode, const std::unordered_set<HDF5Field>& excluded_fields, const int32_t wkld_id, const size_t local_history_length, const stf::STFBranchReader& reader, const bool decode_target_opcodes) :
             hdf5_file_(filename.c_str(), H5F_ACC_TRUNC),
             chunk_mspace_(RANK_, CHUNK_DIM_, MAX_DIMS_),
             branch_type_(BranchType::initBranchType(excluded_fields, local_history_length, decode_target_opcodes)),
             dataset_(hdf5_file_.createDataSet(DATASET_NAME_, branch_type_, chunk_mspace_, getDataSetProps_())),
-            opcode_map_(return_random_for_unknown_target_opcode, iem),
+            opcode_map_(return_random_for_unknown_target_opcode, reader),
             wkld_id_(wkld_id),
             local_history_length_(local_history_length),
             decode_target_opcodes_(decode_target_opcodes)
@@ -840,7 +840,7 @@ void processTrace(const std::string& trace,
     static constexpr size_t CHUNK_SIZE = 1000;
 
     stf::STFBranchReader reader(trace, skip_non_user);
-    HDF5BranchWriter<CHUNK_SIZE, typename BranchTypeChooser<byte_chunks, use_unsigned_bool>::type> writer(output, always_fill_in_target_opcode, excluded_fields, wkld_id, local_history_length, reader.getInitialIEM(), decode_target_opcodes);
+    HDF5BranchWriter<CHUNK_SIZE, typename BranchTypeChooser<byte_chunks, use_unsigned_bool>::type> writer(output, always_fill_in_target_opcode, excluded_fields, wkld_id, local_history_length, reader, decode_target_opcodes);
 
     if(top_branches.empty()) {
         for(const auto& branch: reader) {

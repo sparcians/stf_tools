@@ -146,7 +146,7 @@ int main (int argc, char **argv) {
 
         // Open stf trace reader
         stf::STFInstReader stf_reader(config.trace_filename, config.skip_non_user, config.check_phys_addr);
-        stf::STFDecoder decoder(stf_reader.getInitialIEM());
+        stf::STFDecoder decoder(stf_reader);
         /* FIXME Because we have not kept up with STF versioning, this is currently broken and must be loosened.
         if (!stf_reader.checkVersion()) {
             exit(1);

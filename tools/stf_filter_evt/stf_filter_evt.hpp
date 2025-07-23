@@ -144,7 +144,7 @@ class STFEventFilter {
     public:
         STFEventFilter(const stf::STFInstReader& reader) :
             prev_inst_(reader),
-            decoder_(reader.getInitialIEM())
+            decoder_(reader)
         {
         }
 

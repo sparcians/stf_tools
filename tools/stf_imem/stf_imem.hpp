@@ -329,6 +329,7 @@ class IMemMapVec {
         bool is_rv64_ = false; /**< If true, trace is RV64 */
         stf::ISA inst_set_ = stf::ISA::RESERVED; /**< Instruction set */
         stf::INST_IEM iem_ = stf::INST_IEM::STF_INST_IEM_INVALID; /**< Instruction encoding */
+        std::string isa_string_;
 
         /**
          * Constructs an IMemMap entry
@@ -544,7 +545,7 @@ class IMemMapVec {
 
             std::multimap<SortedMapKey, SortedVector> sorted_map;
             bool first = true;
-            stf::Disassembler dis(findElfFromTrace(config.trace_filename), inst_set_, iem_, config.use_aliases);
+            stf::Disassembler dis(findElfFromTrace(config.trace_filename), inst_set_, iem_, isa_string_, config.use_aliases);
             uint64_t block_count = 0;
 
             for (auto it = imem_mapvec_.rbegin(); it != imem_mapvec_.rend(); it ++) {
@@ -666,6 +667,7 @@ class IMemMapVecIntf : public IMemMapVec {
 
             inst_set_ = stf_reader.getISA();
             iem_ = stf_reader.getInitialIEM();
+            isa_string_ = stf_reader.getISAExtendedInfo();
             is_rv64_ = iem_ == stf::INST_IEM::STF_INST_IEM_RV64;
 
             for (auto it = stf::getStartIterator<IteratorType>(stf_reader, config.skip_count, start_point, stop_point); it != stf_reader.end(); ++it) {
