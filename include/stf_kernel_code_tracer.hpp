@@ -80,7 +80,7 @@ namespace stf {
 
         KernelCodeTracer(const std::string_view trace_filename, uint64_t start_inst, uint64_t end_inst) :
             inst_reader_(trace_filename),
-            decoder_(inst_reader_.getInitialIEM())
+            decoder_(inst_reader_)
         {
             inst_reader_.checkVersion();
             ConsumeInstReader(start_inst, end_inst);

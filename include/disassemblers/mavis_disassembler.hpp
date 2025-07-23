@@ -3,6 +3,7 @@
 #include <iostream>
 #include "stf_decoder.hpp"
 #include "base_disassembler.hpp"
+#include "stf_reader.hpp"
 
 namespace stf {
     namespace disassemblers {
@@ -31,17 +32,14 @@ namespace stf {
                 /**
                  * \brief Construct a MavisDisassembler
                  */
-                explicit MavisDisassembler(const std::string&, const ISA inst_set, const INST_IEM iem, const bool use_aliases) :
-                    MavisDisassembler(inst_set, iem, use_aliases)
+                MavisDisassembler(const std::string& elf, const ISA inst_set, const INST_IEM iem, const std::string& isa_str, const bool use_aliases) :
+                    BaseDisassembler(inst_set),
+                    decoder_(inst_set, iem, isa_str, elf)
                 {
                 }
 
-                /**
-                 * \brief Construct a MavisDisassembler
-                 */
-                explicit MavisDisassembler(const ISA inst_set, const INST_IEM iem, const bool use_aliases) :
-                    BaseDisassembler(inst_set, iem, use_aliases),
-                    decoder_(iem)
+                MavisDisassembler(const std::string& elf, const STFReader& reader, const bool use_aliases) :
+                    MavisDisassembler(elf, reader.getISA(), reader.getInitialIEM(), reader.getISAExtendedInfo(), use_aliases)
                 {
                 }
 

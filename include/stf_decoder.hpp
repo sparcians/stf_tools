@@ -9,10 +9,11 @@
 #include <string_view>
 
 #include "mavis_helpers.hpp"
-#include "isa_defs.hpp"
+#include "stf_isa_defaults.hpp"
 #include "stf_valid_value.hpp"
 #include "stf_record_types.hpp"
 #include "stf_env_var.hpp"
+#include "stf_reader.hpp"
 #include "filesystem.hpp"
 #include "tools_util.hpp"
 
@@ -21,7 +22,7 @@ namespace stf {
      * \class STFDecoderBase
      * \brief Class used by STF tools to decode instructions
      */
-    template<typename InstType, typename AnnotationType>
+    template<typename InstType, typename AnnotationType, bool AllowEnvOverride>
     class STFDecoderBase {
         public:
             /**
@@ -71,6 +72,7 @@ namespace stf {
             const std::string mavis_path_;
             const std::string mavis_isa_spec_;
             const std::string isa_string_;
+            const std::string elf_;
             using ExtMan = mavis::extension_manager::riscv::RISCVExtensionManager;
             const ExtMan ext_man_;
             mutable MavisType mavis_; /**< Mavis decoder */
@@ -218,15 +220,37 @@ namespace stf {
                 static constexpr size_t size = N;
             };
 
-            static ExtMan constructExtMan_(const std::string& isa_string, const std::string& mavis_isa_spec, const std::string& mavis_path) {
-                return ExtMan::fromISA(isa_string, mavis_isa_spec, mavis_helpers::getMavisJSONPath(mavis_path));
+            static ExtMan constructExtMan_(const std::string& isa_string, const std::string& mavis_isa_spec, const std::string& mavis_path, const std::string& elf) {
+                const auto& json_path = mavis_helpers::getMavisJSONPath(mavis_path);
+
+                if(!elf.empty()) {
+                    try {
+                        return ExtMan::fromELF(elf, mavis_isa_spec, json_path);
+                    }
+                    catch(const mavis::extension_manager::ELFNotFoundException&) {
+                    }
+                    catch(const mavis::extension_manager::riscv::ISANotFoundInELFException&) {
+                    }
+                }
+
+                return ExtMan::fromISA(isa_string, mavis_isa_spec, json_path);
             }
 
-            STFDecoderBase(const std::string& mavis_path, const std::string& mavis_isa_spec, const std::string& isa_string) :
+            static inline std::string getISAString_(const std::string& isa_string) {
+                if constexpr(AllowEnvOverride) {
+                    return stf::STFEnvVar("STF_DISASM_ISA", isa_string).get();
+                }
+                else {
+                    return isa_string;
+                }
+            }
+
+            STFDecoderBase(const std::string& mavis_path, const std::string& mavis_isa_spec, const std::string& isa_string, const std::string& elf) :
                 mavis_path_(mavis_path),
                 mavis_isa_spec_(mavis_isa_spec),
                 isa_string_(isa_string),
-                ext_man_(constructExtMan_(isa_string_, mavis_isa_spec_, mavis_path_)),
+                elf_(elf),
+                ext_man_(constructExtMan_(isa_string_, mavis_isa_spec_, mavis_path_, elf_)),
                 mavis_(ext_man_.constructMavis<InstType, AnnotationType>({})),
                 ecall_uid_(lookupInstructionUID("ecall")),
                 mret_uid_(lookupInstructionUID("mret")),
@@ -240,29 +264,49 @@ namespace stf {
              * Constructs an STFDecoderBase
              * \param iem Instruction encoding
              */
-            explicit STFDecoderBase(const stf::INST_IEM iem) :
-                STFDecoderBase(iem, getDefaultPath_())
+            STFDecoderBase(const stf::ISA isa, const stf::INST_IEM iem) :
+                STFDecoderBase(getDefaultPath_(), isa, iem)
             {
             }
 
             /**
              * Constructs an STFDecoderBase
              * \param iem Instruction encoding
-             * \param mavis_path Path to Mavis checkout
-             */
-            STFDecoderBase(const stf::INST_IEM iem, const std::string& mavis_path) :
-                STFDecoderBase(iem, mavis_path, stf::STFEnvVar("STF_DISASM_ISA", stf::isa_defs::getDefaultISAString(iem)).get())
-            {
-            }
-
-            /**
-             * Constructs an STFDecoderBase
-             * \param iem Instruction encoding
-             * \param mavis_path Path to Mavis checkout
              * \param isa_string RISC-V ISA string used to configure Mavis
              */
-            STFDecoderBase(const stf::INST_IEM iem, const std::string& mavis_path, const std::string& isa_string) :
-                STFDecoderBase(mavis_path, mavis_helpers::getISASpecPath(mavis_path, iem), isa_string)
+            STFDecoderBase(const stf::ISA isa, const stf::INST_IEM iem, const std::string& isa_string, const std::string& elf = "") :
+                STFDecoderBase(getDefaultPath_(), isa, iem, isa_string)
+            {
+            }
+
+            /**
+             * Constructs an STFDecoderBase
+             * \param mavis_path Path to Mavis checkout
+             * \param iem Instruction encoding
+             */
+            STFDecoderBase(const std::string& mavis_path, const stf::ISA isa, const stf::INST_IEM iem) :
+                STFDecoderBase(mavis_path, isa, iem, stf::ISADefaults::getISAExtendedInfo(isa, iem))
+            {
+            }
+
+            /**
+             * Constructs an STFDecoderBase
+             * \param mavis_path Path to Mavis checkout
+             * \param iem Instruction encoding
+             * \param isa_string RISC-V ISA string used to configure Mavis
+             */
+            STFDecoderBase(const std::string& mavis_path, const stf::ISA isa, const stf::INST_IEM iem, const std::string& isa_string, const std::string& elf = "") :
+                STFDecoderBase(mavis_path, mavis_helpers::getISASpecPath(mavis_path, isa, iem), getISAString_(isa_string), elf)
+            {
+            }
+
+            STFDecoderBase(const std::string& mavis_path, const STFReader& reader, const std::string& elf = "") :
+                STFDecoderBase(mavis_path, reader.getISA(), reader.getInitialIEM(), reader.getISAExtendedInfo(), elf)
+            {
+            }
+
+            explicit STFDecoderBase(const STFReader& reader, const std::string& elf = "") :
+                STFDecoderBase(getDefaultPath_(), reader, elf)
             {
             }
 
@@ -273,7 +317,8 @@ namespace stf {
                 mavis_path_(rhs.mavis_path_),
                 mavis_isa_spec_(rhs.mavis_isa_spec_),
                 isa_string_(rhs.isa_string_),
-                ext_man_(constructExtMan_(isa_string_, mavis_isa_spec_, mavis_path_)),
+                elf_(rhs.elf_),
+                ext_man_(constructExtMan_(isa_string_, mavis_isa_spec_, mavis_path_, elf_)),
                 mavis_(ext_man_.constructMavis<InstType, AnnotationType>({})),
                 ecall_uid_(lookupInstructionUID("ecall")),
                 mret_uid_(lookupInstructionUID("mret")),
@@ -778,56 +823,41 @@ namespace stf {
             }
     };
 
-    class STFDecoder : public STFDecoderBase<mavis_helpers::InstType, mavis_helpers::DummyAnnotationType> {
-        public:
-            explicit STFDecoder(const stf::INST_IEM iem) :
-                STFDecoderBase(iem)
-            {
-            }
+    template<bool AllowEnvOverride>
+    class STFDecoderImpl : public STFDecoderBase<mavis_helpers::InstType, mavis_helpers::DummyAnnotationType, AllowEnvOverride> {
+        private:
+            using ParentType = STFDecoderBase<mavis_helpers::InstType, mavis_helpers::DummyAnnotationType, AllowEnvOverride>;
 
-            /**
-             * Constructs an STFDecoderBase
-             * \param iem Instruction encoding
-             * \param mavis_path Path to Mavis checkout
-             */
-            STFDecoder(const stf::INST_IEM iem, const std::string& mavis_path) :
-                STFDecoderBase(iem, mavis_path)
-            {
-            }
+        public:
+            using ParentType::ParentType;
 
             template<typename T>
-            STFDecoder& decode(const T& op) {
-                decode_(op);
+            STFDecoderImpl& decode(const T& op) {
+                ParentType::decode_(op);
                 return *this;
             }
     };
 
-    class STFDecoderFull : public STFDecoderBase<mavis_helpers::InstType, mavis_helpers::AnnotationType> {
-        public:
-            explicit STFDecoderFull(const stf::INST_IEM iem) :
-                STFDecoderBase(iem)
-            {
-            }
+    template<bool AllowEnvOverride>
+    class STFDecoderFullImpl : public STFDecoderBase<mavis_helpers::InstType, mavis_helpers::AnnotationType, AllowEnvOverride> {
+        private:
+            using ParentType = STFDecoderBase<mavis_helpers::InstType, mavis_helpers::AnnotationType, AllowEnvOverride>;
 
-            /**
-             * Constructs an STFDecoderFull
-             * \param iem Instruction encoding
-             * \param mavis_path Path to Mavis checkout
-             */
-            STFDecoderFull(const stf::INST_IEM iem, const std::string& mavis_path) :
-                STFDecoderBase(iem, mavis_path)
-            {
-            }
+        public:
+            using ParentType::ParentType;
 
             template<typename T>
-            STFDecoderFull& decode(const T& op) {
-                decode_(op);
+            STFDecoderFullImpl& decode(const T& op) {
+                ParentType::decode_(op);
                 return *this;
             }
 
             const auto& getAnnotation() const {
-                return getDecodeInfo_()->uinfo;
+                return ParentType::getDecodeInfo_()->uinfo;
             }
     };
 
+    using STFDecoder = STFDecoderImpl<true>;
+    using STFDecoderStrict = STFDecoderImpl<false>;
+    using STFDecoderFull = STFDecoderFullImpl<true>;
 } // end namespace stf

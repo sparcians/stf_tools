@@ -10,6 +10,7 @@
 
 #include <memory>
 #include "stf_env_var.hpp"
+#include "stf_reader.hpp"
 
 #ifdef ENABLE_BINUTILS_DISASM
     #include "disassemblers/binutils_disassembler.hpp"
@@ -57,8 +58,9 @@ namespace stf {
             Disassembler(const std::string& elf,
                          const ISA inst_set,
                          const INST_IEM iem,
+                         const std::string& isa_str,
                          const bool use_aliases) :
-                BaseDisassembler(inst_set, iem, use_aliases)
+                BaseDisassembler(inst_set)
             {
                 STFValidatedEnvVar disasm_var("STF_DISASM",
                                               {"MAVIS",
@@ -68,8 +70,10 @@ namespace stf {
                                               },
                                               DEFAULT_DISASM_BACKEND);
                 if(const auto& disasm = disasm_var.get(); disasm == "MAVIS") {
-                    dis_ = std::make_unique<disassemblers::MavisDisassembler>(inst_set,
+                    dis_ = std::make_unique<disassemblers::MavisDisassembler>(elf,
+                                                                              inst_set,
                                                                               iem,
+                                                                              isa_str,
                                                                               use_aliases);
                 }
 #ifdef ENABLE_BINUTILS_DISASM
@@ -77,12 +81,20 @@ namespace stf {
                     dis_ = std::make_unique<disassemblers::BinutilsDisassembler>(elf,
                                                                                  inst_set,
                                                                                  iem,
+                                                                                 isa_str,
                                                                                  use_aliases);
                 }
 #endif
                 else {
                     stf_throw("Invalid disassembler backend specified: " << disasm);
                 }
+            }
+
+            Disassembler(const std::string& elf,
+                         const STFReader& reader,
+                         const bool use_aliases) :
+                Disassembler(elf, reader.getISA(), reader.getInitialIEM(), reader.getISAExtendedInfo(), use_aliases)
+            {
             }
     };
 #else

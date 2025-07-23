@@ -6,8 +6,8 @@
 
 #include "base_disassembler.hpp"
 #include "binutils_wrapper.hpp"
-#include "isa_defs.hpp"
 #include "stf_enums.hpp"
+#include "stf_reader.hpp"
 
 namespace stf {
     namespace disassemblers {
@@ -39,7 +39,9 @@ namespace stf {
                 /**
                  * \brief Construct a BinutilsDisassembler
                  */
-                explicit BinutilsDisassembler(const std::string& elf, const ISA inst_set, const INST_IEM iem, const bool use_aliases);
+                BinutilsDisassembler(const std::string& elf, const ISA inst_set, const INST_IEM iem, const std::string& isa_str, const bool use_aliases);
+
+                BinutilsDisassembler(const std::string& elf, const STFReader& reader, const bool use_aliases);
 
                 ~BinutilsDisassembler();
         };

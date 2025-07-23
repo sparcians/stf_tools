@@ -408,14 +408,25 @@ namespace mavis_helpers {
             }
     };
 
-    static inline std::string getISASpecJSON(const stf::INST_IEM iem) {
-        switch(iem) {
-            case stf::INST_IEM::STF_INST_IEM_RV32:
-            case stf::INST_IEM::STF_INST_IEM_RV64:
-                return "riscv_isa_spec.json";
-            case stf::INST_IEM::STF_INST_IEM_INVALID:
-            case stf::INST_IEM::STF_INST_IEM_RESERVED:
+    static inline std::string getISASpecJSON(const stf::ISA isa, const stf::INST_IEM iem) {
+        switch(isa) {
+            case stf::ISA::RISCV:
+                switch(iem) {
+                    case stf::INST_IEM::STF_INST_IEM_RV32:
+                    case stf::INST_IEM::STF_INST_IEM_RV64:
+                        return "riscv_isa_spec.json";
+                    case stf::INST_IEM::STF_INST_IEM_INVALID:
+                    case stf::INST_IEM::STF_INST_IEM_RESERVED:
+                        break;
+                }
                 break;
+            case stf::ISA::ARM:
+            case stf::ISA::X86:
+            case stf::ISA::POWER:
+                stf_throw("Unimplemented ISA: " << isa);
+            case stf::ISA::RESERVED:
+            case stf::ISA::__RESERVED_END:
+                stf_throw("Invalid ISA: " << isa);
         }
 
         stf_throw("Invalid IEM: " << iem);
@@ -425,8 +436,8 @@ namespace mavis_helpers {
         return fs::path(mavis_path) / "json";
     }
 
-    static inline fs::path getISASpecPath(const std::string& mavis_path, const stf::INST_IEM iem) {
-        return getMavisJSONPath(mavis_path) / getISASpecJSON(iem);
+    static inline fs::path getISASpecPath(const std::string& mavis_path, const stf::ISA isa, const stf::INST_IEM iem) {
+        return getMavisJSONPath(mavis_path) / getISASpecJSON(isa, iem);
     }
 
 } // end namespace mavis_helpers

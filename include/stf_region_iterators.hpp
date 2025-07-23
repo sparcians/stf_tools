@@ -109,7 +109,7 @@ namespace stf {
                                                                       uint32_t start_opcode,
                                                                       uint32_t stop_opcode) {
                 if(start_opcode == 0 || stop_opcode == 0) {
-                    STFDecoder decoder(reader.getInitialIEM());
+                    STFDecoder decoder(reader);
 
                     if(start_opcode == 0) {
                         start_opcode = decoder.getStartTracepointOpcode();

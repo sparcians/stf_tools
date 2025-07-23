@@ -331,7 +331,7 @@ namespace binutils_wrapper {
             }
 
             static inline disassembler_ftype initDisasmFunc_(const std::string& elf,
-                                                             const char* default_isa) {
+                                                             const std::string& default_isa) {
                 std::string isa_str;
                 if(!elf.empty()) {
                     try {
@@ -368,7 +368,7 @@ namespace binutils_wrapper {
         public:
             DisassemblerInternals(const std::string& elf,
                                   const unsigned long bfd_mach,
-                                  const char* default_isa,
+                                  const std::string& default_isa,
                                   const bool use_aliases) :
                 disasm_func_(initDisasmFunc_(elf, default_isa))
             {
@@ -423,9 +423,15 @@ namespace stf {
         BinutilsDisassembler::BinutilsDisassembler(const std::string& elf,
                                                    const ISA inst_set,
                                                    const INST_IEM iem,
+                                                   const std::string& isa_str,
                                                    const bool use_aliases) :
-            BaseDisassembler(inst_set, iem, use_aliases),
-            dis_(std::make_unique<binutils_wrapper::DisassemblerInternals>(elf, getBfdMach_(iem), isa_defs::getDefaultISAString(iem), use_aliases))
+            BaseDisassembler(inst_set),
+            dis_(std::make_unique<binutils_wrapper::DisassemblerInternals>(elf, getBfdMach_(iem), isa_str, use_aliases))
+        {
+        }
+
+        BinutilsDisassembler::BinutilsDisassembler(const std::string& elf, const STFReader& reader, const bool use_aliases) :
+            BinutilsDisassembler(elf, reader.getISA(), reader.getInitialIEM(), reader.getISAExtendedInfo(), use_aliases)
         {
         }
 
