@@ -229,7 +229,7 @@ int main (int argc, char **argv) {
             if(STF_EXPECT_FALSE(decoder.decodeFailed() && prev_events.empty())) {
                 ecount.countError(ErrorCode::DECODER_FAILURE);
                 auto& msg = ecount.reportError(ErrorCode::DECODER_FAILURE);
-                stf::format_utils::formatDecLeft(msg, inst.index(), MAX_COUNT_LENGTH);
+                stf::format_utils::formatDecLeft(msg, inst_prev.index(), MAX_COUNT_LENGTH);
                 msg << " Failed to decode instruction." << std::endl;
             }
 
@@ -256,7 +256,7 @@ int main (int argc, char **argv) {
                     ecount.countError(ErrorCode::MISS_MEM);
                     ecount.countError(ErrorCode::MISS_MEM_LOAD);
                     auto& msg = ecount.reportError(ErrorCode::MISS_MEM_LOAD);
-                    stf::format_utils::formatDecLeft(msg, inst.index(), MAX_COUNT_LENGTH);
+                    stf::format_utils::formatDecLeft(msg, inst_prev.index(), MAX_COUNT_LENGTH);
                     msg << " Load instruction missing memory access record in stf." << std::endl;
                 }
             }
@@ -283,7 +283,7 @@ int main (int argc, char **argv) {
                     ecount.countError(ErrorCode::MISS_MEM);
                     ecount.countError(ErrorCode::MISS_MEM_STR);
                     auto& msg = ecount.reportError(ErrorCode::MISS_MEM_STR);
-                    stf::format_utils::formatDecLeft(msg, inst.index(), MAX_COUNT_LENGTH);
+                    stf::format_utils::formatDecLeft(msg, inst_prev.index(), MAX_COUNT_LENGTH);
                     msg << " Store instruction missing memory access record in stf." << std::endl;
                 }
             }
