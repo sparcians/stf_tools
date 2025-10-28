@@ -99,7 +99,5 @@ set(STF_INSTALL_TARGETS
 
 include(stf_extra_tools.cmake OPTIONAL)
 
-if(STF_INSTALL_DIR)
-    install(TARGETS ${STF_INSTALL_TARGETS}
-            DESTINATION ${STF_INSTALL_DIR})
-endif()
+install(TARGETS ${STF_INSTALL_TARGETS}
+        DESTINATION ${STF_INSTALL_DIR})

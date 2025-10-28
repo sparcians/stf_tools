@@ -52,6 +52,10 @@ setup_stf_linker(true)
 set (DISABLE_STF_DOXYGEN ON)
 set (DISABLE_STF_TESTS ON)
 
+if(NOT STF_INSTALL_DIR)
+    set(STF_INSTALL_DIR bin)
+endif()
+
 if(NOT DISABLE_STF_PYTHON_LIB)
     if(NOT STFPY_INSTALL_DIR)
         set(STFPY_INSTALL_DIR ${STF_INSTALL_DIR})
@@ -71,3 +75,8 @@ add_subdirectory(lib)
 add_subdirectory(tools)
 
 add_subdirectory(examples)
+
+set(CPACK_GENERATOR "ZIP")
+set(CPACK_PACKAGE_DIRECTORY ${PROJECT_BINARY_DIR}/package)
+
+include(CPack)
