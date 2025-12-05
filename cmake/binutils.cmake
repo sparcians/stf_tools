@@ -21,12 +21,11 @@ else()
         set(BINUTILS_REPO git://sourceware.org/git/binutils-gdb.git)
 
         set(BINUTILS_PATCHES
-            ${STF_TOOLS_PATCHES_DIR}/riscv-binutils-gdb/0001-Add-riscv_get_disassembler_arch-function.patch
             ${STF_TOOLS_PATCHES_DIR}/riscv-binutils-gdb/0002-Make-it-possible-to-override-opcodes_error_handler.patch
         )
 
         # Set tag
-        set(BINUTILS_TAG binutils-2_44)
+        set(BINUTILS_TAG binutils-2_45_1)
     endif()
 
     message("-- Building binutils from ${BINUTILS_REPO}, tag ${BINUTILS_TAG}")

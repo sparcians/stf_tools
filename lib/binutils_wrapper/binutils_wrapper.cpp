@@ -1,5 +1,5 @@
 extern "C" {
-#include "config.h"
+#include "binutils_c_wrapper.h"
 }
 
 #include <array>
@@ -18,23 +18,23 @@ extern "C" {
 #include "format_utils.hpp"
 #include "util.hpp"
 
-#define OVERRIDE_OPCODES_ERROR_HANDLER 1
-
-extern "C" {
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wconversion"
-#pragma GCC diagnostic ignored "-Wpragmas"
-#pragma GCC diagnostic ignored "-Wpedantic"
-#include "disassemble.h"
-#include "elf-bfd.h"
-#include "elf/riscv.h"
-#include "bfdver.h"
-#pragma GCC diagnostic pop
-}
-
 #if BFD_VERSION >= 239000000
     #define ENABLE_STYLED_FPRINTF_WRAPPER
 #endif
+
+class RISCVXExtensionMissingVersion : public std::exception
+{
+    private:
+        std::string extension_;
+
+    public:
+        explicit RISCVXExtensionMissingVersion(const char* extension) :
+            extension_(extension)
+        {
+        }
+
+        const std::string& getExtension() const { return extension_; }
+};
 
 static inline int varListFormatter(const char** output_str, const char* format, va_list args) {
     static constexpr size_t INITIAL_BUF_SIZE = 32;
@@ -64,13 +64,31 @@ static inline int varListFormatter(const char** output_str, const char* format, 
 
 // cppcheck-suppress unusedFunction
 void opcodes_error_handler(const char* fmt, ...) {
-    const char* formatted_str;
     va_list args;
-    va_start(args, fmt);
-    varListFormatter(&formatted_str, fmt, args);
-    va_end(args);
 
-    stf_throw("Error encountered in BFD library: " + std::string(formatted_str));
+    // This error message is defined and checked in lib/binutils_wrapper/CMakeLists.txt
+    // If it changes, building this library should fail
+    if(strcmp(fmt, BINUTILS_XEXT_VERSION_ERROR_MESSAGE) == 0)
+    {
+        va_start(args, fmt);
+        char* extension = va_arg(args, char*);
+        va_end(args);
+        const RISCVXExtensionMissingVersion ex(extension);
+        // The calling function makes a copy of the extension string and would ordinarily free it after
+        // the error handler function returns
+        // Since we're about to throw an exception, we'll take care of freeing it ourselves
+        free(static_cast<void*>(extension));
+        throw ex;
+    }
+    else
+    {
+        const char* formatted_str;
+        va_start(args, fmt);
+        varListFormatter(&formatted_str, fmt, args);
+        va_end(args);
+
+        stf_throw("Error encountered in BFD library: " + std::string(formatted_str));
+    }
 }
 
 namespace binutils_wrapper {
@@ -330,29 +348,144 @@ namespace binutils_wrapper {
                 return 0;
             }
 
-            static inline disassembler_ftype initDisasmFunc_(const std::string& elf,
-                                                             const std::string& default_isa) {
-                std::string isa_str;
-                if(!elf.empty()) {
-                    try {
-                        Bfd bfd(elf);
-                        if(auto* attr = bfd.getAttributes()) {
-                            isa_str = attr[Tag_RISCV_arch].s;
-                        }
-                    }
-                    catch(const Bfd::ElfNotFoundException&) {
-                    }
+            void freePrivateData_() const {
+                if(dis_info_.private_data) {
+                    disassemble_free_riscv(&dis_info_);
+                    free(dis_info_.private_data);
+                    dis_info_.private_data = nullptr;
                 }
-
-                if(isa_str.empty()) {
-                    isa_str = stf::STFEnvVar("STF_DISASM_ISA", default_isa).get();
-                }
-
-                return riscv_get_disassembler_arch(nullptr, isa_str.c_str());
             }
 
-            //! Disassembler function pointer
-            const disassembler_ftype disasm_func_;
+            template<typename SetupFunc>
+            void binutilsSetupRetryWrapper_(SetupFunc&& setup_func) const {
+                bool success = false;
+
+                do {
+                    try {
+                        setup_func();
+                        success = true;
+                    }
+                    catch(const RISCVXExtensionMissingVersion& ex) {
+                        dummy_bfd_.addDefaultVersionToExtension(ex.getExtension());
+                        freePrivateData_();
+                    }
+                }
+                while(!success);
+            }
+
+            // Populates *just enough* libbfd fields for the disassembler to successfully grab
+            // the ISA string as if this was a valid ELF
+            class ISAStringBFD
+            {
+                private:
+                    inline static const char* OBJ_ATTRS_SECTION_ = ".RISCV.attributes";
+
+                    std::string isa_string_;
+                    elf_backend_data backend_data_;
+                    bfd_target target_;
+                    elf_obj_tdata elf_tdata_;
+                    bfd bfd_;
+                    asection section_;
+
+                    static inline std::string initISAString_(const std::string& elf,
+                                                             const std::string& default_isa) {
+                        std::string isa_str;
+                        if(!elf.empty()) {
+                            try {
+                                Bfd bfd(elf);
+                                if(auto* attr = bfd.getAttributes()) {
+                                    isa_str = attr[Tag_RISCV_arch].s;
+                                }
+                            }
+                            catch(const Bfd::ElfNotFoundException&) {
+                            }
+                        }
+
+                        if(isa_str.empty()) {
+                            isa_str = stf::STFEnvVar("STF_DISASM_ISA", default_isa).get();
+                        }
+
+                        return isa_str;
+                    }
+
+                    void updateISAStringPointer_() {
+                        elf_tdata_.known_obj_attributes[OBJ_ATTR_PROC][Tag_RISCV_arch].s = isa_string_.data();
+                    }
+
+                public:
+                    ISAStringBFD(const std::string& elf, const std::string& default_isa) :
+                        isa_string_(initISAString_(elf, default_isa))
+                    {
+                        backend_data_.obj_attrs_section = OBJ_ATTRS_SECTION_;
+
+                        target_.flavour = bfd_target_elf_flavour;
+                        target_.backend_data = static_cast<void*>(&backend_data_);
+
+                        auto* riscv_attrs = elf_tdata_.known_obj_attributes[OBJ_ATTR_PROC];
+                        riscv_attrs[Tag_RISCV_priv_spec].i = 0;
+                        riscv_attrs[Tag_RISCV_priv_spec_minor].i = 0;
+                        riscv_attrs[Tag_RISCV_priv_spec_revision].i = 0;
+                        updateISAStringPointer_();
+
+                        init_section_hash_table(&bfd_);
+                        bfd_hash_lookup(&bfd_.section_htab, OBJ_ATTRS_SECTION_, true, false);
+
+                        bfd_.xvec = &target_;
+                        bfd_.tdata.elf_obj_data = &elf_tdata_;
+
+                        section_.owner = &bfd_;
+                        section_.flags |= SEC_CODE;
+                    }
+
+                    ~ISAStringBFD() {
+                        bfd_hash_table_free(&bfd_.section_htab);
+                    }
+
+                    void addDefaultVersionToExtension(const std::string& extension) {
+                        size_t pos = 0;
+                        size_t ext_end = 0;
+
+                        do {
+                            // Find the next occurrence of the extension string
+                            pos = isa_string_.find(extension, pos);
+
+                            stf_assert(pos > 0, "Extension " << extension << " cannot occur at the beginning of an ISA string");
+
+                            stf_assert(
+                                pos != std::string::npos,
+                                "Extension " << extension <<
+                                " is missing a version but is not present in the ISA string: " << isa_string_
+                            );
+
+                            // Get one-past the end of the extension substring
+                            ext_end = pos + extension.size();
+
+                            stf_assert(ext_end <= isa_string_.size());
+
+                            // If the extension substring is not the beginning of the string, it should have an _ before it
+                            // If it's not at the end of the string, it should have an _ after it
+                            // Otherwise, we found a longer extension name that contains the extension we're actually trying to find
+                            if((isa_string_[pos - 1] != '_') || (ext_end != isa_string_.size() && isa_string_[ext_end] != '_')) {
+                                // Jump ahead to the end of this match so we can search again
+                                pos = ext_end;
+                            }
+                            else {
+                                break;
+                            }
+                        }
+                        while(true);
+
+                        // Add a default version number to the end of the extension
+                        isa_string_.insert(ext_end, "1p0");
+                        updateISAStringPointer_();
+                    }
+
+                    asection* getSectionPtr() { return &section_; }
+
+                    bfd* getBFDPtr() { return &bfd_; }
+            };
+
+            mutable ISAStringBFD dummy_bfd_;
 
             //! Disassemble information needed by the binutils disassembler
             mutable struct disassemble_info dis_info_;
@@ -363,15 +496,16 @@ namespace binutils_wrapper {
             //! The PC of the opcode held in the 4 byte opcode memory
             mutable uint64_t opcode_pc_ = 0;
 
-            mutable UnTabStream dismStr_;
+            mutable UnTabStream stream_;
 
         public:
             DisassemblerInternals(const std::string& elf,
                                   const unsigned long bfd_mach,
                                   const std::string& default_isa,
                                   const bool use_aliases) :
-                disasm_func_(initDisasmFunc_(elf, default_isa))
+                dummy_bfd_(elf, default_isa)
             {
+
                 init_disassemble_info (
                     &dis_info_,
                     0,
@@ -380,24 +514,48 @@ namespace binutils_wrapper {
                     , static_cast<fprintf_styled_ftype>(fprintf_styled_wrapper_)
 #endif
                 );
+
                 dis_info_.read_memory_func = readMemoryWrapper_;
                 dis_info_.application_data = static_cast<void*>(this);
+                dis_info_.arch = bfd_arch_riscv;
                 dis_info_.mach = bfd_mach;
-                dis_info_.stream = static_cast<void *>(&dismStr_);
+                dis_info_.section = dummy_bfd_.getSectionPtr();
+                dis_info_.stream = static_cast<void *>(&stream_);
                 if (!use_aliases) {
                     dis_info_.disassembler_options = "no-aliases,numeric";
                 }
+
                 disassemble_init_for_target(&dis_info_);
+
+                // For binutils versions >= 2.45, print_insn_riscv automatically
+                // sets up the disassembler
+                // For older versions, we have to call riscv_get_disassembler
+#if BFD_VERSION < 245000000
+                binutilsSetupRetryWrapper_([this]() {
+                    riscv_get_disassembler(dummy_bfd_.getBFDPtr());
+                });
+#endif
+            }
+
+            ~DisassemblerInternals() {
+                freePrivateData_();
             }
 
             bool disassemble(std::ostream& os,
                              const uint64_t pc,
                              const uint32_t opcode) const {
-                dismStr_.reset(os);
+                stream_.reset(os);
                 opcode_pc_ = pc;
                 copyU32_(opcode_mem_, opcode);
+#if BFD_VERSION >= 245000000
+                binutilsSetupRetryWrapper_([this]() {
+                    print_insn_riscv(opcode_pc_, &dis_info_);
+                });
+#else
                 print_insn_riscv(opcode_pc_, &dis_info_);
-                return dismStr_.hasUnknownDisasm();
+#endif
+
+                return stream_.hasUnknownDisasm();
             }
     };
 }
