@@ -50,3 +50,7 @@ Different RISC-V ISA extensions can be activated by setting the `STF_DISASM_ISA`
 The Mavis disassembly backend can be selected by setting the environment variable `STF_DISASM=MAVIS`.
 
 Building binutils can optionally be disabled by running `cmake` with `-DDISABLE_BINUTILS=1`. In this case the tools will automatically default to using Mavis.
+
+## Tool Documentation
+
+See [the tool READMEs](tools/README.md) for documentation of what tools exist, their purpose, and their usage.

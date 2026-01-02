@@ -1,0 +1,9 @@
+- category: viewer
+  toc_name: Viewers
+  description: Tools in this category present the contents of a trace in a human-readable text format.
+- category: analyzer
+  toc_name: Analyzers
+  description: These tools scan a trace for particular architectural features or behaviors and present the results in a tabular format.
+- category: utility
+  toc_name: Utilities
+  description: These are miscellaneous tools for error checking, querying/modifyng trace files, etc.

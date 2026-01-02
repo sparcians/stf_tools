@@ -1,0 +1,3 @@
+description: Counts all possible conditional operations (conditional forward branch over 1 instruction) in a trace
+note: Requires an ELF or flat binary for full analysis
+category: analyzer

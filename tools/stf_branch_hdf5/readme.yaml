@@ -1,0 +1,2 @@
+description: Creates an HDF5 with every branch from a trace, including operand values, branch type, comparison type, history, etc. for further analysis
+category: analyzer

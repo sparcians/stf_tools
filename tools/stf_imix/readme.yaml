@@ -1,0 +1,2 @@
+description: Counts the instruction mix in a trace, breaking down by Mavis instruction class or mnemonic
+category: analyzer

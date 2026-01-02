@@ -1,0 +1,2 @@
+description: Counts AUIPC/JALR and LUI/JALR fusion opportunities in a trace
+category: analyzer

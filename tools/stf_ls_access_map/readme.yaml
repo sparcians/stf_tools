@@ -1,0 +1,2 @@
+description: Collects memory access statistics by cache line and 4k region
+category: analyzer

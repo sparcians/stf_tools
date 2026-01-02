@@ -1,0 +1,2 @@
+description: Generates a BT9 branch trace (used in the [CBP-5 branch predictor competition](https://jilp.org/cbp2016/))
+category: analyzer
