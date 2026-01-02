@@ -8,6 +8,6 @@ else()
     set(EXTRA_MAVIS_COMPILER_FLAGS )
 endif()
 
-target_compile_options(mavis PRIVATE -Wno-shorten-64-to-32 -Wno-sign-conversion -Wno-conversion ${EXTRA_MAVIS_COMPILER_FLAGS})
+target_compile_options(mavis PRIVATE -Wno-pedantic -Wno-shorten-64-to-32 -Wno-sign-conversion -Wno-conversion ${EXTRA_MAVIS_COMPILER_FLAGS})
 
 install(DIRECTORY ${MAVIS_DIRECTORY}/json DESTINATION ${STF_INSTALL_DIR}/../share/stf_tools/mavis)
