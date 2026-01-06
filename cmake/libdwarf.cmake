@@ -28,7 +28,7 @@ ExternalProject_Add(
 ExternalProject_Add_Step(libdwarf_build
                          autoreconf
                          WORKING_DIRECTORY <SOURCE_DIR>
-                         COMMAND ${CMAKE_COMMAND} -E env CC=${CMAKE_C_COMPILER} CXX=${CMAKE_CXX_COMPILER} CFLAGS=${BINUTILS_CFLAGS} CPPFLAGS=${BINUTILS_CFLAGS} CXXFLAGS=${BINUTILS_CXXFLAGS} LDFLAGS=${BINUTILS_LDFLAGS} autoreconf -f -i
+                         COMMAND ${CMAKE_COMMAND} -E env CC=${CMAKE_C_COMPILER} CXX=${CMAKE_CXX_COMPILER} CFLAGS=${LIBDWARF_CFLAGS} CPPFLAGS=${LIBDWARF_CFLAGS} CXXFLAGS=${LIBDWARF_CXXFLAGS} LDFLAGS=${LIBDWARF_LDFLAGS} autoreconf -f -i
                          DEPENDEES download
                          DEPENDERS configure)
 
