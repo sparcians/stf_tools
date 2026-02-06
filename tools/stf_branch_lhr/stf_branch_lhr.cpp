@@ -9,7 +9,6 @@
 #include "print_utils.hpp"
 #include "stf_branch_reader.hpp"
 #include "command_line_parser.hpp"
-#include <boost/multiprecision/cpp_int.hpp>
 
 void processCommandLine(int argc,
                         char** argv,

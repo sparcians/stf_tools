@@ -1,8 +1,4 @@
-include_guard(DIRECTORY)
+include(mavis_global_path OPTIONAL)
 
-include(${STF_TOOLS_CMAKE_DIR}/mavis.cmake)
-include(${STF_TOOLS_CMAKE_DIR}/stf_elf.cmake)
-
-include(isa_overrides OPTIONAL)
-
-set(STF_LINK_LIBS ${STF_LINK_LIBS} mavis)
+add_library(stf_decoder INTERFACE)
+target_link_libraries(stf_decoder INTERFACE mavis)

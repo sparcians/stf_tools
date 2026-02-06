@@ -1,8 +1,7 @@
+add_library(stf_disasm INTERFACE)
+target_link_libraries(stf_disasm INTERFACE binutils_wrapper stf_decoder)
+
 if(NOT DISABLE_BINUTILS)
-    set(STF_LINK_LIBS ${STF_LINK_LIBS} binutils_wrapper)
-    add_compile_definitions(ENABLE_BINUTILS_DISASM)
+    target_link_libraries(stf_disasm INTERFACE binutils_wrapper)
+    target_compile_definitions(stf_disasm INTERFACE ENABLE_BINUTILS_DISASM)
 endif()
-
-include(isa_overrides OPTIONAL)
-
-include(${STF_TOOLS_CMAKE_DIR}/stf_decoder.cmake)

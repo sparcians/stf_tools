@@ -1,3 +1,2 @@
-include(${STF_TOOLS_CMAKE_DIR}/stf_elf.cmake)
-include_directories(${LIBDWARF_INCLUDE_DIRS}/libdwarf-0)
-set(STF_LINK_LIBS ${STF_LINK_LIBS} libdwarf)
+add_library(stf_symbol_table INTERFACE)
+target_link_libraries(stf_symbol_table INTERFACE elfio libdwarf)

@@ -1,1 +1,2 @@
-include_directories(${STF_INCLUDE_DIRS} ${STF_TOOL_DIR}/../dtl)
+add_library(dtl INTERFACE)
+target_include_directories(dtl INTERFACE ${STF_TOOLS_BASE}/dtl)

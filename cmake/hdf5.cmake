@@ -2,16 +2,17 @@ set(HDF5_USE_STATIC_LIBRARIES 0)
 
 find_package (HDF5 1.10 REQUIRED COMPONENTS CXX)
 
-include_directories (SYSTEM ${HDF5_C_INCLUDE_DIRS} ${HDF5_CXX_INCLUDE_DIRS})
-set(STF_LINK_LIBS ${STF_LINK_LIBS} ${HDF5_CXX_LIBRARIES})
+add_library(stf_hdf5 INTERFACE)
+target_include_directories (stf_hdf5 INTERFACE SYSTEM ${HDF5_C_INCLUDE_DIRS} ${HDF5_CXX_INCLUDE_DIRS})
+target_link_libraries(stf_hdf5 INTERFACE ${HDF5_CXX_LIBRARIES})
 
 if(HDF5_IS_PARALLEL)
     find_package(MPI REQUIRED COMPONENTS CXX)
-    include_directories (SYSTEM ${MPI_CXX_INCLUDE_DIRS})
-    set(STF_LINK_LIBS ${STF_LINK_LIBS} MPI::MPI_CXX)
+    target_include_directories (stf_hdf5 INTERFACE SYSTEM ${MPI_CXX_INCLUDE_DIRS})
+    target_link_libraries(stf_hdf5 INTERFACE MPI::MPI_CXX)
     message (STATUS "Using MPI ${MPI_CXX_VERSION}")
 endif()
 
 if(STATIC_BUILD)
-    set(STF_LINK_LIBS ${STF_LINK_LIBS} aec)
+    target_link_libraries(stf_hdf5 INTERFACE aec)
 endif()

@@ -1,16 +1,21 @@
 set (STF_TOOL_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 
-include(GitVersionGenerator)
-git_version_generator("${CMAKE_CURRENT_SOURCE_DIR}/trace_tools_git_version.cpp.in"
-                      "${CMAKE_CURRENT_BINARY_DIR}/trace_tools_git_version.cpp"
-                      "TRACE_TOOLS_GIT_SHA1")
+include(lto)
+enable_lto()
+
+include(StfGitVersionGenerator)
+stf_git_version_generator("${CMAKE_CURRENT_SOURCE_DIR}/trace_tools_git_version.cpp.in"
+                          "${CMAKE_CURRENT_BINARY_DIR}/trace_tools_git_version.cpp"
+                          "TRACE_TOOLS_GIT_SHA1")
 
 add_library(trace_tools_version "${CMAKE_CURRENT_BINARY_DIR}/trace_tools_git_version.cpp")
+target_link_libraries(trace_tools_version stf_tools_base)
 
-set (STF_LINK_LIBS ${EXTRA_LIBS} ${STF_LINK_LIBS} trace_tools_version stdc++)
+add_library(stf_tools_libs INTERFACE)
+target_link_libraries(stf_tools_libs INTERFACE ${EXTRA_LIBS} trace_tools_version stdc++)
 
 if(STATIC_BUILD)
-    add_link_options(-static -static-libstdc++ -static-libgcc)
+    target_link_options(stf_tools_libs INTERFACE -static -static-libstdc++ -static-libgcc)
 endif()
 
 add_subdirectory(stf_dump)

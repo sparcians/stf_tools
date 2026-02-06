@@ -2,6 +2,9 @@ include_guard(GLOBAL)
 
 include(ExternalProject)
 
+# libdwarf requires libz, liblzma, and libbz2
+find_package(ZLIB REQUIRED)
+
 set(LIBDWARF_CFLAGS ${CMAKE_C_FLAGS})
 set(LIBDWARF_CXXFLAGS ${CMAKE_CXX_FLAGS})
 set(LIBDWARF_LDFLAGS ${CMAKE_EXE_LINKER_FLAGS})
@@ -10,6 +13,14 @@ if (CMAKE_BUILD_TYPE MATCHES "^[Dd]ebug")
     set(LIBDWARF_CFLAGS "${LIBDWARF_CFLAGS} -O0 -g")
     set(LIBDWARF_CXXFLAGS "${LIBDWARF_CXXFLAGS} -O0 -g")
     set(LIBDWARF_LDFLAGS "${LIBDWARF_LDFLAGS} -Wl,-O0")
+elseif(CMAKE_BUILD_TYPE MATCHES "^[Ff]ast[De]bug")
+    set(LIBDWARF_CFLAGS "${LIBDWARF_CFLAGS} -O3 -g")
+    set(LIBDWARF_CXXFLAGS "${LIBDWARF_CXXFLAGS} -O3 -g")
+    set(LIBDWARF_LDFLAGS "${LIBDWARF_LDFLAGS} -Wl,-O3 -g")
+else()
+    set(LIBDWARF_CFLAGS "${LIBDWARF_CFLAGS} -O3")
+    set(LIBDWARF_CXXFLAGS "${LIBDWARF_CXXFLAGS} -O3")
+    set(LIBDWARF_LDFLAGS "${LIBDWARF_LDFLAGS} -Wl,-O3")
 endif()
 
 # Set tag
@@ -40,6 +51,8 @@ set(LIBDWARF_LIB_DIR ${INSTALL_DIR}/lib)
 
 add_library(libdwarf STATIC IMPORTED GLOBAL)
 set_target_properties(libdwarf PROPERTIES IMPORTED_LOCATION ${INSTALL_DIR}/lib/libdwarf.a)
+target_link_libraries(libdwarf INTERFACE ZLIB::ZLIB)
+target_include_directories(libdwarf INTERFACE ${LIBDWARF_INCLUDE_DIRS}/libdwarf-0)
 add_dependencies(libdwarf libdwarf_build)
 
 unset(SOURCE_DIR)

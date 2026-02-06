@@ -11,13 +11,7 @@ if(STATIC_BUILD)
     set(CMAKE_FIND_LIBRARY_SUFFIXES ".a")
 endif()
 
-# Boost
-find_package (Boost 1.75.0 REQUIRED COMPONENTS json)
-find_package (RapidJSON REQUIRED)
-include_directories (SYSTEM ${Boost_INCLUDE_DIRS} ${RapidJSON_INCLUDE_DIR})
-
-set (STF_TOOLS_BASE ${CMAKE_CURRENT_SOURCE_DIR})
-include_directories(${STF_TOOLS_BASE}/include)
+set(STF_TOOLS_BASE ${CMAKE_CURRENT_SOURCE_DIR})
 set(STF_TOOLS_CMAKE_DIR ${STF_TOOLS_BASE}/cmake)
 set(STF_TOOLS_PATCHES_DIR ${STF_TOOLS_BASE}/patches)
 set(STF_LIB_CMAKE_DIR ${STF_TOOLS_BASE}/stf_lib/cmake)
@@ -40,15 +34,9 @@ endif()
 
 include(std_filesystem)
 
-include(stf_linker_setup)
-
 include(binutils)
 
 include(libdwarf)
-
-set(FULL_LTO true)
-
-setup_stf_linker(true)
 
 set (DISABLE_STF_DOXYGEN ON)
 set (DISABLE_STF_TESTS ON)
@@ -67,11 +55,19 @@ endif()
 
 add_subdirectory(stf_lib)
 
-include_directories(${STF_BASE}/stf-inc)
-
-include(${STF_TOOLS_CMAKE_DIR}/mavis_setup.cmake)
+add_library(stf_tools_base INTERFACE)
+target_include_directories(stf_tools_base INTERFACE ${STF_TOOLS_BASE}/include)
+target_link_libraries(stf_tools_base INTERFACE stf)
 
 add_subdirectory(lib)
+
+include(mavis)
+include(dtl)
+include(rapidjson)
+include(stf_decoder)
+include(disassembler)
+include(hdf5)
+include(stf_symbol_table)
 
 add_subdirectory(tools)
 
