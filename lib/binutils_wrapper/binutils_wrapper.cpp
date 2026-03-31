@@ -379,6 +379,7 @@ namespace binutils_wrapper {
             {
                 private:
                     inline static const char* OBJ_ATTRS_SECTION_ = ".RISCV.attributes";
+                    inline static const char* SECTION_NAME_ = ".disasm";
 
                     std::string isa_string_;
                     elf_backend_data backend_data_;
@@ -435,6 +436,7 @@ namespace binutils_wrapper {
 
                         section_.owner = &bfd_;
                         section_.flags |= SEC_CODE;
+                        section_.name = SECTION_NAME_;
                     }
 
                     ~ISAStringBFD() {
