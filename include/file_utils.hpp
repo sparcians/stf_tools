@@ -4,6 +4,7 @@
 #include <cstring>
 #include <fstream>
 #include <iostream>
+#include <optional>
 #include <stdexcept>
 #include <sstream>
 #include <unistd.h>
@@ -167,6 +168,13 @@ class OutputFileManager {
         }
 
         void copyTempToDestination_() const {
+            std::optional<fs::perms> final_outfile_perms;
+
+            // Back up the permissions on the output file if it already exists
+            if(fs::exists(final_outfile_)) {
+                final_outfile_perms = fs::status(final_outfile_).permissions();
+            }
+
             try {
                 fs::rename(outfile_, final_outfile_);
             }
@@ -176,6 +184,11 @@ class OutputFileManager {
                 }
                 fs::copy_file(outfile_, final_outfile_, fs::copy_options::overwrite_existing);
                 fs::remove(outfile_);
+            }
+
+            // Restore permissions
+            if(final_outfile_perms) {
+                fs::permissions(final_outfile_, final_outfile_perms.value());
             }
         }
 
