@@ -389,12 +389,12 @@ namespace mavis_helpers {
                     stf_assert(parent_form_it != mnemonic_map_.end(), "Failed to find mnemonic in map for instruction: " << boost::json::serialize(inst));
 
                     const auto& parent_form_str = parent_form_it->second;
-                    form_ = mavis::FormRegistry::getFormWrapper(parent_form_str);
+                    form_ = mavis::FormRegistry::findFormWrapper(parent_form_str).get();
                     mnemonic_map_.try_emplace(mnemonic_it->value().as_string(), std::string_view(parent_form_str));
                 }
                 else {
                     auto form_str = boost::json::value_to<std::string>(form_it->value());
-                    form_ = mavis::FormRegistry::getFormWrapper(form_str);
+                    form_ = mavis::FormRegistry::findFormWrapper(form_str).get();
                     mnemonic_map_.try_emplace(mnemonic_it->value().as_string(), std::move(form_str));
                 }
             }
