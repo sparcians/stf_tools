@@ -22,16 +22,6 @@ if(NOT EXISTS ${STF_TOOLS_BASE}/stf_lib/.git)
     message(FATAL_ERROR "stf_lib hasn't been checked out. Please run git submodule update --init --recursive")
 endif()
 
-add_compile_options(-Werror -fPIC -g -Wall -Wextra -pedantic -Wconversion -Wno-unused-parameter -Wno-unused-function -pipe)
-
-if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    add_compile_options(-Wno-gnu-zero-variadic-macro-arguments)
-
-    if (CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 19.0)
-        add_compile_options(-Wno-c++20-extensions)
-    endif()
-endif()
-
 include(std_filesystem)
 
 include(binutils)
@@ -58,6 +48,16 @@ add_subdirectory(stf_lib)
 add_library(stf_tools_base INTERFACE)
 target_include_directories(stf_tools_base INTERFACE ${STF_TOOLS_BASE}/include)
 target_link_libraries(stf_tools_base INTERFACE stf)
+
+target_compile_options(stf_tools_base INTERFACE -Werror -Wall -Wextra -pedantic -Wconversion -Wno-unused-parameter -Wno-unused-function -pipe)
+
+if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    target_compile_options(stf_tools_base INTERFACE -Wno-gnu-zero-variadic-macro-arguments)
+
+    if (CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 19.0)
+        target_compile_options(stf_tools_base INTERFACE -Wno-c++20-extensions)
+    endif()
+endif()
 
 add_subdirectory(lib)
 
