@@ -2,6 +2,7 @@
 
 #include <bitset>
 #include <cstdlib>
+#include <filesystem>
 #include <mavis/DecoderTypes.h>
 #include <mavis/extension_managers/RISCVExtensionManager.hpp>
 #include <memory>
@@ -14,7 +15,6 @@
 #include "stf_record_types.hpp"
 #include "stf_env_var.hpp"
 #include "stf_reader.hpp"
-#include "filesystem.hpp"
 #include "tools_util.hpp"
 
 namespace stf {
@@ -131,7 +131,7 @@ namespace stf {
                 static constexpr std::string_view DEFAULT_RELATIVE_JSON_PATH_ = "../../../mavis"; /**< Default path to Mavis JSON files if building locally*/
 
                 const auto mavis_path_env = getenv("MAVIS_PATH");
-                if(mavis_path_env && fs::exists(mavis_path_env)) {
+                if(mavis_path_env && std::filesystem::exists(mavis_path_env)) {
                     return std::string(mavis_path_env);
                 }
 
@@ -139,7 +139,7 @@ namespace stf {
 
                 const auto relative_path = exe_dir / DEFAULT_RELATIVE_JSON_PATH_;
 
-                if(fs::exists(relative_path)) {
+                if(std::filesystem::exists(relative_path)) {
                     return relative_path;
                 }
 
@@ -147,20 +147,20 @@ namespace stf {
 
                 const auto share_relative_path = exe_dir / SHARE_RELATIVE_JSON_PATH_;
 
-                if(fs::exists(share_relative_path)) {
+                if(std::filesystem::exists(share_relative_path)) {
                     return share_relative_path;
                 }
 
                 static constexpr std::string_view SHARE_GLOBAL_JSON_PATH_ = "/usr/share/stf_tools/mavis";
 
-                if(fs::exists(SHARE_GLOBAL_JSON_PATH_)) {
+                if(std::filesystem::exists(SHARE_GLOBAL_JSON_PATH_)) {
                     return std::string(SHARE_GLOBAL_JSON_PATH_);
                 }
 
 #ifdef MAVIS_GLOBAL_PATH
                 static constexpr std::string_view DEFAULT_GLOBAL_JSON_PATH_ = MAVIS_GLOBAL_PATH; /**< Default path to globally installed Mavis JSON files*/
 
-                if(fs::exists(DEFAULT_GLOBAL_JSON_PATH_)) {
+                if(std::filesystem::exists(DEFAULT_GLOBAL_JSON_PATH_)) {
                     return std::string(DEFAULT_GLOBAL_JSON_PATH_);
                 }
 #endif

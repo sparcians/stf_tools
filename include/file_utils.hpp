@@ -2,13 +2,13 @@
 #define __FILE_UTILS_HPP__
 
 #include <cstring>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <optional>
 #include <stdexcept>
 #include <sstream>
 #include <unistd.h>
-#include "filesystem.hpp"
 #include "format_utils.hpp"
 #include "stf_exception.hpp"
 
@@ -144,7 +144,7 @@ class OutputFileManager {
 
     private:
         void assertNonexistentOutput_(const std::string_view file) {
-            if(STF_EXPECT_FALSE(!allow_overwrite_ && fs::exists(file))) {
+            if(STF_EXPECT_FALSE(!allow_overwrite_ && std::filesystem::exists(file))) {
                 std::ostringstream msg;
                 msg << "Output file " << file << " already exists.";
                 throw FileExistsException(msg.str());
@@ -152,8 +152,8 @@ class OutputFileManager {
         }
 
         void createTemporaryIfNeeded_(const std::string_view infile, const std::string_view outfile) {
-            if(fs::exists(outfile) && fs::equivalent(infile, outfile)) {
-                const auto filename_ext = fs::path(outfile).extension().string();
+            if(std::filesystem::exists(outfile) && std::filesystem::equivalent(infile, outfile)) {
+                const auto filename_ext = std::filesystem::path(outfile).extension().string();
                 std::string temp_filename(TEMP_FILENAME_BASE_);
                 temp_filename += filename_ext;
 
@@ -168,27 +168,27 @@ class OutputFileManager {
         }
 
         void copyTempToDestination_() const {
-            std::optional<fs::perms> final_outfile_perms;
+            std::optional<std::filesystem::perms> final_outfile_perms;
 
             // Back up the permissions on the output file if it already exists
-            if(fs::exists(final_outfile_)) {
-                final_outfile_perms = fs::status(final_outfile_).permissions();
+            if(std::filesystem::exists(final_outfile_)) {
+                final_outfile_perms = std::filesystem::status(final_outfile_).permissions();
             }
 
             try {
-                fs::rename(outfile_, final_outfile_);
+                std::filesystem::rename(outfile_, final_outfile_);
             }
-            catch(const fs::filesystem_error& e) {
+            catch(const std::filesystem::filesystem_error& e) {
                 if(e.code().value() != EXDEV) {
                     throw;
                 }
-                fs::copy_file(outfile_, final_outfile_, fs::copy_options::overwrite_existing);
-                fs::remove(outfile_);
+                std::filesystem::copy_file(outfile_, final_outfile_, std::filesystem::copy_options::overwrite_existing);
+                std::filesystem::remove(outfile_);
             }
 
             // Restore permissions
             if(final_outfile_perms) {
-                fs::permissions(final_outfile_, final_outfile_perms.value());
+                std::filesystem::permissions(final_outfile_, final_outfile_perms.value());
             }
         }
 

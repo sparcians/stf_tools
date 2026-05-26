@@ -1,3 +1,4 @@
+#include <filesystem>
 #include <iostream>
 #include <map>
 
@@ -6,7 +7,6 @@
 #include <rapidjson/writer.h>
 
 #include "command_line_parser.hpp"
-#include "filesystem.hpp"
 #include "print_utils.hpp"
 #include "stf_reader.hpp"
 #include "stf_record_types.hpp"
@@ -120,7 +120,7 @@ int main(int argc, char* argv[]) {
             rapidjson::Value traces_json(rapidjson::kArrayType);
             for(const auto& pp: p.second) {
                 process_num_insts += pp.second;
-                traces_json.PushBack(rapidjson::Value(fs::path(traces[pp.first]).filename().c_str(), d_alloc).Move(),
+                traces_json.PushBack(rapidjson::Value(std::filesystem::path(traces[pp.first]).filename().c_str(), d_alloc).Move(),
                                      d_alloc);
             }
             process_json.AddMember("num_insts", process_num_insts, d_alloc);
@@ -181,7 +181,7 @@ int main(int argc, char* argv[]) {
                                                         INSTRUCTION_COUNT_COLUMN_WIDTH +
                                                         COLUMN_SEPARATOR_WIDTH);
                     }
-                    ss << fs::path(traces[pp.first]).filename().c_str() << std::endl;
+                    ss << std::filesystem::path(traces[pp.first]).filename().c_str() << std::endl;
                 }
             }
             stf::print_utils::printDec(process_num_insts, INSTRUCTION_COUNT_COLUMN_WIDTH, ' ');

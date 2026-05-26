@@ -2,11 +2,11 @@ include_guard(GLOBAL)
 
 include(ExternalProject)
 
-include(binutils_internal OPTIONAL)
-
 if(DISABLE_BINUTILS)
     message("-- Disabling binutils support")
 else()
+    include(binutils_internal OPTIONAL)
+
     set(BINUTILS_CFLAGS "${CMAKE_C_FLAGS} -Wno-unknown-warning-option -Wno-format-truncation")
     set(BINUTILS_CXXFLAGS "${CMAKE_CXX_FLAGS} -Wno-unknown-warning-option -Wno-format-truncation")
     set(BINUTILS_LDFLAGS ${CMAKE_EXE_LINKER_FLAGS})

@@ -22,8 +22,6 @@ if(NOT EXISTS ${STF_TOOLS_BASE}/stf_lib/.git)
     message(FATAL_ERROR "stf_lib hasn't been checked out. Please run git submodule update --init --recursive")
 endif()
 
-include(std_filesystem)
-
 include(binutils)
 
 include(libdwarf)

@@ -1,10 +1,10 @@
 #pragma once
 
+#include <filesystem>
 #include <limits>
 #include <ostream>
 #include <boost/json.hpp>
 #include <mavis/Mavis.h>
-#include "filesystem.hpp"
 #include "stf_enums.hpp"
 #include "stf_enum_utils.hpp"
 #include "stf_exception.hpp"
@@ -432,11 +432,11 @@ namespace mavis_helpers {
         stf_throw("Invalid IEM: " << iem);
     }
 
-    static inline fs::path getMavisJSONPath(const std::string& mavis_path) {
-        return fs::path(mavis_path) / "json";
+    static inline std::filesystem::path getMavisJSONPath(const std::string& mavis_path) {
+        return std::filesystem::path(mavis_path) / "json";
     }
 
-    static inline fs::path getISASpecPath(const std::string& mavis_path, const stf::ISA isa, const stf::INST_IEM iem) {
+    static inline std::filesystem::path getISASpecPath(const std::string& mavis_path, const stf::ISA isa, const stf::INST_IEM iem) {
         return getMavisJSONPath(mavis_path) / getISASpecJSON(isa, iem);
     }
 

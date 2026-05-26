@@ -1,5 +1,5 @@
 add_library(stf_disasm INTERFACE)
-target_link_libraries(stf_disasm INTERFACE binutils_wrapper stf_decoder)
+target_link_libraries(stf_disasm INTERFACE stf_decoder)
 
 if(NOT DISABLE_BINUTILS)
     target_link_libraries(stf_disasm INTERFACE binutils_wrapper)

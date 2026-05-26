@@ -1,6 +1,7 @@
 #pragma once
 
 #include <algorithm>
+#include <filesystem>
 #include <iostream>
 #include <ostream>
 #include <string>
@@ -10,7 +11,6 @@
 #include <mach-o/dyld.h>
 #endif
 
-#include "filesystem.hpp"
 #include "stf.hpp"
 #include "trace_tools_git_version.hpp"
 #include "stf_enum_utils.hpp"
@@ -83,7 +83,7 @@ inline uint64_t log2(const uint64_t x) {
     return NUM_U64_BITS - static_cast<uint64_t>(__builtin_clzl(x)) - 1;
 }
 
-inline fs::path getExecutablePath() {
+inline std::filesystem::path getExecutablePath() {
 #ifdef __APPLE__ // OSX
     static constexpr uint32_t DEFAULT_BUF_SIZE = 256;
     uint32_t buf_size = DEFAULT_BUF_SIZE;
@@ -97,14 +97,14 @@ inline fs::path getExecutablePath() {
 
     const char* const relative_path = path_buf.get();
 
-    // fs::read_symlink will throw an exception if it isn't a symlink, so check first
-    if(!fs::is_symlink(relative_path)) {
-        return fs::canonical(relative_path);
+    // std::filesystem::read_symlink will throw an exception if it isn't a symlink, so check first
+    if(!std::filesystem::is_symlink(relative_path)) {
+        return std::filesystem::canonical(relative_path);
     }
 #else // Linux
     static const char* const relative_path = "/proc/self/exe"; // always a symlink
 #endif
-    return fs::canonical(fs::read_symlink(relative_path));
+    return std::filesystem::canonical(std::filesystem::read_symlink(relative_path));
 }
 
 inline std::string findElfFromTrace(const std::string& trace) {
