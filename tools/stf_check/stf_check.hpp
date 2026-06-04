@@ -507,6 +507,7 @@ struct STFCheckConfig {
     bool check_phys_addr = true; /**< Whether we should check physical addresses */
     bool continue_on_error = false; /**< Whether we should continue on an error */
     bool always_print_error_counts = false; /**< Whether we should always print error counts at the end */
+    bool trace_contains_process_switches = false; /**< If false, treat process switches in the trace as discontinuities */
     uint64_t end_inst = 0; /**< If > 0, stop checking after this many instructions */
     std::unordered_set<ErrorCode> ignored_errors; /*< Contains error codes that should be ignored */
 };

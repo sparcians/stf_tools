@@ -14,6 +14,7 @@ usage: stf_check [options] <trace>
     -n                skip checking for physical address
     -v                always print error counts at the end
     -e <M>            end checking at M-th instruction
+    -S                trace does not contain process switch code (i.e., process switches are trace discontinuities)
     -i <err>          ignore the specified error type
     <trace>           trace in STF format
 ```

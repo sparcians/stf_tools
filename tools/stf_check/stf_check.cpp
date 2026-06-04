@@ -54,6 +54,7 @@ static STFCheckConfig parse_command_line (int argc, char **argv) {
     parser.addFlag('n', "skip checking for physical address");
     parser.addFlag('v', "always print error counts at the end");
     parser.addFlag('e', "M", "end checking at M-th instruction");
+    parser.addFlag('S', "trace does not contain process switch code (i.e., process switches are trace discontinuities)");
     parser.addMultiFlag('i', "err", "ignore the specified error type");
     parser.addPositionalArgument("trace", "trace in STF format");
 
@@ -65,6 +66,7 @@ static STFCheckConfig parse_command_line (int argc, char **argv) {
     config.check_phys_addr = !parser.hasArgument('n');
     parser.getArgumentValue('e', config.end_inst);
     config.always_print_error_counts = parser.hasArgument('v');
+    config.trace_contains_process_switches = !parser.hasArgument('S');
     for(const auto& err: parser.getMultipleValueArgument('i')) {
         config.ignored_errors.insert(parseErrorCode(err));
     }
@@ -204,14 +206,17 @@ int main (int argc, char **argv) {
                 msg << std::endl;
             }
 
-            hw_tid = inst.hwtid();
-            pid = inst.pid();
-            tid = inst.tid();
-            thread_id = std::make_tuple(hw_tid, pid, tid);
-            thread_switch = (tid != tid_prev || pid != pid_prev || hw_tid != hw_tid_prev);
-            hw_tid_prev = hw_tid;
-            pid_prev = pid;
-            tid_prev = tid;
+            if(!config.trace_contains_process_switches)
+            {
+                hw_tid = inst.hwtid();
+                pid = inst.pid();
+                tid = inst.tid();
+                thread_id = std::make_tuple(hw_tid, pid, tid);
+                thread_switch = (tid != tid_prev || pid != pid_prev || hw_tid != hw_tid_prev);
+                hw_tid_prev = hw_tid;
+                pid_prev = pid;
+                tid_prev = tid;
+            }
             const auto& inst_prev = thread_pc_prev[thread_id];
             decoder.decode(inst_prev.opcode());
 
