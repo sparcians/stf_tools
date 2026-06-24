@@ -132,6 +132,9 @@ void processTrace_(const STFDumpConfig& config, const StartStopType start_point 
         stf::print_utils::printLabel("INST_IEM");
         std::cout << stf_reader.getInitialIEM() << std::endl;
 
+        stf::print_utils::printLabel("VLEN");
+        std::cout << stf_reader.getVLen() << std::endl;
+
         stf::print_utils::printLabel("INST_EXT");
         std::cout << stf_reader.getISAExtendedInfo() << std::endl;
 
