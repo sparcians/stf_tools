@@ -25,6 +25,11 @@ else()
         set(BINUTILS_LDFLAGS "${BINUTILS_LDFLAGS} -Wl,-O3")
     endif()
 
+    if(APPLE)
+	set(BINUTILS_CFLAGS "${BINUTILS_CFLAGS} -UTARGET_OS_MAC")
+	set(BINUTILS_CXXFLAGS "${BINUTILS_CXXFLAGS} -UTARGET_OS_MAC")
+    endif()
+
     if(NOT USE_INTERNAL_BINUTILS)
         set(BINUTILS_REPO git://sourceware.org/git/binutils-gdb.git)
 
