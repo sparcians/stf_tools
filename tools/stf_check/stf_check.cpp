@@ -330,7 +330,8 @@ int main (int argc, char **argv) {
                                                                              return event.targetValid();
                                                                         });
 
-                    valid_jump = last_event_with_target_it != prev_events.rend() && last_event_with_target_it->getTarget() == inst.pc();
+                    valid_jump = (last_event_with_target_it != prev_events.rend() && last_event_with_target_it->getTarget() == inst.pc()) ||
+                                 (decoder.isExceptionReturn() && inst.isCoF()); // Allow exception returns to use FORCE_PC records instead of Events
                 }
 
                 if(STF_EXPECT_FALSE(!valid_jump)) {
